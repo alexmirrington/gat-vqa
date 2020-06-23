@@ -1,0 +1,5 @@
+[flake8]
+max-line-length = 80
+select = C,E,F,W,B950
+# Consider ignoring E203 and W503 as per https://black.readthedocs.io/en/stable/the_black_code_style.html
+ignore = E501
