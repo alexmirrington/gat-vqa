@@ -2,3 +2,5 @@ pre-commit
 pylint
 pytest
 pytest-cov
+termcolor
+torch
