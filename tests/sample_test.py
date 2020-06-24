@@ -5,5 +5,5 @@ import unittest
 class SampleTest(unittest.TestCase):
     """Container class for sample test cases."""
 
-    def test_sample(self):
+    def test_sample(self) -> None:
         """Assert the unittest module mounts correctly."""
