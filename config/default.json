@@ -1,3 +1,7 @@
 {
-  "dataset": "gqa"
+  "dataset": {
+    "name": "gqa",
+    "split": "train",
+    "version": "all"
+  }
 }

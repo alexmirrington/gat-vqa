@@ -8,6 +8,7 @@ import torch
 from termcolor import colored
 
 from graphgen.config import Config
+from graphgen.datasets.gqa import GQAQuestions
 
 
 def main(config: Config) -> None:
@@ -28,7 +29,11 @@ def main(config: Config) -> None:
     device = torch.device("cuda" if cuda else "cpu")
     print(f"device: {torch.cuda.get_device_name(device) if cuda else 'CPU'}")
 
+    root = "/home/alex/documents/hdd/arch/datasets/gqa"
+
     print(config)
+    dataset = GQAQuestions(root, config.dataset.split, config.dataset.version)
+    print(dataset[0])
 
 
 def parse_args() -> argparse.Namespace:

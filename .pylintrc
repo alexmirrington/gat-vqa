@@ -129,7 +129,9 @@ disable=print-statement,
 # Ignore pydocstyle duplicates
         missing-module-docstring,
         missing-class-docstring,
-        missing-function-docstring
+        missing-function-docstring,
+# Ignore indentation problems, as these are fixed by black
+        bad-continuation
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
