@@ -1,9 +1,8 @@
-"""Classes and enums for storing configuration-related information."""
+"""Classes and enums for storing dataset-related configuration information."""
 from dataclasses import dataclass
 from enum import Enum
-from typing import Union
 
-from .datasets.gqa import GQASplit, GQAVersion
+from ..datasets.gqa import GQASplit, GQAVersion
 
 
 class DatasetName(Enum):
@@ -30,10 +29,3 @@ class GQADatasetConfig(DatasetConfig):
         """Perform post-init checks on the name field."""
         if self.name != DatasetName.GQA:
             raise ValueError(f"Field {self.name=} must be equal to {DatasetName.GQA}")
-
-
-@dataclass(frozen=True)
-class Config:
-    """A class containing configuration information such as model parameters."""
-
-    dataset: Union[GQADatasetConfig]
