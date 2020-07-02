@@ -1,34 +1,19 @@
 """A torch-compatible GQA dataset implementation."""
-from enum import Enum
 from pathlib import Path
 from typing import Any
 
 import torch.utils.data
 
+from ..config.gqa import GQAFilemap, GQASplit, GQAVersion
 from .utilities import ChunkedJSONDataset
-
-
-class GQASplit(Enum):
-    """An enum specifying possible values for GQA dataset splits."""
-
-    TRAIN = "train"
-    VAL = "val"
-    DEV = "testdev"
-    TEST = "test"
-    CHALLENGE = "challenge"
-
-
-class GQAVersion(Enum):
-    """An enum specifying possible values for GQA dataset versions."""
-
-    BALANCED = "balanced"
-    ALL = "all"
 
 
 class GQAQuestions(torch.utils.data.Dataset):  # type: ignore
     """A torch-compatible dataset that retrieves GQA question samples."""
 
-    def __init__(self, root: Path, split: GQASplit, version: GQAVersion) -> None:
+    def __init__(
+        self, root: Path, split: GQASplit, version: GQAVersion, _: GQAFilemap
+    ) -> None:
         """Initialise a `GQAQuestions` instance.
 
         Params:

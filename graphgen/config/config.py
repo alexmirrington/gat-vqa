@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Union
 
-from .dataset import GQADatasetConfig
+from .gqa import GQADatasetConfig
 
 
 @dataclass(frozen=True)

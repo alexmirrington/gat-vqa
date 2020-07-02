@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from graphgen.datasets.gqa import GQAQuestions, GQASplit, GQAVersion
+from graphgen.config.gqa import GQAFilemap, GQASplit, GQAVersion
+from graphgen.datasets.gqa import GQAQuestions
 
 _SPLIT_VERSION_GRID = [(split, version) for split in GQASplit for version in GQAVersion]
 
@@ -67,37 +68,41 @@ def test_questions_nonexistent_root(tmp_path: Path) -> None:
     """Ensure a dataset instance cannot be created with a non-existent root."""
     root = tmp_path / "gqa"
     with pytest.raises(ValueError):
-        GQAQuestions(root, GQASplit.TRAIN, GQAVersion.BALANCED)
+        GQAQuestions(root, GQASplit.TRAIN, GQAVersion.BALANCED, GQAFilemap())
 
 
 def test_questions_valid_symlink_root(tmp_path: Path, gqa_data: Path) -> None:
     """Ensure a dataset instance can be created with a symlinked root."""
     ln_root = tmp_path / "link"
     ln_root.symlink_to(gqa_data)
-    GQAQuestions(ln_root, GQASplit.TRAIN, GQAVersion.BALANCED)
+    GQAQuestions(ln_root, GQASplit.TRAIN, GQAVersion.BALANCED, GQAFilemap())
 
 
 def test_questions_valid_directory_root(gqa_data: Path) -> None:
     """Ensure a dataset instance can be created with a regular directory root."""
-    GQAQuestions(gqa_data, GQASplit.TRAIN, GQAVersion.BALANCED)
+    GQAQuestions(gqa_data, GQASplit.TRAIN, GQAVersion.BALANCED, GQAFilemap())
 
 
 def test_questions_invalid_root_type() -> None:
     """Ensure a dataset instance cannot be created with an invalid root type."""
     with pytest.raises(TypeError):
-        GQAQuestions("gqa", GQASplit.TRAIN, GQAVersion.BALANCED)  # type: ignore
+        GQAQuestions(
+            "gqa", GQASplit.TRAIN, GQAVersion.BALANCED, GQAFilemap()  # type: ignore
+        )
 
 
 def test_questions_invalid_split_type(gqa_data: Path) -> None:
     """Ensure a dataset instance cannot be created with an invalid split type."""
     with pytest.raises(TypeError):
-        GQAQuestions(gqa_data, "train", GQAVersion.BALANCED)  # type: ignore
+        GQAQuestions(
+            gqa_data, "train", GQAVersion.BALANCED, GQAFilemap()  # type: ignore
+        )
 
 
 def test_questions_invalid_version_type(gqa_data: Path) -> None:
     """Ensure a dataset instance cannot be created with an invalid version type."""
     with pytest.raises(TypeError):
-        GQAQuestions(gqa_data, GQASplit.TRAIN, "balanced")  # type: ignore
+        GQAQuestions(gqa_data, GQASplit.TRAIN, "balanced", GQAFilemap())  # type: ignore
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
@@ -109,7 +114,7 @@ def test_questions_nonexistent_question_json(
     root.mkdir()
 
     with pytest.raises(ValueError):
-        GQAQuestions(root, split, version)
+        GQAQuestions(root, split, version, GQAFilemap())
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
@@ -117,7 +122,7 @@ def test_questions_version_property(
     gqa_data: Path, split: GQASplit, version: GQAVersion
 ) -> None:
     """Ensure the `version` property is immutable and returns a correct value."""
-    dataset = GQAQuestions(gqa_data, split, version)
+    dataset = GQAQuestions(gqa_data, split, version, GQAFilemap())
     assert dataset.version == version
 
 
@@ -126,7 +131,7 @@ def test_questions_split_property(
     gqa_data: Path, split: GQASplit, version: GQAVersion
 ) -> None:
     """Ensure the `split` property is immutable and returns a correct value."""
-    dataset = GQAQuestions(gqa_data, split, version)
+    dataset = GQAQuestions(gqa_data, split, version, GQAFilemap())
     assert dataset.split == split
 
 
@@ -135,7 +140,7 @@ def test_questions_root_property(
     gqa_data: Path, split: GQASplit, version: GQAVersion
 ) -> None:
     """Ensure the `root` property is immutable and returns a correct value."""
-    dataset = GQAQuestions(gqa_data, split, version)
+    dataset = GQAQuestions(gqa_data, split, version, GQAFilemap())
     assert dataset.root == gqa_data
 
 
@@ -144,14 +149,14 @@ def test_questions_getitem(
     gqa_data: Path, split: GQASplit, version: GQAVersion
 ) -> None:
     """Ensure an item is returned given valid GQA data."""
-    dataset = GQAQuestions(gqa_data, split, version)
+    dataset = GQAQuestions(gqa_data, split, version, GQAFilemap())
     _ = dataset[0]
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
 def test_questions_len(gqa_data: Path, split: GQASplit, version: GQAVersion) -> None:
     """Ensure an item is returned given valid GQA data."""
-    dataset = GQAQuestions(gqa_data, split, version)
+    dataset = GQAQuestions(gqa_data, split, version, GQAFilemap())
     length = len(dataset)
     assert isinstance(length, int)
     assert length > 0

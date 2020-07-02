@@ -33,7 +33,10 @@ def main(config: Config) -> None:
 
     print(config)
     dataset = GQAQuestions(
-        config.dataset.root, config.dataset.split, config.dataset.version
+        config.dataset.root,
+        config.dataset.split,
+        config.dataset.version,
+        config.dataset.filemap,
     )
     print(dataset[0])
 
