@@ -37,3 +37,5 @@ repos:
   rev: v0.781
   hooks:
   - id: mypy
+    pass_filenames: false
+    args: [., --config-file, .mypy.ini]
