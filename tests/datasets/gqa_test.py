@@ -82,6 +82,24 @@ def test_questions_valid_directory_root(gqa_data: Path) -> None:
     GQAQuestions(gqa_data, GQASplit.TRAIN, GQAVersion.BALANCED)
 
 
+def test_questions_invalid_root_type() -> None:
+    """Ensure a dataset instance cannot be created with an invalid root type."""
+    with pytest.raises(TypeError):
+        GQAQuestions("gqa", GQASplit.TRAIN, GQAVersion.BALANCED)  # type: ignore
+
+
+def test_questions_invalid_split_type(gqa_data: Path) -> None:
+    """Ensure a dataset instance cannot be created with an invalid split type."""
+    with pytest.raises(TypeError):
+        GQAQuestions(gqa_data, "train", GQAVersion.BALANCED)  # type: ignore
+
+
+def test_questions_invalid_version_type(gqa_data: Path) -> None:
+    """Ensure a dataset instance cannot be created with an invalid version type."""
+    with pytest.raises(TypeError):
+        GQAQuestions(gqa_data, GQASplit.TRAIN, "balanced")  # type: ignore
+
+
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
 def test_questions_nonexistent_question_json(
     tmp_path: Path, split: GQASplit, version: GQAVersion

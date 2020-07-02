@@ -43,6 +43,17 @@ class GQAQuestions(torch.utils.data.Dataset):  # type: ignore
         None
         """
         super().__init__()
+        if not isinstance(root, Path):
+            raise TypeError(f"Parameter {root=} must be of type {Path.__name__}.")
+
+        if not isinstance(split, GQASplit):
+            raise TypeError(f"Parameter {split=} must be of type {GQASplit.__name__}.")
+
+        if not isinstance(version, GQAVersion):
+            raise TypeError(
+                f"Parameter {version=} must be of type {GQAVersion.__name__}."
+            )
+
         if not root.exists() or not root.is_dir():
             raise ValueError(f"Parameter {root=} must be a directory.")
 
