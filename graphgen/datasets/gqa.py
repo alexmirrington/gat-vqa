@@ -1,6 +1,7 @@
 """A torch-compatible GQA dataset implementation."""
 import os.path
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 import torch.utils.data
@@ -28,7 +29,7 @@ class GQAVersion(Enum):
 class GQAQuestions(torch.utils.data.Dataset):  # type: ignore
     """A torch-compatible dataset that retrieves GQA question samples."""
 
-    def __init__(self, root: str, split: GQASplit, version: GQAVersion) -> None:
+    def __init__(self, root: Path, split: GQASplit, version: GQAVersion) -> None:
         """Initialise a `GQAQuestions` instance.
 
         Params:
@@ -42,6 +43,9 @@ class GQAQuestions(torch.utils.data.Dataset):  # type: ignore
         None
         """
         super().__init__()
+        if not root.exists() or not root.is_dir():
+            raise ValueError(f"Parameter {root=} must be a directory.")
+
         self._root = root
         self._split = split
         self._version = version
@@ -52,28 +56,22 @@ class GQAQuestions(torch.utils.data.Dataset):  # type: ignore
         )
 
     def _init_filemap(self) -> Any:
-        return {
-            "questions": {
-                split: {
-                    version: os.path.join(
-                        self.root,
-                        "questions",
-                        f"{split.value}_{version.value}_questions",
-                    )
-                    if split == GQASplit.TRAIN and version == GQAVersion.ALL
-                    else os.path.join(
-                        self.root,
-                        "questions",
-                        f"{split.value}_{version.value}_questions.json",
-                    )
-                    for version in GQAVersion
-                }
-                for split in GQASplit
-            }
-        }
+        filemap: Any = {"questions": {}}
+        for split in GQASplit:
+            filemap["questions"][split] = {}
+            for version in GQAVersion:
+                path = self._root / "questions"
+                if split == GQASplit.TRAIN and version == GQAVersion.ALL:
+                    path = path / f"{split.value}_{version.value}_questions"
+                else:
+                    path = path / f"{split.value}_{version.value}_questions.json"
+                if not os.path.exists(path):
+                    raise ValueError(f"No file or folder exists at path {path=}")
+                filemap["questions"][split][version] = path
+        return filemap
 
     @property
-    def root(self) -> str:
+    def root(self) -> Path:
         """Get the dataset root directory."""
         return self._root
 

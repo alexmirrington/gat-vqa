@@ -1,6 +1,6 @@
 """Dataset abstractions and other data-related utilities."""
 import json
-import os
+from pathlib import Path
 from typing import Any, Dict, Tuple
 
 import torch.utils.data
@@ -9,7 +9,7 @@ import torch.utils.data
 class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
     """A torch-compatible dataset that loads data from one or more JSON files."""
 
-    def __init__(self, root: str) -> None:
+    def __init__(self, root: Path) -> None:
         """Initialise a `ChunkedJSONDataset` instance.
 
         Params:
@@ -26,11 +26,10 @@ class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
         self._root = root
         self._chunk_cache = None
 
-        self._chunk_map: Dict[str, Tuple[str, ...]] = {}
-        if os.path.isdir(self._root):
+        self._chunk_map: Dict[Path, Tuple[str, ...]] = {}
+        if self._root.is_dir():
             self._chunk_map = {
-                os.path.join(self._root, name): ()
-                for name in sorted(os.listdir(self._root))
+                self._root / name: () for name in sorted(self._root.iterdir())
             }
         else:
             self._chunk_map = {self._root: ()}
@@ -42,12 +41,9 @@ class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
                 self._chunk_map[chunk_name] = tuple(chunk_data.keys())
                 self._chunk_cache = {chunk_name: chunk_data}
                 del chunk_data
-                print(os.path.relpath(chunk_name, self._root))
-                print(self._chunk_map[chunk_name][:10])
-                print(self._chunk_cache[chunk_name][self._chunk_map[chunk_name][0]])
 
-    def get_chunk_name_and_local_index(self, index: int) -> Tuple[str, int]:
-        """Get the name of the chunk containing the data item at index `index`.
+    def get_chunk_path_and_local_index(self, index: int) -> Tuple[Path, int]:
+        """Get the path of the chunk containing the data item at index `index`.
 
         Params:
         -------
@@ -67,15 +63,15 @@ class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
             if cumulative_count <= index < cumulative_count + len(chunk_keys):
                 return chunk_name, index - cumulative_count
         raise ValueError(
-            f"Parameter {index=} must be less than or equal to the total ",
-            "number of keys across all chunks",
+            f"Parameter {index=} must be less than or equal to the total "
+            "number of keys across all chunks."
         )
 
     def __getitem__(self, index: int) -> Any:
         """Get an item from the dataset at a given index."""
         # Get the name of the chunk the index belongs to and its corresponding
         # chunk-local index in the range [0, len(self.chunk_map[chunk_name]))
-        chunk_name, local_index = self.get_chunk_name_and_local_index(index)
+        chunk_name, local_index = self.get_chunk_path_and_local_index(index)
 
         # Load the correct chunk into memory if not cached
         if self._chunk_cache is None or chunk_name not in self._chunk_cache.keys():

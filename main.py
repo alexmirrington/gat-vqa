@@ -2,6 +2,7 @@
 
 import argparse
 import json
+from pathlib import Path
 
 import jsons
 import torch
@@ -29,7 +30,7 @@ def main(config: Config) -> None:
     device = torch.device("cuda" if cuda else "cpu")
     print(f"device: {torch.cuda.get_device_name(device) if cuda else 'CPU'}")
 
-    root = "/home/alex/documents/hdd/arch/datasets/gqa"
+    root = Path("/home/alex/documents/hdd/arch/datasets/gqa")
 
     print(config)
     dataset = GQAQuestions(root, config.dataset.split, config.dataset.version)
