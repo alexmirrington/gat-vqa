@@ -131,7 +131,12 @@ disable=print-statement,
         missing-class-docstring,
         missing-function-docstring,
 # Ignore indentation problems, as these are fixed by black
-        bad-continuation
+        bad-continuation,
+# Ignore useless-import-alias, as mypy ensures that imports are treated as
+# internal unless renamed using `as`. Most of the time, we will simply rename
+# the import in an __init__.py file to the same name to tell mypy the import
+# is external, which would trigger pylint's useless-import-alias.
+        useless-import-alias,
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
