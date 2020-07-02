@@ -1,6 +1,7 @@
 {
   "dataset": {
     "name": "gqa",
+    "root": "data/gqa",
     "split": "train",
     "version": "balanced"
   }

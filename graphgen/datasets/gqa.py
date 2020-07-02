@@ -1,5 +1,4 @@
 """A torch-compatible GQA dataset implementation."""
-import os.path
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -76,7 +75,7 @@ class GQAQuestions(torch.utils.data.Dataset):  # type: ignore
                     path = path / f"{split.value}_{version.value}_questions"
                 else:
                     path = path / f"{split.value}_{version.value}_questions.json"
-                if not os.path.exists(path):
+                if not path.exists():
                     raise ValueError(f"No file or folder exists at path {path=}")
                 filemap["questions"][split][version] = path
         return filemap

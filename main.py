@@ -2,7 +2,7 @@
 
 import argparse
 import json
-from pathlib import Path
+from pathlib import PurePath
 
 import jsons
 import torch
@@ -10,6 +10,7 @@ from termcolor import colored
 
 from graphgen.config import Config
 from graphgen.datasets.gqa import GQAQuestions
+from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
 
 def main(config: Config) -> None:
@@ -30,10 +31,10 @@ def main(config: Config) -> None:
     device = torch.device("cuda" if cuda else "cpu")
     print(f"device: {torch.cuda.get_device_name(device) if cuda else 'CPU'}")
 
-    root = Path("/home/alex/documents/hdd/arch/datasets/gqa")
-
     print(config)
-    dataset = GQAQuestions(root, config.dataset.split, config.dataset.version)
+    dataset = GQAQuestions(
+        config.dataset.root, config.dataset.split, config.dataset.version
+    )
     print(dataset[0])
 
 
@@ -71,6 +72,10 @@ def load_config(filename: str) -> Config:
     """
     with open(filename, "r") as file:
         config_json = json.load(file)
+
+    # Set up custom `pathlib.Path` serialisers and deserialisers.
+    jsons.set_deserializer(path_deserializer, PurePath)
+    jsons.set_serializer(path_serializer, PurePath)
 
     config: Config = jsons.load(config_json, Config)
     return config
