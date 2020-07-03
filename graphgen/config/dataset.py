@@ -15,6 +15,12 @@ class DatasetConfig:
     """A class specifying the common fields used across all datasets."""
 
     name: DatasetName
+
+
+@dataclass(frozen=True)
+class DatasetFilemap:
+    """A class specifying the common fields used across all dataset filemaps."""
+
     root: Path
 
     def __post_init__(self) -> None:

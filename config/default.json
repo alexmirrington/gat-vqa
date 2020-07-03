@@ -3,6 +3,8 @@
     "name": "gqa",
     "split": "train",
     "version": "balanced",
-    "root": "data/gqa"
+    "filemap": {
+      "root": "data/gqa"
+    }
   }
 }

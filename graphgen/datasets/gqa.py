@@ -1,5 +1,4 @@
 """A torch-compatible GQA dataset implementation."""
-from pathlib import Path
 from typing import Any
 
 import torch.utils.data
@@ -12,24 +11,25 @@ class GQAQuestions(torch.utils.data.Dataset):  # type: ignore
     """A torch-compatible dataset that retrieves GQA question samples."""
 
     def __init__(
-        self, root: Path, split: GQASplit, version: GQAVersion, _: GQAFilemap
+        self, filemap: GQAFilemap, split: GQASplit, version: GQAVersion
     ) -> None:
         """Initialise a `GQAQuestions` instance.
 
         Params:
         -------
-        `root`: A path to the root directory of the GQA dataset.
+        `filemap`: The filemap to use when determining where to load data from.
         `split`: The dataset split to use.
         `version`: The dataset version to use.
-        `_`: The filemap to use when determining where to load data from.
 
         Returns:
         --------
         None
         """
         super().__init__()
-        if not isinstance(root, Path):
-            raise TypeError(f"Parameter {root=} must be of type {Path.__name__}.")
+        if not isinstance(filemap, GQAFilemap):
+            raise TypeError(
+                f"Parameter {filemap=} must be of type {GQAFilemap.__name__}."
+            )
 
         if not isinstance(split, GQASplit):
             raise TypeError(f"Parameter {split=} must be of type {GQASplit.__name__}.")
@@ -39,37 +39,28 @@ class GQAQuestions(torch.utils.data.Dataset):  # type: ignore
                 f"Parameter {version=} must be of type {GQAVersion.__name__}."
             )
 
-        if not root.exists() or not root.is_dir():
-            raise ValueError(f"Parameter {root=} must be a directory.")
-
-        self._root = root
+        self._filemap = filemap
         self._split = split
         self._version = version
 
-        self._filemap = self._init_filemap()
-        self._data = ChunkedJSONDataset(
-            self._filemap["questions"][self.split][self.version]
+        # Validate the questions root file/directory
+        questions_root = self._filemap.question_path(
+            self._split,
+            self._version,
+            chunked=(self._split == GQASplit.TRAIN and self.version == GQAVersion.ALL),
         )
+        if not questions_root.exists():
+            raise ValueError(
+                f"Parameter {filemap=} does not refer to a valid questions"
+                f"file/folder for {split=} and {version=}."
+            )
 
-    def _init_filemap(self) -> Any:
-        filemap: Any = {"questions": {}}
-        for split in GQASplit:
-            filemap["questions"][split] = {}
-            for version in GQAVersion:
-                path = self._root / "questions"
-                if split == GQASplit.TRAIN and version == GQAVersion.ALL:
-                    path = path / f"{split.value}_{version.value}_questions"
-                else:
-                    path = path / f"{split.value}_{version.value}_questions.json"
-                if not path.exists():
-                    raise ValueError(f"No file or folder exists at path {path=}")
-                filemap["questions"][split][version] = path
-        return filemap
+        self._data = ChunkedJSONDataset(questions_root)
 
     @property
-    def root(self) -> Path:
-        """Get the dataset root directory."""
-        return self._root
+    def filemap(self) -> GQAFilemap:
+        """Get the dataset's filemap."""
+        return self._filemap
 
     @property
     def split(self) -> GQASplit:
