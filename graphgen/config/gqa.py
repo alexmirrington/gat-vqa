@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Iterable, Optional, Union
+from typing import Optional
 
 from .dataset import DatasetConfig, DatasetName
 
@@ -37,47 +37,41 @@ class GQAFilemap:
     spatial_dir: Path = Path("images", "spatial")
     scene_graphs_dir: Path = Path("sceneGraphs")
 
-    def images(self, image_id: Optional[str] = None) -> Union[Path, Iterable[Path]]:
-        """Get the path to one/all image files."""
-        if image_id is None:
-            return self.images_dir.iterdir()
+    def image_path(self, image_id: str) -> Path:
+        """Get the path to an image file."""
         return self.images_dir / f"{image_id}.jpg"
 
-    def objects(self, chunk_id: Optional[int] = None) -> Union[Path, Iterable[Path]]:
-        """Get the path to one/all Faster-RCNN object features file(s)."""
-        if chunk_id is None:
-            return [
-                path for path in list(self.objects_dir.iterdir()) if path.match("*.h5")
-            ]
+    def object_path(self, chunk_id: int) -> Path:
+        """Get the path to a Faster-RCNN object features file."""
         return self.objects_dir / f"gqa_objects_{chunk_id}.h5"
 
-    def objects_meta(self) -> Path:
+    def object_meta_path(self) -> Path:
         """Get the path to the Faster-RCNN object features metadata file."""
         return self.objects_dir / "gqa_objects_info.json"
 
-    def spatial(self, chunk_id: Optional[int] = None) -> Union[Path, Iterable[Path]]:
+    def spatial_path(self, chunk_id: int) -> Path:
         """Get the path to one/all ResNet-101 spatial features file(s)."""
-        if chunk_id is None:
-            return [
-                path for path in list(self.spatial_dir.iterdir()) if path.match("*.h5")
-            ]
         return self.spatial_dir / f"gqa_spatial_{chunk_id}.h5"
 
-    def spatial_meta(self) -> Path:
+    def spatial_meta_path(self) -> Path:
         """Get the path to the ResNet-101 spatial features metadata file."""
         return self.spatial_dir / "gqa_spatial_info.json"
 
-    def questions(self, split: GQASplit, version: GQAVersion) -> Iterable[Path]:
+    def question_path(
+        self, split: GQASplit, version: GQAVersion, chunk_id: Optional[int] = None
+    ) -> Path:
         """Get the path to the questions JSON file for a given split and version."""
         if split == GQASplit.TRAIN and version == GQAVersion.ALL:
-            return tuple(
-                (
-                    self.questions_dir / f"{split.value}_{version.value}_questions"
-                ).iterdir()
+            if chunk_id is None:
+                raise ValueError(f"Parameter {chunk_id=} must not be {None}.")
+            return (
+                self.questions_dir
+                / f"{split.value}_{version.value}_questions"
+                / f"{split.value}_{version.value}_questions_{chunk_id}.json"
             )
-        return (self.questions_dir / f"{split.value}_{version.value}_questions.json",)
+        return self.questions_dir / f"{split.value}_{version.value}_questions.json"
 
-    def scene_graphs(self, split: GQASplit) -> Path:
+    def scene_graph_path(self, split: GQASplit) -> Path:
         """Get the path to the scene graphs JSON file for a given split."""
         if split in (GQASplit.TRAIN, GQASplit.VAL):
             return self.scene_graphs_dir / f"{split.value}_sceneGraphs.json"

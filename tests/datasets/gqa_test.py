@@ -45,23 +45,27 @@ _QUESTION_SAMPLE = {
 @pytest.fixture(scope="session", name="gqa_data")
 def fixture_gqa_data(tmp_path_factory):
     """Create a fake GQA dataset in a temporary directory for use in tests."""
-    gqa_dir = tmp_path_factory.mktemp("gqa")
-    (gqa_dir / "questions").mkdir()
+    root = tmp_path_factory.mktemp("gqa")
+    filemap = GQAFilemap()
+
+    # Seed question files
     for split in GQASplit:
         for version in GQAVersion:
-            basename = f"{split.value}_{version.value}_questions"
             if split == GQASplit.TRAIN and version == GQAVersion.ALL:
-                (gqa_dir / "questions" / basename).mkdir()
-                for i in range(10):
-                    with (gqa_dir / "questions" / basename / f"{basename}.json").open(
-                        "w"
-                    ) as file:
-                        json.dump(_QUESTION_SAMPLE, file)
+                paths = [
+                    filemap.question_path(split, version, chunk_id)
+                    for chunk_id in range(10)
+                ]
             else:
-                with (gqa_dir / "questions" / f"{basename}.json").open("w") as file:
+                paths = [filemap.question_path(split, version)]
+            for path in paths:
+                full_path = root / path
+                if not full_path.parent.exists():
+                    full_path.parent.mkdir(parents=True)
+                with full_path.open("w") as file:
                     json.dump(_QUESTION_SAMPLE, file)
 
-    return gqa_dir
+    return root
 
 
 def test_questions_nonexistent_root(tmp_path: Path) -> None:

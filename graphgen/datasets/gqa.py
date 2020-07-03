@@ -21,6 +21,7 @@ class GQAQuestions(torch.utils.data.Dataset):  # type: ignore
         `root`: A path to the root directory of the GQA dataset.
         `split`: The dataset split to use.
         `version`: The dataset version to use.
+        `_`: The filemap to use when determining where to load data from.
 
         Returns:
         --------
