@@ -9,35 +9,46 @@ from graphgen.datasets.gqa import GQAQuestions
 
 _SPLIT_VERSION_GRID = [(split, version) for split in GQASplit for version in GQAVersion]
 
-_QUESTION_SAMPLE = {
-    "02930152": {
-        "semantic": [
-            {"operation": "select", "dependencies": [], "argument": "sky (2486325)"},
-            {"operation": "verify color", "dependencies": [0], "argument": "dark"},
-        ],
-        "entailed": [
-            "02930160",
-            "02930158",
-            "02930159",
-            "02930154",
-            "02930155",
-            "02930156",
-            "02930153",
-        ],
-        "equivalent": ["02930152"],
-        "question": "Is the sky dark?",
-        "imageId": "2354786",
+_QUESTION_SAMPLE_FULL = {
+    "1238592": {
+        "imageId": "2407890",
+        "question": "Is there a red apple on the table?",
+        "answer": "no",
+        "fullAnswer": "No, there is an apple but it is green.",
         "isBalanced": True,
-        "groups": {"global": None, "local": "06-sky_dark"},
-        "answer": "yes",
-        "semanticStr": "select: sky (2486325)->verify color: dark [0]",
-        "annotations": {
-            "answer": {},
-            "question": {"2": "2486325"},
-            "fullAnswer": {"2": "2486325"},
+        "groups": {"global": None, "local": "8r-binary-apple"},
+        "entailed": ["1352631", "1245832", "842753"],
+        "equivalent": ["1245832", "842753"],
+        "types": {
+            "structural": "verify",
+            "semantic": "relation",
+            "detailed": "existAttrRel",
         },
-        "types": {"detailed": "verifyAttr", "semantic": "attr", "structural": "verify"},
-        "fullAnswer": "Yes, the sky is dark.",
+        "annotations": {
+            "question": {"4": "271881", "7": "279472"},
+            "answer": {},
+            "fullAnswer": {"4": "271881"},
+        },
+        "semantic": [
+            {"operation": "select", "argument": "table (279472)", "dependencies": []},
+            {
+                "operation": "relate",
+                "argument": "on, subject, apple (271881)",
+                "dependencies": [0],
+            },
+            {"operation": "filter", "argument": "red", "dependencies": [1]},
+            {"operation": "exist", "argument": "?", "dependencies": [2]},
+        ],
+        "semanticStr": "select: table (279472) -> \
+            relate: on, subject, apple (271881) -> exist: ?",
+    }
+}
+
+_QUESTION_SAMPLE_PARTIAL = {
+    "1238592": {
+        "imageId": "2407890",
+        "question": "Is there a red apple on the table?",
+        "isBalanced": True,
     }
 }
 
@@ -63,8 +74,14 @@ def fixture_gqa_data(tmp_path_factory):
                 full_path = root / path
                 if not full_path.parent.exists():
                     full_path.parent.mkdir(parents=True)
+
+                content = (
+                    _QUESTION_SAMPLE_FULL
+                    if split in (GQASplit.TRAIN, GQASplit.VAL)
+                    else _QUESTION_SAMPLE_PARTIAL
+                )
                 with full_path.open("w") as file:
-                    json.dump(_QUESTION_SAMPLE, file)
+                    json.dump(content, file)
 
     return root
 
