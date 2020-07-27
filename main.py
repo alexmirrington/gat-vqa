@@ -36,12 +36,12 @@ def main(config: Config) -> None:
         config.dataset.filemap, config.dataset.split, config.dataset.version,
     )
     graphs = GQASceneGraphs(config.dataset.filemap, config.dataset.split)
+
     qn_idx = 0
     question = questions[qn_idx]
-    print(question)
-    print()
+    print(f"{question=}")
     graph = graphs[graphs.key_to_idx(question["imageId"])]
-    print(graph)
+    print(f"{graph=}")
 
 
 def parse_args() -> argparse.Namespace:
