@@ -9,7 +9,7 @@ import torch
 from termcolor import colored
 
 from graphgen.config import Config
-from graphgen.datasets.gqa import GQAQuestions
+from graphgen.datasets.gqa import GQAQuestions, GQASceneGraphs
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
 
@@ -32,10 +32,16 @@ def main(config: Config) -> None:
     print(f"device: {torch.cuda.get_device_name(device) if cuda else 'CPU'}")
 
     print(config)
-    dataset = GQAQuestions(
+    questions = GQAQuestions(
         config.dataset.filemap, config.dataset.split, config.dataset.version,
     )
-    print(dataset[0])
+    graphs = GQASceneGraphs(config.dataset.filemap, config.dataset.split)
+    qn_idx = 0
+    question = questions[qn_idx]
+    print(question)
+    print()
+    graph = graphs[graphs.key_to_idx(question["imageId"])]
+    print(graph)
 
 
 def parse_args() -> argparse.Namespace:

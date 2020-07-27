@@ -24,25 +24,35 @@ class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
         super().__init__()
 
         self._root = root
+        self._chunks: Tuple[Path, ...] = ()
+        self._chunk_sizes: Tuple[int, ...] = ()
         self._chunk_cache = None
 
-        self._chunk_map: Dict[Path, Tuple[str, ...]] = {}
+        self._key_to_idx: Dict[str, int] = {}
+
         if self._root.is_dir():
-            self._chunk_map = {
-                self._root / name: () for name in sorted(self._root.iterdir())
-            }
+            self._chunks = tuple(sorted(self._root.iterdir()))
         else:
-            self._chunk_map = {self._root: ()}
+            self._chunks = (self._root,)
 
         # Load top-level JSON keys into `self.chunk_map`
-        for chunk_name in self._chunk_map.keys():
+        cum_idx = 0
+        chunk_sizes = []
+        for chunk_idx, chunk_name in enumerate(self._chunks):
             with open(chunk_name, "r") as chunk:
                 chunk_data = json.load(chunk)
-                self._chunk_map[chunk_name] = tuple(chunk_data.keys())
-                self._chunk_cache = {chunk_name: chunk_data}
+                chunk_size = len(chunk_data)
+                self._key_to_idx.update(
+                    {key: cum_idx + idx for idx, key in enumerate(chunk_data.keys())}
+                )
+                self._chunk_cache = {chunk_idx: tuple(chunk_data.values())}
+                chunk_sizes.append(chunk_size)
+                cum_idx += chunk_size
                 del chunk_data
 
-    def get_chunk_path_and_local_index(self, index: int) -> Tuple[Path, int]:
+        self._chunk_sizes = tuple(chunk_sizes)
+
+    def _get_chunk_local_idx(self, index: int) -> Tuple[int, int]:
         """Get the path of the chunk containing the data item at index `index`.
 
         Params:
@@ -56,12 +66,15 @@ class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
         index `index` and the index of that data item within its chunk.
         """
         if index < 0:
-            raise ValueError(f"Parameter {index=} must be greater than or equal to 0")
+            raise ValueError(
+                f"Parameter {index=} must be greater than or equal to zero."
+            )
 
-        cumulative_count = 0
-        for chunk_name, chunk_keys in self._chunk_map.items():
-            if cumulative_count <= index < cumulative_count + len(chunk_keys):
-                return chunk_name, index - cumulative_count
+        cum_idx = 0
+        for chunk_idx, chunk_size in enumerate(self._chunk_sizes):
+            if cum_idx <= index < cum_idx + chunk_size:
+                return chunk_idx, index - cum_idx
+
         raise ValueError(
             f"Parameter {index=} must be less than or equal to the total "
             "number of keys across all chunks."
@@ -69,19 +82,22 @@ class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
 
     def __getitem__(self, index: int) -> Any:
         """Get an item from the dataset at a given index."""
-        # Get the name of the chunk the index belongs to and its corresponding
-        # chunk-local index in the range [0, len(self.chunk_map[chunk_name]))
-        chunk_name, local_index = self.get_chunk_path_and_local_index(index)
+        # Get the index of the chunk the given index belongs to and its
+        # corresponding chunk-local index in the range
+        # [0, self._chunk_sizes[chunk_idx]))
+        chunk_idx, local_idx = self._get_chunk_local_idx(index)
 
         # Load the correct chunk into memory if not cached
-        if self._chunk_cache is None or chunk_name not in self._chunk_cache.keys():
-            with open(chunk_name, "r") as chunk:
-                self._chunk_cache = {chunk_name: json.load(chunk)}
+        if self._chunk_cache is None or chunk_idx not in self._chunk_cache.keys():
+            with open(self._chunks[chunk_idx], "r") as chunk:
+                self._chunk_cache = {chunk_idx: tuple(json.load(chunk).values())}
 
-        # Get item key and return item
-        item_key = self._chunk_map[chunk_name][local_index]
-        return self._chunk_cache[chunk_name][item_key]
+        return self._chunk_cache[chunk_idx][local_idx]
 
     def __len__(self) -> int:
         """Get the length of the dataset."""
-        return sum([len(chunk_keys) for chunk_keys in self._chunk_map.values()])
+        return sum(self._chunk_sizes)
+
+    def key_to_index(self, key: str) -> int:
+        """Get index of a given key in the dataset."""
+        return self._key_to_idx[key]

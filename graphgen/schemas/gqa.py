@@ -35,4 +35,25 @@ GQA_QUESTION = Schema(
     }
 )
 
+GQA_SCENE_GRAPH = Schema(
+    {
+        "width": And(int, lambda x: x > 0),
+        "height": And(int, lambda x: x > 0),
+        Optional("location"): str,
+        Optional("weather"): str,
+        "objects": {
+            Optional(GQA_OBJECT_ID): {
+                "name": str,
+                "x": And(int, lambda x: x >= 0),
+                "y": And(int, lambda x: x >= 0),
+                "w": int,
+                "h": int,
+                "attributes": [str],
+                "relations": [{"name": str, "object": GQA_OBJECT_ID}],
+            }
+        },
+    }
+)
+
 GQA_QUESTIONS = Schema({GQA_QUESTION_ID: GQA_QUESTION})
+GQA_SCENE_GRAPHS = Schema({GQA_IMAGE_ID: GQA_SCENE_GRAPH})
