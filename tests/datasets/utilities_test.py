@@ -7,7 +7,7 @@ import pytest
 from graphgen.datasets.utilities import ChunkedJSONDataset
 
 
-@pytest.fixture(scope="module", name="chunked_json_data")
+@pytest.fixture(name="chunked_json_data")
 def fixture_chunked_json_data(tmp_path_factory, request):
     """Create a chunked json dataset in a temporary directory for use in tests."""
     # Make root dir
@@ -28,9 +28,6 @@ def fixture_chunked_json_data(tmp_path_factory, request):
             json.dump(content, file)
 
     return root
-
-
-# region ChunkedJSONDataset
 
 
 def test_chunkedjson_nonexistent_root(tmp_path: Path) -> None:
@@ -97,7 +94,7 @@ def test_chunkedjson_valid_symlink_file_root(
 
 
 @pytest.mark.parametrize(
-    "chunked_json_data, num_chunks", [(1, 1), (8, 8)], indirect=["chunked_json_data"]
+    "chunked_json_data, num_chunks", [(1, 1), (8, 8)], indirect=["chunked_json_data"],
 )
 def test_chunkedjson_directory_root_getitem(
     chunked_json_data: Path, num_chunks: int
@@ -137,7 +134,7 @@ def test_chunkedjson_file_root_getitem(chunked_json_data: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "chunked_json_data, num_chunks", [(1, 1), (8, 8)], indirect=["chunked_json_data"]
+    "chunked_json_data, num_chunks", [(1, 1), (8, 8)], indirect=["chunked_json_data"],
 )
 def test_chunkedjson_directory_root_len(
     chunked_json_data: Path, num_chunks: int
@@ -161,6 +158,3 @@ def test_chunkedjson_file_root_len(chunked_json_data: Path) -> None:
     chunk_size = 1
 
     assert len(dataset) == chunk_size
-
-
-# endregion ChunkedJSONDataset

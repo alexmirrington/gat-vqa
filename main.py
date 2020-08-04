@@ -9,7 +9,8 @@ import torch
 from termcolor import colored
 
 from graphgen.config import Config
-from graphgen.datasets.gqa import GQAQuestions, GQASceneGraphs
+from graphgen.datasets.gqa.questions import GQAQuestions
+from graphgen.datasets.gqa.scene_graphs import GQASceneGraphs
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
 
