@@ -28,7 +28,7 @@ def main(config: Config) -> None:
     # Print environment info
     print(colored("Environment:", attrs=["bold"]))
     cuda = torch.cuda.is_available()
-    device = torch.device("cuda" if cuda else "cpu")
+    device = torch.device("cuda" if cuda else "cpu")  # type: ignore
     print(f"device: {torch.cuda.get_device_name(device) if cuda else 'CPU'}")
 
     print(config)

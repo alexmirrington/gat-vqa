@@ -23,6 +23,15 @@ class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
         """
         super().__init__()
 
+        if not isinstance(root, Path):
+            raise TypeError(f"Parameter {root=} must be of type {Path.__name__}.")
+
+        if not root.exists():
+            raise ValueError(f"Parameter {root=} must point to a file or directory.")
+
+        if root.is_dir() and len(tuple(root.iterdir())) == 0:
+            raise ValueError(f"Parameter {root=} must point to a non-empty directory.")
+
         self._root = root
         self._chunks: Tuple[Path, ...] = ()
         self._chunk_sizes: Tuple[int, ...] = ()
@@ -65,15 +74,11 @@ class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
         A tuple containing the name of the chunk containing the data item at
         index `index` and the index of that data item within its chunk.
         """
-        if index < 0:
-            raise ValueError(
-                f"Parameter {index=} must be greater than or equal to zero."
-            )
-
-        cum_idx = 0
+        chunk_start_idx = 0
         for chunk_idx, chunk_size in enumerate(self._chunk_sizes):
-            if cum_idx <= index < cum_idx + chunk_size:
-                return chunk_idx, index - cum_idx
+            if chunk_start_idx <= index < chunk_start_idx + chunk_size:
+                return chunk_idx, index - chunk_start_idx
+            chunk_start_idx += chunk_size
 
         raise ValueError(
             f"Parameter {index=} must be less than or equal to the total "
@@ -86,7 +91,6 @@ class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
         # corresponding chunk-local index in the range
         # [0, self._chunk_sizes[chunk_idx]))
         chunk_idx, local_idx = self._get_chunk_local_idx(index)
-
         # Load the correct chunk into memory if not cached
         if self._chunk_cache is None or chunk_idx not in self._chunk_cache.keys():
             with open(self._chunks[chunk_idx], "r") as chunk:
