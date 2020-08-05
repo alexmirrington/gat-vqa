@@ -29,7 +29,6 @@ repos:
     entry: pylint
     language: python
     types: [python]
-    args: [--rcfile, .pylintrc]
 - repo: https://github.com/PyCQA/pydocstyle
   rev: 5.0.2
   hooks:

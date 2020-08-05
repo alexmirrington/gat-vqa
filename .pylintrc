@@ -137,6 +137,8 @@ disable=print-statement,
 # the import in an __init__.py file to the same name to tell mypy the import
 # is external, which would trigger pylint's useless-import-alias.
         useless-import-alias,
+# Ignore duplicate code warnings, as they are whiny and annoying
+        duplicate-code
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
@@ -156,8 +158,3 @@ logging-format-style=new
 
 # Tells whether unused global variables should be treated as a violation.
 allow-global-unused-variables=no
-
-[SIMILARITIES]
-
-# Minimum lines number of a similarity.
-min-similarity-lines=8
