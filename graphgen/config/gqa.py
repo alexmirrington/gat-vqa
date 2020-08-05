@@ -41,17 +41,21 @@ class GQAFilemap(DatasetFilemap):
         """Get the path to an image file."""
         return self.root / self.images_dir / f"{image_id}.jpg"
 
-    def object_path(self, chunk_id: int) -> Path:
+    def object_path(self, chunk_id: Optional[int] = None) -> Path:
         """Get the path to a Faster-RCNN object features file."""
-        return self.root / self.objects_dir / f"gqa_objects_{chunk_id}.h5"
+        if chunk_id is not None:
+            return self.root / self.objects_dir / f"gqa_objects_{chunk_id}.h5"
+        return self.root / self.objects_dir
 
     def object_meta_path(self) -> Path:
         """Get the path to the Faster-RCNN object features metadata file."""
         return self.root / self.objects_dir / "gqa_objects_info.json"
 
-    def spatial_path(self, chunk_id: int) -> Path:
+    def spatial_path(self, chunk_id: Optional[int] = None) -> Path:
         """Get the path to one/all ResNet-101 spatial features file(s)."""
-        return self.root / self.spatial_dir / f"gqa_spatial_{chunk_id}.h5"
+        if chunk_id is not None:
+            return self.root / self.spatial_dir / f"gqa_spatial_{chunk_id}.h5"
+        return self.root / self.spatial_dir
 
     def spatial_meta_path(self) -> Path:
         """Get the path to the ResNet-101 spatial features metadata file."""

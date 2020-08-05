@@ -156,3 +156,8 @@ logging-format-style=new
 
 # Tells whether unused global variables should be treated as a violation.
 allow-global-unused-variables=no
+
+[SIMILARITIES]
+
+# Minimum lines number of a similarity.
+min-similarity-lines=8

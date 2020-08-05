@@ -53,7 +53,7 @@ class GQAQuestions(torch.utils.data.Dataset):  # type: ignore
         if not questions_root.exists():
             raise ValueError(
                 f"Parameter {filemap=} does not refer to a valid questions"
-                f"file/folder for {split=} and {version=}."
+                f"file or directory for {split=} and {version=}."
             )
 
         self._data = ChunkedJSONDataset(questions_root)

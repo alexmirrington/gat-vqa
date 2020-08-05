@@ -9,8 +9,10 @@ import torch
 from termcolor import colored
 
 from graphgen.config import Config
+from graphgen.datasets.gqa.objects import GQAObjects
 from graphgen.datasets.gqa.questions import GQAQuestions
 from graphgen.datasets.gqa.scene_graphs import GQASceneGraphs
+from graphgen.datasets.gqa.spatial import GQASpatial
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
 
@@ -37,12 +39,18 @@ def main(config: Config) -> None:
         config.dataset.filemap, config.dataset.split, config.dataset.version,
     )
     graphs = GQASceneGraphs(config.dataset.filemap, config.dataset.split)
+    spatial = GQASpatial(config.dataset.filemap, config.cache)
+    objects = GQAObjects(config.dataset.filemap, config.cache)
 
     qn_idx = 0
     question = questions[qn_idx]
     print(f"{question=}")
     graph = graphs[graphs.key_to_idx(question["imageId"])]
     print(f"{graph=}")
+    spatial_features = spatial[spatial.key_to_idx(question["imageId"])]
+    print(f"{spatial_features=}")
+    object_features = objects[objects.key_to_idx(question["imageId"])]
+    print(f"{object_features=}")
 
 
 def parse_args() -> argparse.Namespace:

@@ -6,3 +6,4 @@ termcolor
 torch
 jsons
 schema
+h5py
