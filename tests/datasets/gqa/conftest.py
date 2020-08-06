@@ -68,7 +68,7 @@ _SCENE_GRAPH_SAMPLE_FULL = {
 }
 
 
-@pytest.fixture(name="gqa", scope="package")
+@pytest.fixture(name="gqa")
 def fixture_gqa(tmp_path_factory):
     """Create a fake GQA dataset in a temporary directory for use in tests."""
     # Create directory
