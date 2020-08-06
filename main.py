@@ -39,8 +39,8 @@ def main(config: Config) -> None:
         config.dataset.filemap, config.dataset.split, config.dataset.version,
     )
     graphs = GQASceneGraphs(config.dataset.filemap, config.dataset.split)
-    spatial = GQASpatial(config.dataset.filemap, config.cache)
-    objects = GQAObjects(config.dataset.filemap, config.cache)
+    spatial = GQASpatial(config.dataset.filemap)
+    objects = GQAObjects(config.dataset.filemap)
 
     qn_idx = 0
     question = questions[qn_idx]

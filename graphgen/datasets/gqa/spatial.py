@@ -1,6 +1,5 @@
-"""A torch-compatible GQA scene graphs dataset implementation."""
+"""A torch-compatible GQA spatial features dataset implementation."""
 import json
-from pathlib import Path
 from typing import Any
 
 import torch.utils.data
@@ -10,9 +9,9 @@ from ..utilities import ChunkedHDF5Dataset
 
 
 class GQASpatial(torch.utils.data.Dataset):  # type: ignore
-    """A torch-compatible dataset that retrieves GQA spatial samples."""
+    """A torch-compatible dataset that retrieves GQA spatial feature samples."""
 
-    def __init__(self, filemap: GQAFilemap, cache: Path) -> None:
+    def __init__(self, filemap: GQAFilemap) -> None:
         """Initialise a `GQASpatial` instance.
 
         Params:
@@ -30,7 +29,6 @@ class GQASpatial(torch.utils.data.Dataset):  # type: ignore
             )
 
         self._filemap = filemap
-        self._cache = cache
         # Validate the spatial data root file/directory
         spatial_root = self._filemap.spatial_path()
         if not spatial_root.exists():
@@ -47,9 +45,7 @@ class GQASpatial(torch.utils.data.Dataset):  # type: ignore
                 for key, val in meta.items()
             }
 
-        self._data = ChunkedHDF5Dataset(
-            spatial_root, self._cache / "gqa_spatial_vds.h5", chunk_map
-        )
+        self._data = ChunkedHDF5Dataset(spatial_root, chunk_map)
 
     @property
     def filemap(self) -> GQAFilemap:

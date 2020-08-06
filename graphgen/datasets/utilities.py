@@ -1,7 +1,9 @@
 """Dataset abstractions and other data-related utilities."""
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Dict, List, Tuple
+from uuid import uuid4
 
 import h5py
 import torch.utils.data
@@ -111,9 +113,7 @@ class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
 class ChunkedHDF5Dataset(torch.utils.data.Dataset):  # type: ignore
     """A torch-compatible dataset that loads data from one or more HDF5 files."""
 
-    def __init__(
-        self, root: Path, cache: Path, chunk_map: Dict[str, Tuple[Path, int]]
-    ) -> None:
+    def __init__(self, root: Path, chunk_map: Dict[str, Tuple[Path, int]]) -> None:
         """Initialise a `ChunkedHDF5Dataset` instance.
 
         Params:
@@ -137,7 +137,6 @@ class ChunkedHDF5Dataset(torch.utils.data.Dataset):  # type: ignore
             raise ValueError(f"Parameter {root=} must point to a non-empty directory.")
 
         self._root = root
-        self._cache = cache
         self._key_to_idx: Dict[str, int] = {}
         self._chunks: Tuple[Path, ...] = ()
         self._chunk_sizes: Tuple[int, ...] = ()
@@ -156,29 +155,29 @@ class ChunkedHDF5Dataset(torch.utils.data.Dataset):  # type: ignore
         for dataset, shape in dataset_shapes.items():
             chunk_start = 0
             for chunk_idx, chunk_size in enumerate(self._chunk_sizes):
+                print(self._chunks[chunk_idx].resolve())
                 source = h5py.VirtualSource(
-                    self._chunks[chunk_idx], dataset, shape=(chunk_size,) + shape
+                    self._chunks[chunk_idx].resolve(),
+                    dataset,
+                    shape=(chunk_size,) + shape,
                 )
                 layouts[dataset][chunk_start : chunk_start + chunk_size] = source
                 chunk_start += chunk_size
 
-        # Create cache directory if it doesn't exist
-        if not self._cache.parent.exists():
-            self._cache.parent.mkdir(parents=True)
-
-        # Move to tempfile.TemporaryFile() or io.BytesIO() instead of self.cache
-        # when this is fixed: https://github.com/h5py/h5py/issues/1623
-        with h5py.File(self._cache, "w") as file:
+        self._tempdir = TemporaryDirectory()
+        self._vds = Path(self._tempdir.name) / str(uuid4())
+        with h5py.File(self._vds, "w") as file:
             for dataset, layout in layouts.items():
                 file.create_virtual_dataset(dataset, layout)
-        self._data = h5py.File(self._cache, "r")
+
+        self._data = h5py.File(self._vds, "r")
 
         self._key_to_idx = {
-            dataset: sum(
+            image_id: sum(
                 [self._chunk_sizes[i] for i in range(self._chunks.index(chunk))]
             )
             + idx
-            for dataset, (chunk, idx) in chunk_map.items()
+            for image_id, (chunk, idx) in chunk_map.items()
         }
 
     def _load_dataset_metadata(

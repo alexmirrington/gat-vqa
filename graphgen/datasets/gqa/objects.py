@@ -1,6 +1,5 @@
-"""A torch-compatible GQA scene graphs dataset implementation."""
+"""A torch-compatible GQA object features dataset implementation."""
 import json
-from pathlib import Path
 from typing import Any
 
 import torch.utils.data
@@ -12,7 +11,7 @@ from ..utilities import ChunkedHDF5Dataset
 class GQAObjects(torch.utils.data.Dataset):  # type: ignore
     """A torch-compatible dataset that retrieves GQA object feature samples."""
 
-    def __init__(self, filemap: GQAFilemap, cache: Path) -> None:
+    def __init__(self, filemap: GQAFilemap) -> None:
         """Initialise a `GQAObjects` instance.
 
         Params:
@@ -30,7 +29,6 @@ class GQAObjects(torch.utils.data.Dataset):  # type: ignore
             )
 
         self._filemap = filemap
-        self._cache = cache
 
         # Validate the objects data root file/directory
         objects_root = self._filemap.object_path()
@@ -48,9 +46,7 @@ class GQAObjects(torch.utils.data.Dataset):  # type: ignore
                 for key, val in meta.items()
             }
 
-        self._data = ChunkedHDF5Dataset(
-            objects_root, self._cache / "gqa_objects_vds.h5", chunk_map
-        )
+        self._data = ChunkedHDF5Dataset(objects_root, chunk_map)
 
     @property
     def filemap(self) -> GQAFilemap:
