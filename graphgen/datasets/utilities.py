@@ -83,7 +83,7 @@ class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
                 return chunk_idx, index - chunk_start_idx
             chunk_start_idx += chunk_size
 
-        raise ValueError(
+        raise IndexError(
             f"Parameter {index=} must be less than or equal to the total "
             "number of keys across all chunks."
         )
@@ -144,6 +144,13 @@ class ChunkedHDF5Dataset(torch.utils.data.Dataset):  # type: ignore
         self._chunk_sizes: Tuple[int, ...] = ()
 
         self._chunks, self._chunk_sizes, dataset_shapes = self._load_dataset_metadata()
+
+        if len(self._chunks) == 0:
+            raise ValueError(
+                f"Parameter {root=} must contain one or more readable HDF5 ",
+                "files if it is a directory, otherwise should be a readable ",
+                "HDF5 file.",
+            )
 
         # Determine concatenated dataset shape and create virtual dataset
         cat_shapes = {
@@ -253,9 +260,12 @@ class ChunkedHDF5Dataset(torch.utils.data.Dataset):  # type: ignore
     def key_to_index(self, key: str) -> int:
         """Get index of a given key in the dataset."""
         if self._key_to_idx is None:
-            key_int = int(key)
-            if 0 <= key_int < len(self):
-                return key_int
+            try:
+                key_int = int(key)
+                if 0 <= key_int < len(self):
+                    return key_int
+            except ValueError:
+                raise KeyError(f"Parameter {key=} is not a valid key for the dataset.")
         elif key in self._key_to_idx:
             return self._key_to_idx[key]
-        raise ValueError(f"Parameter {key=} is not a valid key for the dataset.")
+        raise KeyError(f"Parameter {key=} is not a valid key for the dataset.")
