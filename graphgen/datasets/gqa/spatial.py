@@ -44,6 +44,7 @@ class GQASpatial(torch.utils.data.Dataset):  # type: ignore
                 key: (self._filemap.spatial_path(val["file"]), val["idx"])
                 for key, val in meta.items()
             }
+        print(chunk_map)
 
         self._data = ChunkedHDF5Dataset(spatial_root, chunk_map)
 
@@ -60,6 +61,6 @@ class GQASpatial(torch.utils.data.Dataset):  # type: ignore
         """Get an item from the dataset at a given index."""
         return self._data[index]
 
-    def key_to_idx(self, key: str) -> Any:
+    def key_to_index(self, key: str) -> Any:
         """Get the index of the spatial feature in the dataset with a given image id."""
         return self._data.key_to_index(key)

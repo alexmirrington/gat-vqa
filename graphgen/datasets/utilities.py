@@ -259,6 +259,7 @@ class ChunkedHDF5Dataset(torch.utils.data.Dataset):  # type: ignore
 
     def key_to_index(self, key: str) -> int:
         """Get index of a given key in the dataset."""
+        print(self._key_to_idx)
         if self._key_to_idx is None:
             try:
                 key_int = int(key)

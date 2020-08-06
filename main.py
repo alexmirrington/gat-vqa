@@ -45,11 +45,11 @@ def main(config: Config) -> None:
     qn_idx = 0
     question = questions[qn_idx]
     print(f"{question=}")
-    graph = graphs[graphs.key_to_idx(question["imageId"])]
+    graph = graphs[graphs.key_to_index(question["imageId"])]
     print(f"{graph=}")
-    spatial_features = spatial[spatial.key_to_idx(question["imageId"])]
+    spatial_features = spatial[spatial.key_to_index(question["imageId"])]
     print(f"{spatial_features=}")
-    object_features = objects[objects.key_to_idx(question["imageId"])]
+    object_features = objects[objects.key_to_index(question["imageId"])]
     print(f"{object_features=}")
 
 

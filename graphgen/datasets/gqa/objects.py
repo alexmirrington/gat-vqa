@@ -61,6 +61,6 @@ class GQAObjects(torch.utils.data.Dataset):  # type: ignore
         """Get an item from the dataset at a given index."""
         return self._data[index]
 
-    def key_to_idx(self, key: str) -> Any:
+    def key_to_index(self, key: str) -> Any:
         """Get the index of the object feature in the dataset with a given image id."""
         return self._data.key_to_index(key)

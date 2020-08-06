@@ -97,3 +97,15 @@ def test_scene_graphs_len(gqa: Path, split: GQASplit) -> None:
     length = len(dataset)
     assert isinstance(length, int)
     assert length == 1
+
+
+@pytest.mark.parametrize("split", [GQASplit.TRAIN, GQASplit.VAL])
+def test_scene_graphs_key_to_index(gqa: Path, split: GQASplit) -> None:
+    """Ensure key_to_index returns the correct index given valid GQA data."""
+    dataset = GQASceneGraphs(GQAFilemap(gqa), split)
+
+    for idx in range(len(dataset)):
+        assert dataset.key_to_index(str(idx)) == idx
+
+    with pytest.raises(KeyError):
+        dataset.key_to_index("abc")

@@ -102,3 +102,17 @@ def test_questions_len(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
     length = len(dataset)
     assert isinstance(length, int)
     assert length == 10 if split == GQASplit.TRAIN and version == GQAVersion.ALL else 1
+
+
+@pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
+def test_questions_key_to_index(
+    gqa: Path, split: GQASplit, version: GQAVersion
+) -> None:
+    """Ensure key_to_index returns the correct index given valid GQA data."""
+    dataset = GQAQuestions(GQAFilemap(gqa), split, version)
+
+    for idx in range(len(dataset)):
+        assert dataset.key_to_index(str(idx)) == idx
+
+    with pytest.raises(KeyError):
+        dataset.key_to_index("abc")
