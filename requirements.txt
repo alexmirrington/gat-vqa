@@ -8,3 +8,4 @@ jsons
 schema
 h5py
 numpy
+pillow

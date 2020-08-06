@@ -2,18 +2,21 @@
 
 import argparse
 import json
-from pathlib import PurePath
+import random
+from pathlib import Path, PurePath
 
 import jsons
 import torch
 from termcolor import colored
 
 from graphgen.config import Config
+from graphgen.datasets.gqa.images import GQAImages
 from graphgen.datasets.gqa.objects import GQAObjects
 from graphgen.datasets.gqa.questions import GQAQuestions
 from graphgen.datasets.gqa.scene_graphs import GQASceneGraphs
 from graphgen.datasets.gqa.spatial import GQASpatial
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
+from graphgen.utilities.visualisation import plot_image, plot_spatial_features
 
 
 def main(config: Config) -> None:
@@ -41,16 +44,22 @@ def main(config: Config) -> None:
     graphs = GQASceneGraphs(config.dataset.filemap, config.dataset.split)
     spatial = GQASpatial(config.dataset.filemap)
     objects = GQAObjects(config.dataset.filemap)
+    images = GQAImages(config.dataset.filemap)
 
-    qn_idx = 0
+    qn_idx = random.randint(0, len(questions) - 1)
     question = questions[qn_idx]
     print(f"{question=}")
     graph = graphs[graphs.key_to_index(question["imageId"])]
     print(f"{graph=}")
     spatial_features = spatial[spatial.key_to_index(question["imageId"])]
-    print(f"{spatial_features=}")
+    print({key: val.shape for key, val in spatial_features.items()})
     object_features = objects[objects.key_to_index(question["imageId"])]
-    print(f"{object_features=}")
+    print({key: val.shape for key, val in object_features.items()})
+    image = images[images.key_to_index(question["imageId"])]
+
+    # Plot visual features
+    plot_image(image, Path("image.png"), object_features["bboxes"])
+    plot_spatial_features(spatial_features["features"], Path("spatial.png"))
 
 
 def parse_args() -> argparse.Namespace:

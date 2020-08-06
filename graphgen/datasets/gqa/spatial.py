@@ -44,7 +44,6 @@ class GQASpatial(torch.utils.data.Dataset):  # type: ignore
                 key: (self._filemap.spatial_path(val["file"]), val["idx"])
                 for key, val in meta.items()
             }
-        print(chunk_map)
 
         self._data = ChunkedHDF5Dataset(spatial_root, chunk_map)
 
