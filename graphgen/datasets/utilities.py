@@ -1,24 +1,26 @@
 """Dataset abstractions and other data-related utilities."""
 import json
+from abc import abstractmethod
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Dict, List, Optional, Tuple
-from uuid import uuid4
 
 import h5py
+import numpy as np
 import torch.utils.data
+from PIL import Image
 
 
-class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
-    """A torch-compatible dataset that loads data from one or more JSON files."""
+class ChunkedDataset(torch.utils.data.Dataset):  # type: ignore
+    """A torch-compatible dataset that loads data from one or more files."""
 
     def __init__(self, root: Path) -> None:
-        """Initialise a `ChunkedJSONDataset` instance.
+        """Initialise a `ChunkedDataset` instance.
 
         Params:
         -------
-        `root`: A path to a single JSON file or a folder containing multiple
-        JSON files (chunks) at its top level.
+        `root`: A path to a single file or a folder containing multiple files
+        (chunks) at its top level.
 
         Returns:
         --------
@@ -36,16 +38,51 @@ class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
             raise ValueError(f"Parameter {root=} must point to a non-empty directory.")
 
         self._root = root
-        self._chunks: Tuple[Path, ...] = ()
-        self._chunk_sizes: Tuple[int, ...] = ()
-        self._chunk_cache = None
+        self._chunks: Tuple[Path, ...] = tuple(
+            sorted(self._root.iterdir())
+        ) if self._root.is_dir() else (self._root,)
+
+    @property
+    def root(self) -> Path:
+        """Get the root of the dataset, either a single file or a directory."""
+        return self._root
+
+    @property
+    def chunks(self) -> Tuple[Path, ...]:
+        """Get a tuple of containing the paths to the chunks in the dataset."""
+        return self._chunks
+
+    @abstractmethod
+    def __getitem__(self, index: int) -> Any:
+        """Get an item from the dataset at a given index."""
+        raise NotImplementedError()
+
+    @abstractmethod
+    def __len__(self) -> int:
+        """Get the length of the dataset."""
+        raise NotImplementedError()
+
+
+class ChunkedJSONDataset(ChunkedDataset):
+    """A torch-compatible dataset that loads data from one or more JSON files."""
+
+    def __init__(self, root: Path) -> None:
+        """Initialise a `ChunkedJSONDataset` instance.
+
+        Params:
+        -------
+        `root`: A path to a single JSON file or a folder containing multiple
+        JSON files (chunks) at its top level.
+
+        Returns:
+        --------
+        None
+        """
+        super().__init__(root)
 
         self._key_to_idx: Dict[str, int] = {}
-
-        if self._root.is_dir():
-            self._chunks = tuple(sorted(self._root.iterdir()))
-        else:
-            self._chunks = (self._root,)
+        self._chunk_sizes: Tuple[int, ...] = ()
+        self._chunk_cache = None
 
         # Load top-level JSON keys into `self.chunk_map`
         cum_idx = 0
@@ -110,7 +147,7 @@ class ChunkedJSONDataset(torch.utils.data.Dataset):  # type: ignore
         return self._key_to_idx[key]
 
 
-class ChunkedHDF5Dataset(torch.utils.data.Dataset):  # type: ignore
+class ChunkedHDF5Dataset(ChunkedDataset):
     """A torch-compatible dataset that loads data from one or more HDF5 files."""
 
     def __init__(
@@ -127,22 +164,10 @@ class ChunkedHDF5Dataset(torch.utils.data.Dataset):  # type: ignore
         --------
         None
         """
-        super().__init__()
+        super().__init__(root)
 
-        if not isinstance(root, Path):
-            raise TypeError(f"Parameter {root=} must be of type {Path.__name__}.")
-
-        if not root.exists():
-            raise ValueError(f"Parameter {root=} must point to a file or directory.")
-
-        if root.is_dir() and len(tuple(root.iterdir())) == 0:
-            raise ValueError(f"Parameter {root=} must point to a non-empty directory.")
-
-        self._root = root
         self._key_to_idx: Optional[Dict[str, int]] = {}
-        self._chunks: Tuple[Path, ...] = ()
         self._chunk_sizes: Tuple[int, ...] = ()
-
         self._chunks, self._chunk_sizes, dataset_shapes = self._load_dataset_metadata()
 
         if len(self._chunks) == 0:
@@ -171,7 +196,7 @@ class ChunkedHDF5Dataset(torch.utils.data.Dataset):  # type: ignore
                 chunk_start += chunk_size
 
         self._tempdir = TemporaryDirectory()
-        self._vds = Path(self._tempdir.name) / str(uuid4())
+        self._vds = Path(self._tempdir.name) / "vds.h5"
         with h5py.File(self._vds, "w") as file:
             for dataset, layout in layouts.items():
                 file.create_virtual_dataset(dataset, layout)
@@ -193,10 +218,7 @@ class ChunkedHDF5Dataset(torch.utils.data.Dataset):  # type: ignore
     def _load_dataset_metadata(
         self,
     ) -> Tuple[Tuple[Path, ...], Tuple[int, ...], Dict[str, Tuple[Any, ...]]]:
-        chunks = (
-            list(sorted(self._root.iterdir())) if self._root.is_dir() else [self._root]
-        )
-
+        chunks = list(self._chunks)
         dataset_shapes: Dict[str, Tuple[Any, ...]] = {}
         chunk_sizes: List[int] = []
         to_remove = []
@@ -250,7 +272,7 @@ class ChunkedHDF5Dataset(torch.utils.data.Dataset):  # type: ignore
 
     def __getitem__(self, index: int) -> Any:
         """Get an item from the dataset at a given index."""
-        return {key: self._data[key][index] for key in self._data.keys()}
+        return {dset: self._data[dset][index] for dset in self._data.keys()}
 
     def __len__(self) -> int:
         """Get the length of the dataset."""
@@ -269,3 +291,38 @@ class ChunkedHDF5Dataset(torch.utils.data.Dataset):  # type: ignore
         elif key in self._key_to_idx:
             return self._key_to_idx[key]
         raise KeyError(f"Parameter {key=} is not a valid key for the dataset.")
+
+
+class ImageFolderDataset(ChunkedDataset):
+    """A torch-compatible dataset that loads data from one or more image files."""
+
+    def __init__(self, root: Path) -> None:
+        """Initialise an `ImageFolderDataset` instance.
+
+        Params:
+        -------
+        `root`: A path to a single image file or a folder containing multiple
+        image files at its top level.
+
+        Returns:
+        --------
+        None
+        """
+        super().__init__(root)
+        self._key_to_idx: Dict[str, int] = {
+            img.stem: idx for idx, img in enumerate(self._chunks)
+        }
+
+    def __getitem__(self, index: int) -> Any:
+        """Get an item from the dataset at a given index."""
+        img_path = self._chunks[index]
+        img = Image.open(img_path)
+        return np.asarray(img)
+
+    def __len__(self) -> int:
+        """Get the length of the dataset."""
+        return len(self._chunks)
+
+    def key_to_index(self, key: str) -> int:
+        """Get index of a given key in the dataset."""
+        return self._key_to_idx[key]

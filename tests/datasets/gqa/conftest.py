@@ -1,10 +1,14 @@
 """Fixtures and configuration for GQA dataset tests."""
 
 import json
+from pathlib import Path
+from random import randint
+from typing import Any, List, Mapping, Tuple
 
 import h5py
 import numpy as np
 import pytest
+from PIL import Image
 
 from graphgen.config.gqa import GQAFilemap, GQASplit, GQAVersion
 
@@ -68,12 +72,56 @@ _SCENE_GRAPH_SAMPLE_FULL = {
 }
 
 
+def generate_image_files(
+    filenames: List[Path],
+    min_size: Tuple[int, int] = (16, 16),
+    max_size: Tuple[int, int] = (32, 32),
+) -> None:
+    """Create multiple images with given filenames and random sizes."""
+    for path in filenames:
+        image = Image.new(
+            mode="RGB",
+            size=(randint(min_size[0], max_size[0]), randint(min_size[1], max_size[1])),
+        )
+        if not path.parent.exists():
+            path.parent.mkdir(parents=True)
+        with open(path, "w") as img_file:
+            image.save(img_file)
+
+
+def generate_hdf5_files(
+    filenames: List[Path], dataset_shapes: Mapping[str, Tuple[int, ...]]
+) -> None:
+    """Create multiple hdf5 files with given filenames and corresponding \
+    datasets containing randomly generated data."""
+    for path in filenames:
+        if not path.parent.exists():
+            path.parent.mkdir(parents=True)
+
+        with h5py.File(path, "w") as h5_file:
+            for dataset, shape in dataset_shapes.items():
+                h5_file.create_dataset(dataset, data=np.random.rand(*shape))
+
+
+def generate_json_files(filenames: List[Path], contents: List[Any]) -> None:
+    """Create multiple JSON files with given filenames and corresponding contents."""
+    for content, path in zip(contents, filenames):
+        if not path.parent.exists():
+            path.parent.mkdir(parents=True)
+        with path.open("w") as json_file:
+            json.dump(content, json_file)
+
+
 @pytest.fixture(name="gqa")
 def fixture_gqa(tmp_path_factory):
     """Create a fake GQA dataset in a temporary directory for use in tests."""
     # Create directory
     root = tmp_path_factory.mktemp("gqa")
     filemap = GQAFilemap(root)
+
+    image_count = 8
+    spatial_count = 16
+    object_count = 16
 
     # Create question files
     for split in GQASplit:
@@ -86,56 +134,44 @@ def fixture_gqa(tmp_path_factory):
             else:
                 paths = [filemap.question_path(split, version)]
 
-            for idx, path in enumerate(paths):
-                if not path.parent.exists():
-                    path.parent.mkdir(parents=True)
+            contents = [
+                {str(idx): _QUESTION_SAMPLE_FULL}
+                if split in (GQASplit.TRAIN, GQASplit.VAL)
+                else {str(idx): _QUESTION_SAMPLE_PARTIAL}
+                for idx in range(len(paths))
+            ]
 
-                content = (
-                    {str(idx): _QUESTION_SAMPLE_FULL}
-                    if split in (GQASplit.TRAIN, GQASplit.VAL)
-                    else {str(idx): _QUESTION_SAMPLE_PARTIAL}
-                )
-                with path.open("w") as json_file:
-                    json.dump(content, json_file)
+            generate_json_files(paths, contents)
 
     # Create scene graph files
-    for split in (GQASplit.TRAIN, GQASplit.VAL):
-        path = filemap.scene_graph_path(split)
-        if not path.parent.exists():
-            path.parent.mkdir(parents=True)
-        content = {"0": _SCENE_GRAPH_SAMPLE_FULL}
-        with path.open("w") as json_file:
-            json.dump(content, json_file)
+    paths = [
+        filemap.scene_graph_path(split) for split in (GQASplit.TRAIN, GQASplit.VAL)
+    ]
+    contents = [{"0": _SCENE_GRAPH_SAMPLE_FULL} for _ in range(len(paths))]
+    generate_json_files(paths, contents)
 
     # Create spatial features
-    paths = [filemap.spatial_path(chunk_id=idx) for idx in range(16)]
-    content = np.zeros((1, 2048, 7, 7))
-    for path in paths:
-        if not path.parent.exists():
-            path.parent.mkdir(parents=True)
-
-        with h5py.File(path, "w") as h5_file:
-            h5_file.create_dataset("features", data=content)
+    paths = [filemap.spatial_path(chunk_id=idx) for idx in range(spatial_count)]
+    spatial_datasets = {"features": (1, 2048, 7, 7)}
+    generate_hdf5_files(paths, spatial_datasets)
 
     # Create spatial features meta file
-    with open(filemap.spatial_meta_path(), "w") as json_file:
-        json.dump({str(idx): {"idx": 0, "file": idx} for idx in range(16)}, json_file)
+    paths = [filemap.spatial_meta_path()]
+    contents = [{str(idx): {"idx": 0, "file": idx} for idx in range(spatial_count)}]
+    generate_json_files(paths, contents)
 
     # Create object features
-    paths = [filemap.object_path(chunk_id=idx) for idx in range(16)]
-    content_features = np.zeros((1, 100, 2048))
-    content_bboxes = np.zeros((1, 100, 4))
-
-    for path in paths:
-        if not path.parent.exists():
-            path.parent.mkdir(parents=True)
-
-        with h5py.File(path, "w") as h5_file:
-            h5_file.create_dataset("features", data=content_features)
-            h5_file.create_dataset("bboxes", data=content_bboxes)
+    paths = [filemap.object_path(chunk_id=idx) for idx in range(object_count)]
+    object_datasets = {"features": (1, 100, 2048), "bboxes": (1, 100, 4)}
+    generate_hdf5_files(paths, object_datasets)
 
     # Create object features meta file
-    with open(filemap.object_meta_path(), "w") as json_file:
-        json.dump({str(idx): {"idx": 0, "file": idx} for idx in range(16)}, json_file)
+    paths = [filemap.object_meta_path()]
+    contents = [{str(idx): {"idx": 0, "file": idx} for idx in range(object_count)}]
+    generate_json_files(paths, contents)
+
+    # Create image files
+    paths = [filemap.image_path(str(idx)) for idx in range(image_count)]
+    generate_image_files(paths)
 
     return root

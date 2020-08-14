@@ -37,9 +37,11 @@ class GQAFilemap(DatasetFilemap):
     spatial_dir: Path = Path("images", "spatial")
     scene_graphs_dir: Path = Path("sceneGraphs")
 
-    def image_path(self, image_id: str) -> Path:
+    def image_path(self, image_id: Optional[str] = None) -> Path:
         """Get the path to an image file."""
-        return self.root / self.images_dir / f"{image_id}.jpg"
+        if image_id is not None:
+            return self.root / self.images_dir / f"{image_id}.jpg"
+        return self.root / self.images_dir
 
     def object_path(self, chunk_id: Optional[int] = None) -> Path:
         """Get the path to a Faster-RCNN object features file."""

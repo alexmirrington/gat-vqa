@@ -56,7 +56,7 @@ def main(config: Config) -> None:
     object_features = objects[objects.key_to_index(question["imageId"])]
     print({key: val.shape for key, val in object_features.items()})
     image = images[images.key_to_index(question["imageId"])]
-
+    print(image.shape)
     # Plot visual features
     plot_image(image, Path("image.png"), object_features["bboxes"])
     plot_spatial_features(spatial_features["features"], Path("spatial.png"))
