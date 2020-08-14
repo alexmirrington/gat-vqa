@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Any, List, Mapping, Tuple
+from typing import Any, Dict, List, Mapping, Tuple
 
 import h5py
 import numpy as np
@@ -11,63 +11,75 @@ from PIL import Image
 
 from graphgen.config.gqa import GQAFilemap, GQASplit, GQAVersion
 
-_QUESTION_SAMPLE_FULL = {
-    "imageId": "0",
-    "question": "Is there a red apple on the table?",
-    "answer": "no",
-    "fullAnswer": "No, there is an apple but it is green.",
-    "isBalanced": True,
-    "groups": {"global": None, "local": "8r-binary-apple"},
-    "entailed": ["1352631", "1245832", "842753"],
-    "equivalent": ["1245832", "842753"],
-    "types": {
-        "structural": "verify",
-        "semantic": "relation",
-        "detailed": "existAttrRel",
-    },
-    "annotations": {
-        "question": {"4": "271881", "7": "279472"},
-        "answer": {},
-        "fullAnswer": {"4": "271881"},
-    },
-    "semantic": [
-        {"operation": "select", "argument": "table (279472)", "dependencies": []},
-        {
-            "operation": "relate",
-            "argument": "on, subject, apple (271881)",
-            "dependencies": [0],
+_QUESTIONS_FULL: Dict[str, Any] = {
+    "0": {
+        "imageId": "0",
+        "question": "Is there a red apple on the table?",
+        "answer": "no",
+        "fullAnswer": "No, there is an apple but it is green.",
+        "isBalanced": True,
+        "groups": {"global": None, "local": "8r-binary-apple"},
+        "entailed": [],
+        "equivalent": [],
+        "types": {
+            "structural": "verify",
+            "semantic": "relation",
+            "detailed": "existAttrRel",
         },
-        {"operation": "filter", "argument": "red", "dependencies": [1]},
-        {"operation": "exist", "argument": "?", "dependencies": [2]},
-    ],
-    "semanticStr": "select: table (279472) -> \
-        relate: on, subject, apple (271881) -> exist: ?",
+        "annotations": {
+            "question": {"4": "0", "7": "1"},
+            "answer": {},
+            "fullAnswer": {"4": "0"},
+        },
+        "semantic": [
+            {"operation": "select", "argument": "table (1)", "dependencies": []},
+            {
+                "operation": "relate",
+                "argument": "on, subject, apple (0)",
+                "dependencies": [0],
+            },
+            {"operation": "filter", "argument": "red", "dependencies": [1]},
+            {"operation": "exist", "argument": "?", "dependencies": [2]},
+        ],
+        "semanticStr": "select: table (1) -> relate: on, subject, \
+apple (0) -> exist: ?",
+    }
 }
 
-_QUESTION_SAMPLE_PARTIAL = {
-    "imageId": "0",
-    "question": "Is there a red apple on the table?",
-    "isBalanced": True,
+_QUESTIONS_PARTIAL: Dict[str, Any] = {
+    "0": {
+        "imageId": "0",
+        "question": "Is there a red apple on the table?",
+        "isBalanced": True,
+    }
 }
 
-_SCENE_GRAPH_SAMPLE_FULL = {
-    "width": 640,
-    "height": 480,
-    "location": "living room",
-    "objects": {
-        "271881": {
-            "name": "chair",
-            "x": 220,
-            "y": 310,
-            "w": 50,
-            "h": 80,
-            "attributes": ["brown", "wooden", "small"],
-            "relations": [
-                {"name": "on", "object": "275312"},
-                {"name": "near", "object": "279472"},
-            ],
-        }
-    },
+_SCENE_GRAPHS: Dict[str, Any] = {
+    "0": {
+        "width": 800,
+        "height": 564,
+        "location": "living room",
+        "objects": {
+            "0": {
+                "name": "apple",
+                "x": 386,
+                "y": 174,
+                "w": 264,
+                "h": 260,
+                "attributes": ["green", "round"],
+                "relations": [{"name": "on", "object": "1"}],
+            },
+            "1": {
+                "name": "table",
+                "x": 4,
+                "y": 100,
+                "w": 791,
+                "h": 457,
+                "attributes": ["wooden"],
+                "relations": [{"name": "under", "object": "0"}],
+            },
+        },
+    }
 }
 
 
@@ -76,7 +88,7 @@ def generate_image_files(
 ) -> None:
     """Create multiple images with given filenames and random sizes."""
     for path, dim in zip(filenames, dimensions):
-        image = Image.new(mode="RGB", size=dim,)
+        image = Image.new(mode="RGB", size=dim)
         if not path.parent.exists():
             path.parent.mkdir(parents=True)
         with open(path, "w") as img_file:
@@ -84,7 +96,7 @@ def generate_image_files(
 
 
 def generate_hdf5_files(
-    filenames: List[Path], dataset_shapes: Mapping[str, Tuple[int, ...]]
+    filenames: List[Path], datasets: Mapping[str, np.ndarray]
 ) -> None:
     """Create multiple hdf5 files with given filenames and corresponding \
     datasets containing randomly generated data."""
@@ -93,8 +105,8 @@ def generate_hdf5_files(
             path.parent.mkdir(parents=True)
 
         with h5py.File(path, "w") as h5_file:
-            for dataset, shape in dataset_shapes.items():
-                h5_file.create_dataset(dataset, data=np.random.rand(*shape))
+            for dataset, data in datasets.items():
+                h5_file.create_dataset(dataset, data=data)
 
 
 def generate_json_files(filenames: List[Path], contents: List[Any]) -> None:
@@ -113,8 +125,8 @@ def fixture_gqa(tmp_path_factory):
     root = tmp_path_factory.mktemp("gqa")
     filemap = GQAFilemap(root)
 
-    spatial_chunks = 16
-    object_chunks = 16
+    question_count = len(_QUESTIONS_FULL)
+    image_count = len(_SCENE_GRAPHS)
 
     # Create question files
     for split in GQASplit:
@@ -122,17 +134,23 @@ def fixture_gqa(tmp_path_factory):
             if split == GQASplit.TRAIN and version == GQAVersion.ALL:
                 paths = [
                     filemap.question_path(split, version, chunked=True, chunk_id=idx)
-                    for idx in range(10)
+                    for idx in range(question_count)
+                ]
+                contents = [
+                    {key: val}
+                    for key, val in (
+                        _QUESTIONS_FULL
+                        if split in (GQASplit.TRAIN, GQASplit.VAL)
+                        else _QUESTIONS_PARTIAL
+                    ).items()
                 ]
             else:
                 paths = [filemap.question_path(split, version)]
-
-            contents = [
-                {str(idx): _QUESTION_SAMPLE_FULL}
-                if split in (GQASplit.TRAIN, GQASplit.VAL)
-                else {str(idx): _QUESTION_SAMPLE_PARTIAL}
-                for idx in range(len(paths))
-            ]
+                contents = [
+                    _QUESTIONS_FULL
+                    if split in (GQASplit.TRAIN, GQASplit.VAL)
+                    else _QUESTIONS_PARTIAL
+                ]
 
             generate_json_files(paths, contents)
 
@@ -140,32 +158,65 @@ def fixture_gqa(tmp_path_factory):
     paths = [
         filemap.scene_graph_path(split) for split in (GQASplit.TRAIN, GQASplit.VAL)
     ]
-    contents = [{"0": _SCENE_GRAPH_SAMPLE_FULL} for _ in range(len(paths))]
+    contents = [_SCENE_GRAPHS for _ in range(len(paths))]
     generate_json_files(paths, contents)
 
-    # Create spatial features
-    paths = [filemap.spatial_path(chunk_id=idx) for idx in range(spatial_chunks)]
-    spatial_datasets = {"features": (1, 2048, 7, 7)}
+    # Create spatial features, one h5 file per image
+    paths = [filemap.spatial_path(chunk_id=idx) for idx in range(image_count)]
+    spatial_datasets: Dict[str, Any] = {
+        "features": np.random.rand(len(_SCENE_GRAPHS), 2048, 7, 7)
+    }
     generate_hdf5_files(paths, spatial_datasets)
 
     # Create spatial features meta file
     paths = [filemap.spatial_meta_path()]
-    contents = [{str(idx): {"idx": 0, "file": idx} for idx in range(spatial_chunks)}]
+    contents = [{str(idx): {"idx": 0, "file": idx} for idx in range(image_count)}]
     generate_json_files(paths, contents)
 
-    # Create object features
-    paths = [filemap.object_path(chunk_id=idx) for idx in range(object_chunks)]
-    object_datasets = {"features": (1, 100, 2048), "bboxes": (1, 100, 4)}
+    # Create object features, one h5 file per image
+    paths = [filemap.object_path(chunk_id=idx) for idx in range(image_count)]
+    object_counts = {
+        img_id: len(graph["objects"]) for img_id, graph in _SCENE_GRAPHS.items()
+    }
+    object_datasets: Dict[str, Any] = {
+        "features": np.array(
+            [
+                np.concatenate(
+                    (np.random.rand(n, 2048), np.zeros((100 - n, 2048))), axis=0
+                )
+                for n in object_counts.values()
+            ]
+        ),
+        "bboxes": np.array(
+            [
+                np.concatenate(
+                    (
+                        np.array(
+                            [
+                                (val["x"], val["y"], val["w"], val["h"])
+                                for val in _SCENE_GRAPHS[img_id]["objects"].values()
+                            ]
+                        ),
+                        np.zeros((100 - n, 4)),
+                    ),
+                    axis=0,
+                )
+                for img_id, n in object_counts.items()
+            ]
+        ),
+    }
     generate_hdf5_files(paths, object_datasets)
 
     # Create object features meta file
     paths = [filemap.object_meta_path()]
-    contents = [{str(idx): {"idx": 0, "file": idx} for idx in range(object_chunks)}]
+    contents = [{str(idx): {"idx": 0, "file": idx} for idx in range(image_count)}]
     generate_json_files(paths, contents)
 
     # Create image files
-    paths = [filemap.image_path(str(0))]
-    dimensions = [(640, 480)]
+    paths = [filemap.image_path(str(idx)) for idx in range(image_count)]
+    dimensions = [
+        (int(graph["width"]), int(graph["height"])) for graph in _SCENE_GRAPHS.values()
+    ]
     generate_image_files(paths, dimensions)
 
     return root

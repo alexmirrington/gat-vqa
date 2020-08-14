@@ -101,7 +101,7 @@ def test_questions_len(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
     dataset = GQAQuestions(GQAFilemap(gqa), split, version)
     length = len(dataset)
     assert isinstance(length, int)
-    assert length == 10 if split == GQASplit.TRAIN and version == GQAVersion.ALL else 1
+    assert length == 1
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)

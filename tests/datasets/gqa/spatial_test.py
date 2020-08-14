@@ -62,7 +62,7 @@ def test_spatial_len(gqa: Path) -> None:
     dataset = GQASpatial(GQAFilemap(gqa))
     length = len(dataset)
     assert isinstance(length, int)
-    assert length == 16
+    assert length == 1
 
 
 def test_spatial_key_to_index(gqa: Path) -> None:
