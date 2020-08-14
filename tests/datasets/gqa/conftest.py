@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-from random import randint
 from typing import Any, List, Mapping, Tuple
 
 import h5py
@@ -13,7 +12,7 @@ from PIL import Image
 from graphgen.config.gqa import GQAFilemap, GQASplit, GQAVersion
 
 _QUESTION_SAMPLE_FULL = {
-    "imageId": "2407890",
+    "imageId": "0",
     "question": "Is there a red apple on the table?",
     "answer": "no",
     "fullAnswer": "No, there is an apple but it is green.",
@@ -46,7 +45,7 @@ _QUESTION_SAMPLE_FULL = {
 }
 
 _QUESTION_SAMPLE_PARTIAL = {
-    "imageId": "2407890",
+    "imageId": "0",
     "question": "Is there a red apple on the table?",
     "isBalanced": True,
 }
@@ -73,16 +72,11 @@ _SCENE_GRAPH_SAMPLE_FULL = {
 
 
 def generate_image_files(
-    filenames: List[Path],
-    min_size: Tuple[int, int] = (16, 16),
-    max_size: Tuple[int, int] = (32, 32),
+    filenames: List[Path], dimensions: List[Tuple[int, int]],
 ) -> None:
     """Create multiple images with given filenames and random sizes."""
-    for path in filenames:
-        image = Image.new(
-            mode="RGB",
-            size=(randint(min_size[0], max_size[0]), randint(min_size[1], max_size[1])),
-        )
+    for path, dim in zip(filenames, dimensions):
+        image = Image.new(mode="RGB", size=dim,)
         if not path.parent.exists():
             path.parent.mkdir(parents=True)
         with open(path, "w") as img_file:
@@ -112,16 +106,15 @@ def generate_json_files(filenames: List[Path], contents: List[Any]) -> None:
             json.dump(content, json_file)
 
 
-@pytest.fixture(name="gqa")
+@pytest.fixture(name="gqa", scope="session")
 def fixture_gqa(tmp_path_factory):
     """Create a fake GQA dataset in a temporary directory for use in tests."""
     # Create directory
     root = tmp_path_factory.mktemp("gqa")
     filemap = GQAFilemap(root)
 
-    image_count = 8
-    spatial_count = 16
-    object_count = 16
+    spatial_chunks = 16
+    object_chunks = 16
 
     # Create question files
     for split in GQASplit:
@@ -151,27 +144,28 @@ def fixture_gqa(tmp_path_factory):
     generate_json_files(paths, contents)
 
     # Create spatial features
-    paths = [filemap.spatial_path(chunk_id=idx) for idx in range(spatial_count)]
+    paths = [filemap.spatial_path(chunk_id=idx) for idx in range(spatial_chunks)]
     spatial_datasets = {"features": (1, 2048, 7, 7)}
     generate_hdf5_files(paths, spatial_datasets)
 
     # Create spatial features meta file
     paths = [filemap.spatial_meta_path()]
-    contents = [{str(idx): {"idx": 0, "file": idx} for idx in range(spatial_count)}]
+    contents = [{str(idx): {"idx": 0, "file": idx} for idx in range(spatial_chunks)}]
     generate_json_files(paths, contents)
 
     # Create object features
-    paths = [filemap.object_path(chunk_id=idx) for idx in range(object_count)]
+    paths = [filemap.object_path(chunk_id=idx) for idx in range(object_chunks)]
     object_datasets = {"features": (1, 100, 2048), "bboxes": (1, 100, 4)}
     generate_hdf5_files(paths, object_datasets)
 
     # Create object features meta file
     paths = [filemap.object_meta_path()]
-    contents = [{str(idx): {"idx": 0, "file": idx} for idx in range(object_count)}]
+    contents = [{str(idx): {"idx": 0, "file": idx} for idx in range(object_chunks)}]
     generate_json_files(paths, contents)
 
     # Create image files
-    paths = [filemap.image_path(str(idx)) for idx in range(image_count)]
-    generate_image_files(paths)
+    paths = [filemap.image_path(str(0))]
+    dimensions = [(640, 480)]
+    generate_image_files(paths, dimensions)
 
     return root

@@ -59,7 +59,7 @@ def test_images_len(gqa: Path) -> None:
     dataset = GQAImages(GQAFilemap(gqa))
     length = len(dataset)
     assert isinstance(length, int)
-    assert length == 8
+    assert length == 1
 
 
 def test_images_key_to_index(gqa: Path) -> None:

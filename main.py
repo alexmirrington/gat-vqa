@@ -10,11 +10,7 @@ import torch
 from termcolor import colored
 
 from graphgen.config import Config
-from graphgen.datasets.gqa.images import GQAImages
-from graphgen.datasets.gqa.objects import GQAObjects
-from graphgen.datasets.gqa.questions import GQAQuestions
-from graphgen.datasets.gqa.scene_graphs import GQASceneGraphs
-from graphgen.datasets.gqa.spatial import GQASpatial
+from graphgen.datasets.gqa import GQA
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 from graphgen.utilities.visualisation import plot_image, plot_spatial_features
 
@@ -38,28 +34,19 @@ def main(config: Config) -> None:
     print(f"device: {torch.cuda.get_device_name(device) if cuda else 'CPU'}")
 
     print(config)
-    questions = GQAQuestions(
-        config.dataset.filemap, config.dataset.split, config.dataset.version,
-    )
-    graphs = GQASceneGraphs(config.dataset.filemap, config.dataset.split)
-    spatial = GQASpatial(config.dataset.filemap)
-    objects = GQAObjects(config.dataset.filemap)
-    images = GQAImages(config.dataset.filemap)
+    dataset = GQA(config.dataset.filemap, config.dataset.split, config.dataset.version)
 
-    qn_idx = random.randint(0, len(questions) - 1)
-    question = questions[qn_idx]
+    idx = random.randint(0, len(dataset) - 1)
+    question, image, spatial, objects, graph = dataset[idx]
     print(f"{question=}")
-    graph = graphs[graphs.key_to_index(question["imageId"])]
     print(f"{graph=}")
-    spatial_features = spatial[spatial.key_to_index(question["imageId"])]
-    print({key: val.shape for key, val in spatial_features.items()})
-    object_features = objects[objects.key_to_index(question["imageId"])]
-    print({key: val.shape for key, val in object_features.items()})
-    image = images[images.key_to_index(question["imageId"])]
+    print({key: val.shape for key, val in spatial.items()})
+    print({key: val.shape for key, val in objects.items()})
     print(image.shape)
+
     # Plot visual features
-    plot_image(image, Path("image.png"), object_features["bboxes"])
-    plot_spatial_features(spatial_features["features"], Path("spatial.png"))
+    plot_image(image, Path("image.png"), objects["bboxes"])
+    plot_spatial_features(spatial["features"], Path("spatial.png"))
 
 
 def parse_args() -> argparse.Namespace:
