@@ -1,0 +1,10 @@
+{
+  "dataset": {
+    "name": "gqa",
+    "split": "train",
+    "version": "balanced",
+    "filemap": {
+      "root": "./data/gqa"
+    }
+  }
+}

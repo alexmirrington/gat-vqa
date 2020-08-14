@@ -2,7 +2,7 @@
 .PHONY: test
 
 test:
-	@pytest --cov=graphgen
+	@pytest ./tests/ --cov-report term-missing --cov=graphgen
 
 install:
 	@pip install -r requirements.txt

@@ -38,4 +38,5 @@ repos:
   hooks:
   - id: mypy
     pass_filenames: false
-    args: [., --config-file, .mypy.ini]
+    args: [.]
+    additional_dependencies: [torch, pytest, jsons]

@@ -2,3 +2,10 @@ pre-commit
 pylint
 pytest
 pytest-cov
+termcolor
+torch
+jsons
+schema
+h5py
+numpy
+pillow
