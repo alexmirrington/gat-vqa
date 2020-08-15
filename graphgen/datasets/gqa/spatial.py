@@ -3,6 +3,7 @@ import json
 from typing import Any
 
 import torch.utils.data
+from torch import Tensor
 
 from ...config.gqa import GQAFilemap
 from ..utilities import ChunkedHDF5Dataset
@@ -56,9 +57,10 @@ class GQASpatial(torch.utils.data.Dataset):  # type: ignore
         """Get the length of the dataset."""
         return len(self._data)
 
-    def __getitem__(self, index: int) -> Any:
+    def __getitem__(self, index: int) -> Tensor:
         """Get an item from the dataset at a given index."""
-        return self._data[index]
+        sample = self._data[index]
+        return torch.tensor(sample["features"])  # pylint: disable=not-callable
 
     def key_to_index(self, key: str) -> Any:
         """Get the index of the spatial feature in the dataset with a given image id."""

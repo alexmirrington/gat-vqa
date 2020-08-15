@@ -2,6 +2,7 @@
 from pathlib import Path
 
 import pytest
+from torch import Tensor
 
 from graphgen.config.gqa import GQAFilemap, GQASplit, GQAVersion
 from graphgen.datasets.gqa import GQA
@@ -132,7 +133,7 @@ def test_gqa_questions_property(
 def test_gqa_getitem(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
     """Ensure an item is returned given valid GQA data."""
     dataset = GQA(GQAFilemap(gqa), split, version)
-    question, image, spatial, objects, scene_graph = dataset[0]
+    question, image, spatial, objects, boxes, scene_graph = dataset[0]
 
     # Validate scene question data
     GQA_QUESTION_SCHEMA.validate(question)
@@ -144,16 +145,14 @@ def test_gqa_getitem(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
         assert scene_graph is None
 
     # Validate spatial features
-    assert isinstance(spatial, dict)
-    assert "features" in spatial.keys()
-    assert spatial["features"].shape == (2048, 7, 7)
+    assert isinstance(spatial, Tensor)
+    assert spatial.size() == (2048, 7, 7)
 
     # Validate object features
-    assert isinstance(objects, dict)
-    assert "features" in objects.keys()
-    assert objects["features"].shape == (100, 2048)
-    assert "bboxes" in objects.keys()
-    assert objects["bboxes"].shape == (100, 4)
+    assert isinstance(objects, Tensor)
+    assert objects.size() == (100, 2048)
+    assert isinstance(boxes, Tensor)
+    assert boxes.size() == (100, 4)
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)

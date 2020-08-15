@@ -1,7 +1,8 @@
 """A torch-compatible GQA dataset implementation."""
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 import torch.utils.data
+from torch import Tensor
 
 from ...config.gqa import GQAFilemap, GQASplit, GQAVersion
 from .images import GQAImages
@@ -9,6 +10,34 @@ from .objects import GQAObjects
 from .questions import GQAQuestions
 from .scene_graphs import GQASceneGraphs
 from .spatial import GQASpatial
+
+# class GQABatch:
+
+#     def __init__(
+#         self, data: Iterable[Tuple[Any, Tensor, Tensor, Tensor, Tensor, Any]]
+#     ) -> None:
+#         transposed_data = list(zip(*data))
+#         self.questions = transposed_data[0]
+#         self.images = transposed_data[1]
+#         self.spatials = torch.stack(transposed_data[2], 0)
+#         self.objects = torch.stack(transposed_data[3], 0)
+#         self.boxes = torch.stack(transposed_data[4], 0)
+#         self.scene_graphs = transposed_data[5]
+
+#     def pin_memory(self) -> "GQABatch":
+#         self.questions = self.questions.pin_memory()
+#         self.images = self.images.pin_memory()
+#         self.spatials = self.spatials.pin_memory()
+#         self.objects = self.objects.pin_memory()
+#         self.boxes = self.boxes.pin_memory()
+#         self.scene_graphs = self.scene_graphs.pin_memory()
+#         return self
+
+
+# def gqa_collator_wrapper(
+#     batch: Iterable[Tuple[Any, Tensor, Tensor, Tensor, Tensor, Any]]
+# ) -> GQABatch:
+#     return GQABatch(batch)
 
 
 class GQA(torch.utils.data.Dataset):  # type: ignore
@@ -99,18 +128,20 @@ class GQA(torch.utils.data.Dataset):  # type: ignore
         """Get the questions portion of the dataset."""
         return self._questions
 
-    def __getitem__(self, index: int) -> Any:
+    def __getitem__(
+        self, index: int
+    ) -> Tuple[Any, Tensor, Tensor, Tensor, Tensor, Any]:
         """Get an item from the dataset at a given index."""
         question = self._questions[index]
         image_id = question["imageId"]
         image = self._images[self._images.key_to_index(image_id)]
-        objects = self._objects[self._objects.key_to_index(image_id)]
+        objects, boxes = self._objects[self._objects.key_to_index(image_id)]
         spatial = self._spatial[self._spatial.key_to_index(image_id)]
         scene_graph = None
         if self._scene_graphs is not None:
             scene_graph = self._scene_graphs[self._scene_graphs.key_to_index(image_id)]
 
-        return (question, image, spatial, objects, scene_graph)
+        return (question, image, spatial, objects, boxes, scene_graph)
 
     def __len__(self) -> int:
         """Get the length of the dataset."""

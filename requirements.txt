@@ -12,3 +12,4 @@ pillow
 wandb
 torchvision
 mypy
+tqdm

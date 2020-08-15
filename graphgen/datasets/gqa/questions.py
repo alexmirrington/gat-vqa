@@ -1,14 +1,9 @@
 """A torch-compatible GQA questions dataset implementation."""
-
-from typing import Any
-
-import torch.utils.data
-
 from ...config.gqa import GQAFilemap, GQASplit, GQAVersion
 from ..utilities import ChunkedJSONDataset
 
 
-class GQAQuestions(torch.utils.data.Dataset):  # type: ignore
+class GQAQuestions(ChunkedJSONDataset):
     """A torch-compatible dataset that retrieves GQA question samples."""
 
     def __init__(
@@ -26,7 +21,6 @@ class GQAQuestions(torch.utils.data.Dataset):  # type: ignore
         --------
         None
         """
-        super().__init__()
         if not isinstance(filemap, GQAFilemap):
             raise TypeError(
                 f"Parameter {filemap=} must be of type {GQAFilemap.__name__}."
@@ -40,23 +34,23 @@ class GQAQuestions(torch.utils.data.Dataset):  # type: ignore
                 f"Parameter {version=} must be of type {GQAVersion.__name__}."
             )
 
-        self._filemap = filemap
-        self._split = split
-        self._version = version
-
-        # Validate the questions root file/directory
-        questions_root = self._filemap.question_path(
-            self._split,
-            self._version,
-            chunked=(self._split == GQASplit.TRAIN and self.version == GQAVersion.ALL),
+        root = filemap.question_path(
+            split,
+            version,
+            chunked=(split == GQASplit.TRAIN and version == GQAVersion.ALL),
         )
-        if not questions_root.exists():
+
+        if not root.exists():
             raise ValueError(
                 f"Parameter {filemap=} does not refer to a valid questions"
                 f"file or directory for {split=} and {version=}."
             )
 
-        self._data = ChunkedJSONDataset(questions_root)
+        super().__init__(root)
+
+        self._filemap = filemap
+        self._split = split
+        self._version = version
 
     @property
     def filemap(self) -> GQAFilemap:
@@ -72,15 +66,3 @@ class GQAQuestions(torch.utils.data.Dataset):  # type: ignore
     def version(self) -> GQAVersion:
         """Get the dataset version."""
         return self._version
-
-    def __len__(self) -> int:
-        """Get the length of the dataset."""
-        return len(self._data)
-
-    def __getitem__(self, index: int) -> Any:
-        """Get an item from the dataset at a given index."""
-        return self._data[index]
-
-    def key_to_index(self, key: str) -> Any:
-        """Get the index of the question in the dataset with a given question id."""
-        return self._data.key_to_index(key)

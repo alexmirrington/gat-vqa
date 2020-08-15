@@ -2,7 +2,6 @@
 
 import argparse
 import json
-import random
 from pathlib import Path, PurePath
 from typing import Any, Tuple
 
@@ -10,9 +9,12 @@ import jsons
 import torch
 import wandb
 from termcolor import colored
+from torch.utils.data import DataLoader  # , SequentialSampler
+from tqdm import tqdm
 
 from graphgen.config import Config
 from graphgen.datasets.gqa import GQA
+from graphgen.datasets.utilities import ChunkedRandomSampler
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
 
@@ -31,19 +33,29 @@ def main(config: Config) -> None:
     # Print environment info
     print(colored("environment:", attrs=["bold"]))
     cuda = torch.cuda.is_available()
-    device = torch.device("cuda" if cuda else "cpu")  # type: ignore
+    device = torch.device("cuda" if cuda else "cpu")
     print(f"device: {torch.cuda.get_device_name(device) if cuda else 'CPU'}")
-
     print(config)
-    dataset = GQA(config.dataset.filemap, config.dataset.split, config.dataset.version)
 
-    idx = random.randint(0, len(dataset) - 1)
-    question, image, spatial, objects, graph = dataset[idx]
-    print(f"{question=}")
-    print(f"{graph=}")
-    print({key: val.shape for key, val in spatial.items()})
-    print({key: val.shape for key, val in objects.items()})
-    print(image.shape)
+    print(colored("preprocessing:", attrs=["bold"]))
+    gqa = GQA(config.dataset.filemap, config.dataset.split, config.dataset.version)
+
+    dataset = gqa.questions
+
+    print(colored("running:", attrs=["bold"]))
+    sampler = ChunkedRandomSampler(dataset)  # SequentialSampler(dataset)
+    dataloader = DataLoader(
+        dataset,
+        batch_size=config.dataloader.batch_size,
+        num_workers=config.dataloader.workers,
+        sampler=sampler,
+        collate_fn=lambda batch: batch,
+    )  # collate_fn=gqa_collator_wrapper)
+    for batch, sample in enumerate(tqdm(dataloader)):
+        continue
+        # sample.spatials.to(device)
+        # sample.objects.to(device)
+        # sample.boxes.to(device)
 
 
 def parse_args() -> argparse.Namespace:

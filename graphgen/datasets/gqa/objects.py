@@ -1,8 +1,9 @@
 """A torch-compatible GQA object features dataset implementation."""
 import json
-from typing import Any
+from typing import Any, Tuple
 
 import torch.utils.data
+from torch import Tensor
 
 from ...config.gqa import GQAFilemap
 from ..utilities import ChunkedHDF5Dataset
@@ -57,9 +58,13 @@ class GQAObjects(torch.utils.data.Dataset):  # type: ignore
         """Get the length of the dataset."""
         return len(self._data)
 
-    def __getitem__(self, index: int) -> Any:
+    def __getitem__(self, index: int) -> Tuple[Tensor, Tensor]:
         """Get an item from the dataset at a given index."""
-        return self._data[index]
+        data = self._data[index]
+        return (
+            torch.tensor(data["features"]),  # pylint: disable=not-callable
+            torch.tensor(data["bboxes"]),  # pylint: disable=not-callable
+        )
 
     def key_to_index(self, key: str) -> Any:
         """Get the index of the object feature in the dataset with a given image id."""

@@ -1,7 +1,9 @@
 """A torch-compatible GQA images dataset implementation."""
-from typing import Any
+from typing import Any, Callable, Optional
 
 import torch.utils.data
+from PIL import Image
+from torch import Tensor
 
 from ...config.gqa import GQAFilemap
 from ..utilities import ImageFolderDataset
@@ -10,7 +12,11 @@ from ..utilities import ImageFolderDataset
 class GQAImages(torch.utils.data.Dataset):  # type: ignore
     """A torch-compatible dataset that retrieves GQA image samples."""
 
-    def __init__(self, filemap: GQAFilemap) -> None:
+    def __init__(
+        self,
+        filemap: GQAFilemap,
+        transform: Optional[Callable[[Image.Image], Tensor]] = None,
+    ) -> None:
         """Initialise a `GQAImages` instance.
 
         Params:
@@ -34,7 +40,7 @@ class GQAImages(torch.utils.data.Dataset):  # type: ignore
             )
 
         self._filemap = filemap
-        self._data = ImageFolderDataset(images_root)
+        self._data = ImageFolderDataset(images_root, transform)
 
     @property
     def filemap(self) -> GQAFilemap:
