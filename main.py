@@ -3,14 +3,14 @@
 import argparse
 import json
 import random
-from pathlib import PurePath
+from pathlib import Path, PurePath
 from typing import Any, Tuple
 
 import jsons
 import torch
+import wandb
 from termcolor import colored
 
-import wandb
 from graphgen.config import Config
 from graphgen.datasets.gqa import GQA
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
@@ -92,5 +92,7 @@ def load_config(filename: str) -> Tuple[Config, Any]:
 if __name__ == "__main__":
     parsed_args = parse_args()
     config_obj, config_dict = load_config(parsed_args.config)
-    wandb.init(project="graphgen", config=config_dict)
+    if not Path(".wandb").exists():
+        Path(".wandb").mkdir()
+    wandb.init(project="graphgen", dir=".wandb", config=config_dict)
     main(config_obj)
