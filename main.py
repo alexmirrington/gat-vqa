@@ -4,15 +4,16 @@ import argparse
 import json
 import random
 from pathlib import Path, PurePath
+from typing import Any, Tuple
 
 import jsons
 import torch
+import wandb
 from termcolor import colored
 
 from graphgen.config import Config
 from graphgen.datasets.gqa import GQA
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
-from graphgen.utilities.visualisation import plot_image, plot_spatial_features
 
 
 def main(config: Config) -> None:
@@ -28,7 +29,7 @@ def main(config: Config) -> None:
     None.
     """
     # Print environment info
-    print(colored("Environment:", attrs=["bold"]))
+    print(colored("environment:", attrs=["bold"]))
     cuda = torch.cuda.is_available()
     device = torch.device("cuda" if cuda else "cpu")  # type: ignore
     print(f"device: {torch.cuda.get_device_name(device) if cuda else 'CPU'}")
@@ -43,10 +44,6 @@ def main(config: Config) -> None:
     print({key: val.shape for key, val in spatial.items()})
     print({key: val.shape for key, val in objects.items()})
     print(image.shape)
-
-    # Plot visual features
-    plot_image(image, Path("image.png"), objects["bboxes"])
-    plot_spatial_features(spatial["features"], Path("spatial.png"))
 
 
 def parse_args() -> argparse.Namespace:
@@ -69,7 +66,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_config(filename: str) -> Config:
+def load_config(filename: str) -> Tuple[Config, Any]:
     """Load a JSON configuration from `filename` into a `Config` object.
 
     Params:
@@ -89,10 +86,13 @@ def load_config(filename: str) -> Config:
     jsons.set_serializer(path_serializer, PurePath)
 
     config: Config = jsons.load(config_json, Config)
-    return config
+    return config, config_json
 
 
 if __name__ == "__main__":
     parsed_args = parse_args()
-    config_obj = load_config(parsed_args.config)
+    config_obj, config_dict = load_config(parsed_args.config)
+    if not Path(".wandb").exists():
+        Path(".wandb").mkdir()
+    wandb.init(project="graphgen", dir=".wandb", config=config_dict)
     main(config_obj)
