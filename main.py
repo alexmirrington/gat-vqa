@@ -9,13 +9,14 @@ import jsons
 import torch
 import wandb
 from termcolor import colored
-from torch.utils.data import DataLoader  # , SequentialSampler
+from torch.utils.data import DataLoader, SequentialSampler
 from tqdm import tqdm
 
 from graphgen.config import Config
 from graphgen.datasets.gqa import GQA
-from graphgen.datasets.utilities import ChunkedRandomSampler
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
+
+# from graphgen.datasets.utilities import ChunkedRandomSampler
 
 
 def main(config: Config) -> None:
@@ -43,7 +44,7 @@ def main(config: Config) -> None:
     dataset = gqa.questions
 
     print(colored("running:", attrs=["bold"]))
-    sampler = ChunkedRandomSampler(dataset)  # SequentialSampler(dataset)
+    sampler = SequentialSampler(dataset)
     dataloader = DataLoader(
         dataset,
         batch_size=config.dataloader.batch_size,
