@@ -9,3 +9,4 @@ schema
 h5py
 numpy
 pillow
+wandb
