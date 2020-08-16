@@ -3,7 +3,6 @@
 import argparse
 import json
 import re
-import sys
 from pathlib import Path, PurePath
 from typing import Any, Dict, Tuple
 
@@ -96,7 +95,7 @@ def main(config: Config) -> None:
         sampler=sampler,
         collate_fn=lambda batch: list(zip(*batch)),
     )
-    for batch, sample in enumerate(tqdm(dataloader, file=sys.stdout)):
+    for sample in tqdm(dataloader, desc="batch: "):
         question, image, spatial, objects, boxes, scene_graph = sample
 
 
