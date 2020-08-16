@@ -3,6 +3,7 @@
 import argparse
 import json
 import re
+import sys
 from pathlib import Path, PurePath
 from typing import Any, Dict, Tuple
 
@@ -11,9 +12,10 @@ import torch
 import wandb
 from termcolor import colored
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from graphgen.config import Config
-from graphgen.datasets.gqa.questions import GQAQuestions
+from graphgen.datasets.gqa import GQA, GQAImages, GQAQuestions
 from graphgen.datasets.utilities import ChunkedRandomSampler
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
@@ -67,32 +69,35 @@ def main(config: Config) -> None:
     print(f"device: {torch.cuda.get_device_name(device) if cuda else 'CPU'}")
     print(config)
 
+    # Preprocess data
     print(colored("preprocessing:", attrs=["bold"]))
-    preprocessor = QuestionPreprocessor()
-    dataset = GQAQuestions(
+    questions = GQAQuestions(
         config.dataset.filemap,
         config.dataset.split,
         config.dataset.version,
-        preprocessor=preprocessor,
+        preprocessor=QuestionPreprocessor(),
         tempdir=Path(),
     )
+    print(f"loaded {questions.__class__.__name__}")
 
-    # Save word to index dict
-    with open("word_to_index.json", "w") as file:
-        json.dump(preprocessor.word_to_index, file, indent=2)
+    images = GQAImages(config.dataset.filemap)
+    print(f"loaded {images.__class__.__name__}")
 
+    dataset = GQA(questions, images=images)
+    print(f"loaded {dataset.__class__.__name__}")
+
+    # Run model
     print(colored("running:", attrs=["bold"]))
-    sampler = ChunkedRandomSampler(dataset)
+    sampler = ChunkedRandomSampler(dataset.questions)
     dataloader = DataLoader(
         dataset,
         batch_size=config.dataloader.batch_size,
         num_workers=config.dataloader.workers,
         sampler=sampler,
-        collate_fn=lambda batch: batch,
+        collate_fn=lambda batch: list(zip(*batch)),
     )
-    for batch, sample in enumerate(dataloader):
-        print(sample)
-        break
+    for batch, sample in enumerate(tqdm(dataloader, file=sys.stdout)):
+        question, image, spatial, objects, boxes, scene_graph = sample
 
 
 def parse_args() -> argparse.Namespace:

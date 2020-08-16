@@ -16,108 +16,111 @@ from graphgen.schemas.gqa import GQA_QUESTION_SCHEMA, GQA_SCENE_GRAPH_SCHEMA
 _SPLIT_VERSION_GRID = [(split, version) for split in GQASplit for version in GQAVersion]
 
 
-def test_gqa_nonexistent_root(tmp_path: Path) -> None:
-    """Ensure a dataset instance cannot be created with a non-existent root."""
-    root = tmp_path / "gqa"
-    with pytest.raises(ValueError):
-        GQA(GQAFilemap(root), GQASplit.TRAIN, GQAVersion.BALANCED)
-
-
-def test_gqa_valid_symlink_root(tmp_path: Path, gqa: Path) -> None:
-    """Ensure a dataset instance can be created with a symlinked root."""
-    ln_root = tmp_path / "link"
-    ln_root.symlink_to(gqa)
-    GQA(GQAFilemap(ln_root), GQASplit.TRAIN, GQAVersion.BALANCED)
-
-
-def test_gqa_valid_directory_root(gqa: Path) -> None:
-    """Ensure a dataset instance can be created with a regular directory root."""
-    GQA(GQAFilemap(gqa), GQASplit.TRAIN, GQAVersion.BALANCED)
-
-
-def test_gqa_invalid_root_type() -> None:
-    """Ensure a dataset instance cannot be created with an invalid root type."""
-    with pytest.raises(TypeError):
-        GQA("gqa", GQASplit.TRAIN, GQAVersion.BALANCED)  # type: ignore
-
-
-def test_gqa_invalid_split_type(gqa: Path) -> None:
-    """Ensure a dataset instance cannot be created with an invalid split type."""
-    with pytest.raises(TypeError):
-        GQA(GQAFilemap(gqa), "train", GQAVersion.BALANCED)  # type: ignore
-
-
-def test_gqa_invalid_version_type(gqa: Path) -> None:
-    """Ensure a dataset instance cannot be created with an invalid version type."""
-    with pytest.raises(TypeError):
-        GQA(GQAFilemap(gqa), GQASplit.TRAIN, "balanced")  # type: ignore
-
-
-@pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
-def test_gqa_nonexistent_question_json(
-    tmp_path: Path, split: GQASplit, version: GQAVersion
-) -> None:
-    """Ensure a dataset instance cannot be created with a missing question file."""
-    root = tmp_path / "gqa"
-    root.mkdir()
-
-    with pytest.raises(ValueError):
-        GQA(GQAFilemap(root), split, version)
-
-
-@pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
-def test_gqa_filemap_property(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
-    """Ensure the `filemap` property returns a correct value."""
-    filemap = GQAFilemap(gqa)
-    dataset = GQA(filemap, split, version)
-    assert dataset.filemap == filemap
-
-
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
 def test_gqa_version_property(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
     """Ensure the `version` property returns a correct value."""
-    dataset = GQA(GQAFilemap(gqa), split, version)
+    questions = GQAQuestions(GQAFilemap(gqa), split, version)
+    dataset = GQA(questions)
     assert dataset.version == version
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
 def test_gqa_split_property(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
     """Ensure the `split` property returns a correct value."""
-    dataset = GQA(GQAFilemap(gqa), split, version)
+    questions = GQAQuestions(GQAFilemap(gqa), split, version)
+    dataset = GQA(questions)
     assert dataset.split == split
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
 def test_gqa_images_property(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
-    """Ensure the `images` property returns a correct value."""
-    dataset = GQA(GQAFilemap(gqa), split, version)
-    assert isinstance(dataset.images, GQAImages)
+    """Ensure the `images` property returns a correct value when am images \
+    dataset is supplied."""
+    questions = GQAQuestions(GQAFilemap(gqa), split, version)
+    images = GQAImages(GQAFilemap(gqa))
+    dataset = GQA(questions, images=images)
+    assert dataset.images is images
+
+
+@pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
+def test_gqa_images_property_none(
+    gqa: Path, split: GQASplit, version: GQAVersion
+) -> None:
+    """Ensure the `images` property returns `None` when no image dataset is \
+    supplied."""
+    questions = GQAQuestions(GQAFilemap(gqa), split, version)
+    dataset = GQA(questions)
+    assert dataset.images is None
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
 def test_gqa_objects_property(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
-    """Ensure the `objects` property returns a correct value."""
-    dataset = GQA(GQAFilemap(gqa), split, version)
-    assert isinstance(dataset.objects, GQAObjects)
+    """Ensure the `objects` property returns a correct value when an objects \
+    dataset is supplied."""
+    questions = GQAQuestions(GQAFilemap(gqa), split, version)
+    objects = GQAObjects(GQAFilemap(gqa))
+    dataset = GQA(questions, objects=objects)
+    assert dataset.objects is objects
+
+
+@pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
+def test_gqa_objects_property_none(
+    gqa: Path, split: GQASplit, version: GQAVersion
+) -> None:
+    """Ensure the `objects` property returns `None` when no objects dataset is \
+    supplied."""
+    questions = GQAQuestions(GQAFilemap(gqa), split, version)
+    dataset = GQA(questions)
+    assert dataset.objects is None
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
 def test_gqa_scene_graphs_property(
     gqa: Path, split: GQASplit, version: GQAVersion
 ) -> None:
-    """Ensure the `scene_graphs` property returns a correct value."""
-    dataset = GQA(GQAFilemap(gqa), split, version)
-    if split in (GQASplit.TRAIN, GQASplit.VAL):
-        assert isinstance(dataset.scene_graphs, GQASceneGraphs)
+    """Ensure the `scene_graphs` property returns a correct value when a scene \
+    graphs dataset is supplied."""
+    questions = GQAQuestions(GQAFilemap(gqa), split, version)
+    if split not in (GQASplit.TRAIN, GQASplit.VAL):
+        with pytest.raises(ValueError):
+            scene_graphs = GQASceneGraphs(GQAFilemap(gqa), split)
+            return
     else:
-        assert dataset.scene_graphs is None
+        scene_graphs = GQASceneGraphs(GQAFilemap(gqa), split)
+        dataset = GQA(questions, scene_graphs=scene_graphs)
+        assert dataset.scene_graphs is scene_graphs
+
+
+@pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
+def test_gqa_scene_graphs_property_none(
+    gqa: Path, split: GQASplit, version: GQAVersion
+) -> None:
+    """Ensure the `scene_graphs` property returns `None` when no scene graphs \
+    dataset is supplied."""
+    questions = GQAQuestions(GQAFilemap(gqa), split, version)
+    dataset = GQA(questions)
+    assert dataset.scene_graphs is None
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
 def test_gqa_spatial_property(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
-    """Ensure the `spatial` property returns a correct value."""
-    dataset = GQA(GQAFilemap(gqa), split, version)
-    assert isinstance(dataset.spatial, GQASpatial)
+    """Ensure the `spatial` property returns a correct value when a spatial \
+    dataset is supplied."""
+    questions = GQAQuestions(GQAFilemap(gqa), split, version)
+    spatial = GQASpatial(GQAFilemap(gqa))
+    dataset = GQA(questions, spatial=spatial)
+    assert dataset.spatial is spatial
+
+
+@pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
+def test_gqa_spatial_property_none(
+    gqa: Path, split: GQASplit, version: GQAVersion
+) -> None:
+    """Ensure the `spatial` property returns `None` when no spatial dataset is \
+    supplied."""
+    questions = GQAQuestions(GQAFilemap(gqa), split, version)
+    dataset = GQA(questions)
+    assert dataset.spatial is None
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
@@ -125,18 +128,39 @@ def test_gqa_questions_property(
     gqa: Path, split: GQASplit, version: GQAVersion
 ) -> None:
     """Ensure the `questions` property returns a correct value."""
-    dataset = GQA(GQAFilemap(gqa), split, version)
-    assert isinstance(dataset.questions, GQAQuestions)
+    questions = GQAQuestions(GQAFilemap(gqa), split, version)
+    dataset = GQA(questions)
+    assert dataset.questions is questions
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
-def test_gqa_getitem(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
+def test_gqa_getitem_all(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
     """Ensure an item is returned given valid GQA data."""
-    dataset = GQA(GQAFilemap(gqa), split, version)
+    filemap = GQAFilemap(gqa)
+    questions = GQAQuestions(filemap, split, version)
+    images = GQAImages(filemap)
+    objects = GQAObjects(filemap)
+    spatials = GQASpatial(filemap)
+    scene_graphs = (
+        GQASceneGraphs(filemap, split)
+        if split in (GQASplit.TRAIN, GQASplit.VAL)
+        else None
+    )
+
+    dataset = GQA(
+        questions,
+        images=images,
+        objects=objects,
+        spatial=spatials,
+        scene_graphs=scene_graphs,
+    )
     question, image, spatial, objects, boxes, scene_graph = dataset[0]
 
-    # Validate scene question data
+    # Validate question data
     GQA_QUESTION_SCHEMA.validate(question)
+
+    # Validate image data
+    assert isinstance(image, Tensor)
 
     # Validate scene graph data
     if split in (GQASplit.TRAIN, GQASplit.VAL):
@@ -156,9 +180,31 @@ def test_gqa_getitem(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
+def test_gqa_getitem_questions_only(
+    gqa: Path, split: GQASplit, version: GQAVersion
+) -> None:
+    """Ensure an item is returned given valid GQA data."""
+    filemap = GQAFilemap(gqa)
+    questions = GQAQuestions(filemap, split, version)
+    dataset = GQA(questions)
+    question, image, spatial, objects, boxes, scene_graph = dataset[0]
+
+    # Validate scene question data
+    GQA_QUESTION_SCHEMA.validate(question)
+
+    # Validate all other data
+    assert image is None
+    assert scene_graph is None
+    assert spatial is None
+    assert objects is None
+    assert boxes is None
+
+
+@pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
 def test_gqa_len(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
     """Ensure the correct dataset length is returned given valid GQA data."""
-    dataset = GQA(GQAFilemap(gqa), split, version)
+    questions = GQAQuestions(GQAFilemap(gqa), split, version)
+    dataset = GQA(questions)
     length = len(dataset)
     assert isinstance(length, int)
     assert length == 1
@@ -167,7 +213,8 @@ def test_gqa_len(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
 def test_gqa_key_to_index(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
     """Ensure key_to_index returns the correct index given valid GQA data."""
-    dataset = GQA(GQAFilemap(gqa), split, version)
+    questions = GQAQuestions(GQAFilemap(gqa), split, version)
+    dataset = GQA(questions)
 
     for idx in range(len(dataset)):
         assert dataset.key_to_index(str(idx)) == idx
