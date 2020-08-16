@@ -2,21 +2,50 @@
 
 import argparse
 import json
+import re
 from pathlib import Path, PurePath
-from typing import Any, Tuple
+from typing import Any, Dict, Tuple
 
 import jsons
 import torch
 import wandb
 from termcolor import colored
-from torch.utils.data import DataLoader, SequentialSampler
-from tqdm import tqdm
+from torch.utils.data import DataLoader
 
 from graphgen.config import Config
-from graphgen.datasets.gqa import GQA
+from graphgen.datasets.gqa.questions import GQAQuestions
+from graphgen.datasets.utilities import ChunkedRandomSampler
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
-# from graphgen.datasets.utilities import ChunkedRandomSampler
+
+class QuestionPreprocessor:
+    """Class for preprocessing questions."""
+
+    KEY_MASK = ("imageId", "question", "answer")
+    VOCAB_MASK = ("question", "answer")
+
+    def __init__(self) -> None:
+        """Create a `QuestionPreprocessor` instance."""
+        self.word_to_index: Dict[str, int] = {}
+
+    def __call__(self, question: Any) -> Any:
+        """Preprocess a question sample."""
+        # Filter out unused fields
+        result = {key: val for key, val in question.items() if key in self.KEY_MASK}
+
+        # Populate word_to_index dict
+        for key, val in result.items():
+            if key in self.VOCAB_MASK:
+                lval = val.lower()
+                lval = re.sub(r"[^\w\s]", "", lval)
+                tokens = []
+                for word in lval.split():
+                    if word not in self.word_to_index.keys():
+                        self.word_to_index[word] = len(self.word_to_index)
+                    tokens.append(self.word_to_index[word])
+                result[key] = tokens
+
+        return result
 
 
 def main(config: Config) -> None:
@@ -39,24 +68,31 @@ def main(config: Config) -> None:
     print(config)
 
     print(colored("preprocessing:", attrs=["bold"]))
-    gqa = GQA(config.dataset.filemap, config.dataset.split, config.dataset.version)
+    preprocessor = QuestionPreprocessor()
+    dataset = GQAQuestions(
+        config.dataset.filemap,
+        config.dataset.split,
+        config.dataset.version,
+        preprocessor=preprocessor,
+        tempdir=Path(),
+    )
 
-    dataset = gqa.questions
+    # Save word to index dict
+    with open("word_to_index.json", "w") as file:
+        json.dump(preprocessor.word_to_index, file, indent=2)
 
     print(colored("running:", attrs=["bold"]))
-    sampler = SequentialSampler(dataset)
+    sampler = ChunkedRandomSampler(dataset)
     dataloader = DataLoader(
         dataset,
         batch_size=config.dataloader.batch_size,
         num_workers=config.dataloader.workers,
         sampler=sampler,
         collate_fn=lambda batch: batch,
-    )  # collate_fn=gqa_collator_wrapper)
-    for batch, sample in enumerate(tqdm(dataloader)):
-        continue
-        # sample.spatials.to(device)
-        # sample.objects.to(device)
-        # sample.boxes.to(device)
+    )
+    for batch, sample in enumerate(dataloader):
+        print(sample)
+        break
 
 
 def parse_args() -> argparse.Namespace:

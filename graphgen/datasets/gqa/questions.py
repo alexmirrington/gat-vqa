@@ -1,4 +1,7 @@
 """A torch-compatible GQA questions dataset implementation."""
+from pathlib import Path
+from typing import Any, Callable, Optional
+
 from ...config.gqa import GQAFilemap, GQASplit, GQAVersion
 from ..utilities import ChunkedJSONDataset
 
@@ -7,20 +10,38 @@ class GQAQuestions(ChunkedJSONDataset):
     """A torch-compatible dataset that retrieves GQA question samples."""
 
     def __init__(
-        self, filemap: GQAFilemap, split: GQASplit, version: GQAVersion
+        self,
+        filemap: GQAFilemap,
+        split: GQASplit,
+        version: GQAVersion,
+        tempdir: Optional[Path] = None,
+        preprocessor: Optional[Callable[[Any], Any]] = None,
+        transform: Optional[Callable[[Any], Any]] = None,
     ) -> None:
         """Initialise a `GQAQuestions` instance.
 
         Params:
         -------
         `filemap`: The filemap to use when determining where to load data from.
+
         `split`: The dataset split to use.
+
         `version`: The dataset version to use.
 
-        Returns:
-        --------
-        None
+        `tempdir`: A path to a directory that preprocessed files can be saved in.
+        Preprocessed files are removed when the dataset is unloaded from memory,
+        though files may persist if a process crashes. If `tempdir` is `None`,
+        a system temporary directory will be used.
+
+        `preprocessor`: A callable that preprocesses a single sample of the data.
+        Preprocessing occurs on dataset creation, and preprocessed data is saved
+        to disk.
+
+        `transform`: A function that is applied to each sample in __getitem__,
+        i.e. applied to the result of the `preprocessor` function for a sample,
+        or to raw samples if `preprocessor` is `None`.
         """
+        # Validate parameters
         if not isinstance(filemap, GQAFilemap):
             raise TypeError(
                 f"Parameter {filemap=} must be of type {GQAFilemap.__name__}."
@@ -46,7 +67,9 @@ class GQAQuestions(ChunkedJSONDataset):
                 f"file or directory for {split=} and {version=}."
             )
 
-        super().__init__(root)
+        super().__init__(
+            root, tempdir=tempdir, preprocessor=preprocessor, transform=transform
+        )
 
         self._filemap = filemap
         self._split = split

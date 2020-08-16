@@ -165,3 +165,10 @@ allow-global-unused-variables=no
 # system, and so shouldn't trigger E1101 when accessed. Python regular
 # expressions are accepted.
 generated-members=numpy.*,torch.*
+
+[DESIGN]
+
+max-attributes=8
+max-args=8
+max-locals=16
+min-public-methods=1

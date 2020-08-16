@@ -2,13 +2,13 @@
   "dataset": {
     "name": "gqa",
     "split": "train",
-    "version": "all",
+    "version": "balanced",
     "filemap": {
       "root": "./data/gqa"
     }
   },
   "dataloader": {
-    "batch_size": 64,
-    "workers": 1
+    "batch_size": 8,
+    "workers": 0
   }
 }
