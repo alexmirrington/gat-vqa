@@ -2,9 +2,8 @@
 
 import argparse
 import json
-import re
 from pathlib import Path, PurePath
-from typing import Any, Dict, Tuple
+from typing import Any, Tuple
 
 import jsons
 import torch
@@ -16,37 +15,8 @@ from tqdm import tqdm
 from graphgen.config import Config
 from graphgen.datasets.gqa import GQA, GQAImages, GQAQuestions
 from graphgen.datasets.utilities import ChunkedRandomSampler
+from graphgen.utilities.preprocessing import QuestionPreprocessor
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
-
-
-class QuestionPreprocessor:
-    """Class for preprocessing questions."""
-
-    KEY_MASK = ("imageId", "question", "answer")
-    VOCAB_MASK = ("question", "answer")
-
-    def __init__(self) -> None:
-        """Create a `QuestionPreprocessor` instance."""
-        self.word_to_index: Dict[str, int] = {}
-
-    def __call__(self, question: Any) -> Any:
-        """Preprocess a question sample."""
-        # Filter out unused fields
-        result = {key: val for key, val in question.items() if key in self.KEY_MASK}
-
-        # Populate word_to_index dict
-        for key, val in result.items():
-            if key in self.VOCAB_MASK:
-                lval = val.lower()
-                lval = re.sub(r"[^\w\s]", "", lval)
-                tokens = []
-                for word in lval.split():
-                    if word not in self.word_to_index.keys():
-                        self.word_to_index[word] = len(self.word_to_index)
-                    tokens.append(self.word_to_index[word])
-                result[key] = tokens
-
-        return result
 
 
 def main(config: Config) -> None:
