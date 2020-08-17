@@ -2,6 +2,7 @@
 from pathlib import Path
 
 import pytest
+from torch import Tensor
 
 from graphgen.config.gqa import GQAFilemap
 from graphgen.datasets.gqa.spatial import GQASpatial
@@ -52,9 +53,8 @@ def test_spatial_getitem(gqa: Path) -> None:
     """Ensure an item is returned given valid GQA data."""
     dataset = GQASpatial(GQAFilemap(gqa))
     spatial = dataset[0]
-    assert isinstance(spatial, dict)
-    assert "features" in spatial.keys()
-    assert spatial["features"].shape == (2048, 7, 7)
+    assert isinstance(spatial, Tensor)
+    assert spatial.size() == (2048, 7, 7)
 
 
 def test_spatial_len(gqa: Path) -> None:

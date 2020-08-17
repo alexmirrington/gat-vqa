@@ -1,54 +1,43 @@
 """A torch-compatible GQA images dataset implementation."""
-from typing import Any
+from typing import Callable, Optional
 
-import torch.utils.data
+from PIL import Image
+from torch import Tensor
 
 from ...config.gqa import GQAFilemap
 from ..utilities import ImageFolderDataset
 
 
-class GQAImages(torch.utils.data.Dataset):  # type: ignore
+class GQAImages(ImageFolderDataset):
     """A torch-compatible dataset that retrieves GQA image samples."""
 
-    def __init__(self, filemap: GQAFilemap) -> None:
+    def __init__(
+        self,
+        filemap: GQAFilemap,
+        transform: Optional[Callable[[Image.Image], Tensor]] = None,
+    ) -> None:
         """Initialise a `GQAImages` instance.
 
         Params:
         -------
         `filemap`: The filemap to use when determining where to load data from.
-
-        Returns:
-        --------
-        None
         """
-        super().__init__()
         if not isinstance(filemap, GQAFilemap):
             raise TypeError(
                 f"Parameter {filemap=} must be of type {GQAFilemap.__name__}."
             )
 
-        images_root = filemap.image_path()
-        if not images_root.exists():
+        root = filemap.image_path()
+        if not root.exists():
             raise ValueError(
                 f"Parameter {filemap=} does not refer to a valid images directory."
             )
 
+        super().__init__(root, transform)
+
         self._filemap = filemap
-        self._data = ImageFolderDataset(images_root)
 
     @property
     def filemap(self) -> GQAFilemap:
         """Get the dataset's filemap."""
         return self._filemap
-
-    def __len__(self) -> int:
-        """Get the length of the dataset."""
-        return len(self._data)
-
-    def __getitem__(self, index: int) -> Any:
-        """Get an item from the dataset at a given index."""
-        return self._data[index]
-
-    def key_to_index(self, key: str) -> Any:
-        """Get the index of the image in the dataset with a given image id."""
-        return self._data.key_to_index(key)

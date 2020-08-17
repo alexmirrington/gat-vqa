@@ -2,7 +2,6 @@
 
 import argparse
 import json
-import random
 from pathlib import Path, PurePath
 from typing import Any, Tuple
 
@@ -10,9 +9,13 @@ import jsons
 import torch
 import wandb
 from termcolor import colored
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from graphgen.config import Config
-from graphgen.datasets.gqa import GQA
+from graphgen.datasets.gqa import GQA, GQAImages, GQAQuestions
+from graphgen.datasets.utilities import ChunkedRandomSampler
+from graphgen.utilities.preprocessing import QuestionPreprocessor
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
 
@@ -31,19 +34,39 @@ def main(config: Config) -> None:
     # Print environment info
     print(colored("environment:", attrs=["bold"]))
     cuda = torch.cuda.is_available()
-    device = torch.device("cuda" if cuda else "cpu")  # type: ignore
+    device = torch.device("cuda" if cuda else "cpu")
     print(f"device: {torch.cuda.get_device_name(device) if cuda else 'CPU'}")
-
     print(config)
-    dataset = GQA(config.dataset.filemap, config.dataset.split, config.dataset.version)
 
-    idx = random.randint(0, len(dataset) - 1)
-    question, image, spatial, objects, graph = dataset[idx]
-    print(f"{question=}")
-    print(f"{graph=}")
-    print({key: val.shape for key, val in spatial.items()})
-    print({key: val.shape for key, val in objects.items()})
-    print(image.shape)
+    # Preprocess data
+    print(colored("preprocessing:", attrs=["bold"]))
+    questions = GQAQuestions(
+        config.dataset.filemap,
+        config.dataset.split,
+        config.dataset.version,
+        preprocessor=QuestionPreprocessor(),
+        tempdir=Path(),
+    )
+    print(f"loaded {questions.__class__.__name__}")
+
+    images = GQAImages(config.dataset.filemap)
+    print(f"loaded {images.__class__.__name__}")
+
+    dataset = GQA(questions, images=images)
+    print(f"loaded {dataset.__class__.__name__}")
+
+    # Run model
+    print(colored("running:", attrs=["bold"]))
+    sampler = ChunkedRandomSampler(dataset.questions)
+    dataloader = DataLoader(
+        dataset,
+        batch_size=config.dataloader.batch_size,
+        num_workers=config.dataloader.workers,
+        sampler=sampler,
+        collate_fn=lambda batch: list(zip(*batch)),
+    )
+    for sample in tqdm(dataloader, desc="batch: "):
+        question, image, spatial, objects, boxes, scene_graph = sample
 
 
 def parse_args() -> argparse.Namespace:

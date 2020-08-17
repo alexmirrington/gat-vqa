@@ -6,5 +6,9 @@
     "filemap": {
       "root": "./data/gqa"
     }
+  },
+  "dataloader": {
+    "batch_size": 64,
+    "workers": 0
   }
 }

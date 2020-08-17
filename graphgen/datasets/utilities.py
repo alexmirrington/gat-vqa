@@ -3,12 +3,14 @@ import json
 from abc import abstractmethod
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 import h5py
-import numpy as np
+import torch
 import torch.utils.data
 from PIL import Image
+from torch import Tensor
+from torchvision import transforms
 
 
 class ChunkedDataset(torch.utils.data.Dataset):  # type: ignore
@@ -52,6 +54,12 @@ class ChunkedDataset(torch.utils.data.Dataset):  # type: ignore
         """Get a tuple of containing the paths to the chunks in the dataset."""
         return self._chunks
 
+    @property
+    @abstractmethod
+    def chunk_sizes(self) -> Tuple[int, ...]:
+        """Get the length of each of the chunks in the dataset."""
+        raise NotImplementedError()
+
     @abstractmethod
     def __getitem__(self, index: int) -> Any:
         """Get an item from the dataset at a given index."""
@@ -66,7 +74,14 @@ class ChunkedDataset(torch.utils.data.Dataset):  # type: ignore
 class ChunkedJSONDataset(ChunkedDataset):
     """A torch-compatible dataset that loads data from one or more JSON files."""
 
-    def __init__(self, root: Path) -> None:
+    # pylint: disable=too-many-instance-attributes
+    def __init__(
+        self,
+        root: Path,
+        tempdir: Optional[Path] = None,
+        preprocessor: Optional[Callable[[Any], Any]] = None,
+        transform: Optional[Callable[[Any], Any]] = None,
+    ) -> None:
         """Initialise a `ChunkedJSONDataset` instance.
 
         Params:
@@ -74,19 +89,33 @@ class ChunkedJSONDataset(ChunkedDataset):
         `root`: A path to a single JSON file or a folder containing multiple
         JSON files (chunks) at its top level.
 
-        Returns:
-        --------
-        None
+        `tempdir`: A path to a directory that preprocessed files can be saved in.
+        Preprocessed files are removed when the dataset is unloaded from memory,
+        though files may persist if a process crashes. If `tempdir` is `None`,
+        a system temporary directory will be used.
+
+        `preprocessor`: A callable that preprocesses a single sample of the data.
+        Preprocessing occurs on dataset creation, and preprocessed data is saved
+        to disk.
+
+        `transform`: A function that is applied to each sample in __getitem__,
+        i.e. applied to the result of the `preprocessor` function for a sample,
+        or to raw samples if `preprocessor` is `None`.
         """
         super().__init__(root)
 
         self._key_to_idx: Dict[str, int] = {}
         self._chunk_sizes: Tuple[int, ...] = ()
-        self._chunk_cache = None
+        self._chunk_cache: Dict[int, Tuple[Any, ...]] = {}
+
+        self._tempdir = TemporaryDirectory(dir=tempdir)
+        self._preprocessor = preprocessor
+        self._transform = transform
 
         # Load top-level JSON keys into `self.chunk_map`
         cum_idx = 0
         chunk_sizes = []
+        preprocessed_chunks = []
         for chunk_idx, chunk_name in enumerate(self._chunks):
             with open(chunk_name, "r") as chunk:
                 chunk_data = json.load(chunk)
@@ -94,12 +123,32 @@ class ChunkedJSONDataset(ChunkedDataset):
                 self._key_to_idx.update(
                     {key: cum_idx + idx for idx, key in enumerate(chunk_data.keys())}
                 )
-                self._chunk_cache = {chunk_idx: tuple(chunk_data.values())}
                 chunk_sizes.append(chunk_size)
                 cum_idx += chunk_size
+                # Preprocess data
+                preprocessed_data = None
+                if self._preprocessor is not None:
+                    preprocessed_data = {
+                        key: self._preprocessor(val) for key, val in chunk_data.items()
+                    }
                 del chunk_data
+                # Save preprocessed data
+                if preprocessed_data is not None:
+                    pchunk = Path(self._tempdir.name) / f"{chunk_idx}.json"
+                    with open(pchunk, "w") as file:
+                        json.dump(preprocessed_data, file)
+                    preprocessed_chunks.append(pchunk)
+                del preprocessed_data
 
         self._chunk_sizes = tuple(chunk_sizes)
+        if self._preprocessor is not None:
+            self._root = Path(self._tempdir.name)
+            self._chunks = tuple(preprocessed_chunks)
+
+    @property
+    def chunk_sizes(self) -> Tuple[int, ...]:
+        """Get the length of each of the chunks in the dataset."""
+        return self._chunk_sizes
 
     def _get_chunk_local_idx(self, index: int) -> Tuple[int, int]:
         """Get the path of the chunk containing the data item at index `index`.
@@ -136,7 +185,11 @@ class ChunkedJSONDataset(ChunkedDataset):
             with open(self._chunks[chunk_idx], "r") as chunk:
                 self._chunk_cache = {chunk_idx: tuple(json.load(chunk).values())}
 
-        return self._chunk_cache[chunk_idx][local_idx]
+        result = self._chunk_cache[chunk_idx][local_idx]
+        if self._transform is not None:
+            result = self._transform(result)
+
+        return result
 
     def __len__(self) -> int:
         """Get the length of the dataset."""
@@ -270,6 +323,11 @@ class ChunkedHDF5Dataset(ChunkedDataset):
 
         return tuple(chunks), tuple(chunk_sizes), dataset_shapes
 
+    @property
+    def chunk_sizes(self) -> Tuple[int, ...]:
+        """Get the length of each of the chunks in the dataset."""
+        return self._chunk_sizes
+
     def __getitem__(self, index: int) -> Any:
         """Get an item from the dataset at a given index."""
         return {dset: self._data[dset][index] for dset in self._data.keys()}
@@ -296,7 +354,9 @@ class ChunkedHDF5Dataset(ChunkedDataset):
 class ImageFolderDataset(ChunkedDataset):
     """A torch-compatible dataset that loads data from one or more image files."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(
+        self, root: Path, transform: Optional[Callable[[Image.Image], Tensor]] = None
+    ) -> None:
         """Initialise an `ImageFolderDataset` instance.
 
         Params:
@@ -312,12 +372,22 @@ class ImageFolderDataset(ChunkedDataset):
         self._key_to_idx: Dict[str, int] = {
             img.stem: idx for idx, img in enumerate(self._chunks)
         }
+        self._transform = transform
+        self._chunk_sizes = tuple([1 for _ in range(len(self._key_to_idx))])
 
-    def __getitem__(self, index: int) -> Any:
+    @property
+    def chunk_sizes(self) -> Tuple[int, ...]:
+        """Get the length of each of the chunks in the dataset."""
+        return self._chunk_sizes
+
+    def __getitem__(self, index: int) -> Tensor:
         """Get an item from the dataset at a given index."""
         img_path = self._chunks[index]
         img = Image.open(img_path)
-        return np.asarray(img)
+        transform = (
+            self._transform if self._transform is not None else transforms.ToTensor()
+        )
+        return transform(img)
 
     def __len__(self) -> int:
         """Get the length of the dataset."""
@@ -326,3 +396,42 @@ class ImageFolderDataset(ChunkedDataset):
     def key_to_index(self, key: str) -> int:
         """Get index of a given key in the dataset."""
         return self._key_to_idx[key]
+
+
+class ChunkedRandomSampler:
+    """Custom sampler that performs a chunked shuffle fo maximise cache hits."""
+
+    def __init__(
+        self, data_source: ChunkedDataset, generator: torch.Generator = None
+    ) -> None:
+        """Create a new ChunkedRandomSampler instance.
+
+        Params:
+        -------
+        `data_source`: Dataset to sample from.
+        `generator`: Generator used in sampling.
+        """
+        self.data_source = data_source
+        self.generator = generator
+
+    def __iter__(self) -> Iterable[int]:
+        """Get an iterator for the sampler instance."""
+        chunk_bounds = self.data_source.chunk_sizes
+        # Permute items inside chunks
+        perms = []
+        start = 0
+        for bound in chunk_bounds:
+            perms.append(
+                (torch.randperm(bound, generator=self.generator) + start).tolist()
+            )
+            start += bound
+        # Permute chunks
+        chunk_perm = torch.randperm(len(perms), generator=self.generator).tolist()
+        result = []
+        for cidx in chunk_perm:
+            result += perms[cidx]
+        return iter(result)
+
+    def __len__(self) -> int:
+        """Get the length of the sampler's data source."""
+        return len(self.data_source)

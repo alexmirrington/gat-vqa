@@ -2,6 +2,7 @@
 from pathlib import Path
 
 import pytest
+from torch import Tensor
 
 from graphgen.config.gqa import GQAFilemap
 from graphgen.datasets.gqa.objects import GQAObjects
@@ -51,12 +52,13 @@ def test_objects_filemap_property(gqa: Path) -> None:
 def test_objects_getitem(gqa: Path) -> None:
     """Ensure an item is returned given valid GQA data."""
     dataset = GQAObjects(GQAFilemap(gqa))
-    objects = dataset[0]
-    assert isinstance(objects, dict)
-    assert "features" in objects.keys()
-    assert "bboxes" in objects.keys()
-    assert objects["features"].shape == (100, 2048)
-    assert objects["bboxes"].shape == (100, 4)
+    objects, boxes = dataset[0]
+
+    # Validate object features
+    assert isinstance(objects, Tensor)
+    assert objects.size() == (100, 2048)
+    assert isinstance(boxes, Tensor)
+    assert boxes.size() == (100, 4)
 
 
 def test_objects_len(gqa: Path) -> None:

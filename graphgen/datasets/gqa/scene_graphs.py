@@ -1,28 +1,44 @@
 """A torch-compatible GQA scene graphs dataset implementation."""
-from typing import Any
-
-import torch.utils.data
+from pathlib import Path
+from typing import Any, Callable, Optional
 
 from ...config.gqa import GQAFilemap, GQASplit
 from ..utilities import ChunkedJSONDataset
 
 
-class GQASceneGraphs(torch.utils.data.Dataset):  # type: ignore
+class GQASceneGraphs(ChunkedJSONDataset):
     """A torch-compatible dataset that retrieves GQA scene graph samples."""
 
-    def __init__(self, filemap: GQAFilemap, split: GQASplit) -> None:
+    def __init__(
+        self,
+        filemap: GQAFilemap,
+        split: GQASplit,
+        tempdir: Optional[Path] = None,
+        preprocessor: Optional[Callable[[Any], Any]] = None,
+        transform: Optional[Callable[[Any], Any]] = None,
+    ) -> None:
         """Initialise a `GQASceneGraphs` instance.
 
         Params:
         -------
         `filemap`: The filemap to use when determining where to load data from.
+
         `split`: The dataset split to use.
 
-        Returns:
-        --------
-        None
+        `cache`: A path to a directory that preprocessed files can be saved in.
+        Preprocessed files are removed when the dataset is unloaded from memory,
+        though files may persist if a process crashes. If `tempdir` is `None`,
+        a system temporary directory will be used.
+
+        `preprocessor`: A callable that preprocesses a single sample of the data.
+        Preprocessing occurs on dataset creation, and preprocessed data is saved
+        to disk.
+
+        `transform`: A function that is applied to each sample in __getitem__,
+        i.e. applied to the result of the `preprocessor` function for a sample,
+        or to raw samples if `preprocessor` is `None`.
         """
-        super().__init__()
+        # Validate parameters
         if not isinstance(filemap, GQAFilemap):
             raise TypeError(
                 f"Parameter {filemap=} must be of type {GQAFilemap.__name__}."
@@ -36,18 +52,20 @@ class GQASceneGraphs(torch.utils.data.Dataset):  # type: ignore
                 f"Parameter {split=} must be one of {(GQASplit.TRAIN, GQASplit.VAL)}."
             )
 
-        self._filemap = filemap
-        self._split = split
-
         # Validate the scene_graphs root file/directory
-        scene_graphs_root = self._filemap.scene_graph_path(self._split,)
-        if not scene_graphs_root.exists():
+        root = filemap.scene_graph_path(split)
+        if not root.exists():
             raise ValueError(
                 f"Parameter {filemap=} does not refer to a valid scene graph"
                 f"file/folder for {split=}."
             )
 
-        self._data = ChunkedJSONDataset(scene_graphs_root)
+        super().__init__(
+            root, tempdir=tempdir, preprocessor=preprocessor, transform=transform
+        )
+
+        self._filemap = filemap
+        self._split = split
 
     @property
     def filemap(self) -> GQAFilemap:
@@ -58,15 +76,3 @@ class GQASceneGraphs(torch.utils.data.Dataset):  # type: ignore
     def split(self) -> GQASplit:
         """Get the dataset split."""
         return self._split
-
-    def __len__(self) -> int:
-        """Get the length of the dataset."""
-        return len(self._data)
-
-    def __getitem__(self, index: int) -> Any:
-        """Get an item from the dataset at a given index."""
-        return self._data[index]
-
-    def key_to_index(self, key: str) -> Any:
-        """Get the index of the scene graph in the dataset with a given question id."""
-        return self._data.key_to_index(key)
