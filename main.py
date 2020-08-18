@@ -6,10 +6,12 @@ from pathlib import Path, PurePath
 from typing import Any, Tuple
 
 import jsons
+import stanza
 import torch
 import wandb
 from termcolor import colored
 from torch.utils.data import DataLoader
+from torch_geometric.data import Data
 from tqdm import tqdm
 
 from graphgen.config import Config
@@ -17,6 +19,17 @@ from graphgen.datasets.gqa import GQA, GQAImages, GQAQuestions
 from graphgen.datasets.utilities import ChunkedRandomSampler
 from graphgen.utilities.preprocessing import QuestionPreprocessor
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
+
+
+def custom_transform(data: Any) -> Any:
+    """Transform data into data for torch-geometric."""
+    adjacency = torch.tensor(  # pylint: disable=not-callable
+        data["question"]["dependencies"]
+    )
+    return {
+        "imageId": data["imageId"],
+        "question": Data(edge_index=adjacency),
+    }
 
 
 def main(config: Config) -> None:
@@ -31,6 +44,10 @@ def main(config: Config) -> None:
     --------
     None.
     """
+    # Download and initialise resources
+    print(colored("initialisation:", attrs=["bold"]))
+    stanza.download(lang="en")
+
     # Print environment info
     print(colored("environment:", attrs=["bold"]))
     cuda = torch.cuda.is_available()
@@ -45,7 +62,8 @@ def main(config: Config) -> None:
         config.dataset.split,
         config.dataset.version,
         preprocessor=QuestionPreprocessor(),
-        tempdir=Path(),
+        transform=custom_transform,
+        cache=Path("cache"),
     )
     print(f"loaded {questions.__class__.__name__}")
 
@@ -67,6 +85,8 @@ def main(config: Config) -> None:
     )
     for sample in tqdm(dataloader, desc="batch: "):
         question, image, spatial, objects, boxes, scene_graph = sample
+        print(question)
+        break
 
 
 def parse_args() -> argparse.Namespace:

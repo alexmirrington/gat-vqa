@@ -13,7 +13,7 @@ class GQASceneGraphs(ChunkedJSONDataset):
         self,
         filemap: GQAFilemap,
         split: GQASplit,
-        tempdir: Optional[Path] = None,
+        cache: Optional[Path] = None,
         preprocessor: Optional[Callable[[Any], Any]] = None,
         transform: Optional[Callable[[Any], Any]] = None,
     ) -> None:
@@ -26,9 +26,7 @@ class GQASceneGraphs(ChunkedJSONDataset):
         `split`: The dataset split to use.
 
         `cache`: A path to a directory that preprocessed files can be saved in.
-        Preprocessed files are removed when the dataset is unloaded from memory,
-        though files may persist if a process crashes. If `tempdir` is `None`,
-        a system temporary directory will be used.
+        If `cache` is `None`, a system temporary directory will be used.
 
         `preprocessor`: A callable that preprocesses a single sample of the data.
         Preprocessing occurs on dataset creation, and preprocessed data is saved
@@ -61,7 +59,7 @@ class GQASceneGraphs(ChunkedJSONDataset):
             )
 
         super().__init__(
-            root, tempdir=tempdir, preprocessor=preprocessor, transform=transform
+            root, cache=cache, preprocessor=preprocessor, transform=transform
         )
 
         self._filemap = filemap

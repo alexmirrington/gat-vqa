@@ -13,3 +13,5 @@ wandb
 torchvision
 mypy
 tqdm
+torch-geometric
+stanza
