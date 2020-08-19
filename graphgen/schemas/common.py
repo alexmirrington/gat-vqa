@@ -1,7 +1,21 @@
 """Common schema definitions."""
 
-from schema import And, Schema
+from typing import List, TypedDict
 
-SLICE_SCHEMA = Schema(
-    And(lambda s: slice(*s.split(":")), lambda s: 1 <= len(s.split(":")) <= 2)
-)
+from torch_geometric.data import Data
+
+
+class Question(TypedDict):
+    """Serialisable representation of a question instance, from any dataset."""
+
+    imageId: str
+    question: str
+    tokens: List[int]
+    dependencies: List[List[int]]
+
+
+class TrainableQuestion(TypedDict):
+    """Trainable representation of a question instance, from any dataset."""
+
+    imageId: str
+    dependencies: Data

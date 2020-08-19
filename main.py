@@ -10,26 +10,13 @@ import stanza
 import torch
 import wandb
 from termcolor import colored
-from torch.utils.data import DataLoader
-from torch_geometric.data import Data
+from torch_geometric.data import DataLoader
 from tqdm import tqdm
 
 from graphgen.config import Config
-from graphgen.datasets.gqa import GQA, GQAImages, GQAQuestions
+from graphgen.datasets.factory import DatasetFactory
 from graphgen.datasets.utilities import ChunkedRandomSampler
-from graphgen.utilities.preprocessing import QuestionPreprocessor
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
-
-
-def custom_transform(data: Any) -> Any:
-    """Transform data into data for torch-geometric."""
-    adjacency = torch.tensor(  # pylint: disable=not-callable
-        data["question"]["dependencies"]
-    )
-    return {
-        "imageId": data["imageId"],
-        "question": Data(edge_index=adjacency),
-    }
 
 
 def main(config: Config) -> None:
@@ -57,21 +44,8 @@ def main(config: Config) -> None:
 
     # Preprocess data
     print(colored("preprocessing:", attrs=["bold"]))
-    questions = GQAQuestions(
-        config.dataset.filemap,
-        config.dataset.split,
-        config.dataset.version,
-        preprocessor=QuestionPreprocessor(),
-        transform=custom_transform,
-        cache=Path("cache"),
-    )
-    print(f"loaded {questions.__class__.__name__}")
-
-    images = GQAImages(config.dataset.filemap)
-    print(f"loaded {images.__class__.__name__}")
-
-    dataset = GQA(questions, images=images)
-    print(f"loaded {dataset.__class__.__name__}")
+    factory = DatasetFactory()
+    dataset = factory.create(config)
 
     # Run model
     print(colored("running:", attrs=["bold"]))
@@ -81,11 +55,9 @@ def main(config: Config) -> None:
         batch_size=config.dataloader.batch_size,
         num_workers=config.dataloader.workers,
         sampler=sampler,
-        collate_fn=lambda batch: list(zip(*batch)),
     )
     for sample in tqdm(dataloader, desc="batch: "):
-        question, image, spatial, objects, boxes, scene_graph = sample
-        print(question)
+        print(sample)
         break
 
 
@@ -105,7 +77,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config", type=str, required=True, help="The config to load settings from."
     )
-
     return parser.parse_args()
 
 

@@ -58,12 +58,11 @@ class GQASceneGraphs(ChunkedJSONDataset):
                 f"file/folder for {split=}."
             )
 
-        super().__init__(
-            root, cache=cache, preprocessor=preprocessor, transform=transform
-        )
+        super().__init__(root, cache=cache, preprocessor=preprocessor)
 
         self._filemap = filemap
         self._split = split
+        self._transform = transform
 
     @property
     def filemap(self) -> GQAFilemap:
@@ -74,3 +73,10 @@ class GQASceneGraphs(ChunkedJSONDataset):
     def split(self) -> GQASplit:
         """Get the dataset split."""
         return self._split
+
+    def __getitem__(self, index: int) -> Any:
+        """Get an item from the dataset at a given index."""
+        item = super().__getitem__(index)
+        if self._transform is not None:
+            return self._transform(item)
+        return item

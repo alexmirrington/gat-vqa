@@ -80,7 +80,6 @@ class ChunkedJSONDataset(ChunkedDataset):
         root: Path,
         cache: Optional[Path] = None,
         preprocessor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
-        transform: Optional[Callable[[Any], Any]] = None,
     ) -> None:
         """Initialise a `ChunkedJSONDataset` instance.
 
@@ -95,10 +94,6 @@ class ChunkedJSONDataset(ChunkedDataset):
         `preprocessor`: A callable that preprocesses a single sample of the data.
         Preprocessing occurs on dataset creation, and preprocessed data is saved
         to disk.
-
-        `transform`: A function that is applied to each sample in __getitem__,
-        i.e. applied to the result of the `preprocessor` function for a sample,
-        or to raw samples if `preprocessor` is `None`.
         """
         super().__init__(root)
 
@@ -107,9 +102,9 @@ class ChunkedJSONDataset(ChunkedDataset):
         self._chunk_cache: Dict[int, Tuple[Any, ...]] = {}
 
         self._preprocessor = preprocessor
-        self._transform = transform
         self._cache: Path
         self._tempdir = None
+
         # Create system tempdir if we are preprocessing and cache is not specified
         if cache is None:
             self._tempdir = TemporaryDirectory()
@@ -190,11 +185,7 @@ class ChunkedJSONDataset(ChunkedDataset):
             with open(self._chunks[chunk_idx], "r") as chunk:
                 self._chunk_cache = {chunk_idx: tuple(json.load(chunk).values())}
 
-        result = self._chunk_cache[chunk_idx][local_idx]
-        if self._transform is not None:
-            result = self._transform(result)
-
-        return result
+        return self._chunk_cache[chunk_idx][local_idx]
 
     def __len__(self) -> int:
         """Get the length of the dataset."""

@@ -1,6 +1,6 @@
 """A torch-compatible GQA questions dataset implementation."""
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 from ...config.gqa import GQAFilemap, GQASplit, GQAVersion
 from ..utilities import ChunkedJSONDataset
@@ -15,7 +15,7 @@ class GQAQuestions(ChunkedJSONDataset):
         split: GQASplit,
         version: GQAVersion,
         cache: Optional[Path] = None,
-        preprocessor: Optional[Callable[[Any], Any]] = None,
+        preprocessor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
         transform: Optional[Callable[[Any], Any]] = None,
     ) -> None:
         """Initialise a `GQAQuestions` instance.
@@ -65,13 +65,12 @@ class GQAQuestions(ChunkedJSONDataset):
                 f"file or directory for {split=} and {version=}."
             )
 
-        super().__init__(
-            root, cache=cache, preprocessor=preprocessor, transform=transform
-        )
+        super().__init__(root, cache=cache, preprocessor=preprocessor)
 
         self._filemap = filemap
         self._split = split
         self._version = version
+        self._transform = transform
 
     @property
     def filemap(self) -> GQAFilemap:
@@ -87,3 +86,10 @@ class GQAQuestions(ChunkedJSONDataset):
     def version(self) -> GQAVersion:
         """Get the dataset version."""
         return self._version
+
+    def __getitem__(self, index: int) -> Any:
+        """Get an item from the dataset at a given index."""
+        item = super().__getitem__(index)
+        if self._transform is not None:
+            return self._transform(item)
+        return item
