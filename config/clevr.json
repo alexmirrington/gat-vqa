@@ -1,0 +1,15 @@
+{
+  "cache": "./cache",
+  "dataset": {
+    "name": "clevr",
+    "split": "train",
+    "features": [],
+    "filemap": {
+      "root": "./data/clevr"
+    }
+  },
+  "dataloader": {
+    "batch_size": 64,
+    "workers": 0
+  }
+}

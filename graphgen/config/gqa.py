@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Set
 
 from .dataset import DatasetConfig, DatasetFilemap, DatasetName
 
@@ -22,6 +22,15 @@ class GQAVersion(Enum):
 
     BALANCED = "balanced"
     ALL = "all"
+
+
+class GQAFeatures(Enum):
+    """An enum specifying possible values for GQA features."""
+
+    IMAGES = "images"
+    OBJECTS = "objects"
+    SPATIAL = "spatial"
+    SCENE_GRAPHS = "scene_graphs"
 
 
 @dataclass(frozen=True)
@@ -99,11 +108,12 @@ class GQAFilemap(DatasetFilemap):
 class GQADatasetConfig(DatasetConfig):
     """A class specifying the valid values for a GQA dataset config."""
 
-    split: GQASplit
     version: GQAVersion
+    split: GQASplit
+    features: Set[GQAFeatures]
     filemap: GQAFilemap
 
     def __post_init__(self) -> None:
-        """Perform post-init checks on the `name` field."""
+        """Perform post-init checks on fields."""
         if self.name != DatasetName.GQA:
             raise ValueError(f"Field {self.name=} must be equal to {DatasetName.GQA}")

@@ -1,14 +1,16 @@
 {
+  "cache": "./cache",
   "dataset": {
     "name": "gqa",
-    "split": "train",
+    "split": "testdev",
     "version": "balanced",
+    "features": [],
     "filemap": {
       "root": "./data/gqa"
     }
   },
   "dataloader": {
-    "batch_size": 64,
+    "batch_size": 2,
     "workers": 0
   }
 }
