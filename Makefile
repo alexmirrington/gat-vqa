@@ -9,6 +9,7 @@ requirements:
 	@pip install -r requirements.txt
 
 install: requirements
+	# Refer to: https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html
 	$(eval CUDA_VERSION = $(shell python -c "import torch; print(torch.version.cuda)"))
 	$(eval CUDA_STRING = $(if $(findstring None,$(CUDA_VERSION)),cpu,cu$(subst .,,$(CUDA_VERSION))))
 	$(eval TORCH_VERSION = $(shell python -c "import torch; print(torch.__version__)"))
