@@ -2,7 +2,7 @@
   "cache": "./cache",
   "dataset": {
     "name": "gqa",
-    "split": "testdev",
+    "split": "train",
     "version": "balanced",
     "features": [],
     "filemap": {
