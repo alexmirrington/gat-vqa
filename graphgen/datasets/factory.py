@@ -5,7 +5,7 @@ from ..config import Config
 from ..config.clevr import CLEVRDatasetConfig
 from ..config.dataset import DatasetName
 from ..config.gqa import GQADatasetConfig, GQAFeatures
-from ..utilities.preprocessing import GQAQuestionPreprocessor, custom_transform
+from ..utilities.preprocessing import GQAQuestionPreprocessor, QuestionTransformer
 from .gqa import GQA, GQAImages, GQAObjects, GQAQuestions, GQASceneGraphs, GQASpatial
 
 
@@ -45,7 +45,7 @@ class DatasetFactory:
             dataset_config.version,
             cache=config.cache,
             preprocessor=GQAQuestionPreprocessor(),
-            transform=custom_transform,
+            transform=QuestionTransformer(),
         )
         images = None
         objects = None

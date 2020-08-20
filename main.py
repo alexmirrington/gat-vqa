@@ -6,16 +6,17 @@ from pathlib import Path, PurePath
 from typing import Any, Tuple
 
 import jsons
+import numpy as np
 import stanza
 import torch
 import wandb
 from termcolor import colored
 from torch_geometric.data import DataLoader
-from tqdm import tqdm
 
 from graphgen.config import Config
 from graphgen.datasets.factory import DatasetFactory
 from graphgen.datasets.utilities import ChunkedRandomSampler
+from graphgen.modules.gcn import GCN
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
 
@@ -31,6 +32,8 @@ def main(config: Config) -> None:
     --------
     None.
     """
+    # pylint: disable=too-many-locals
+
     # Download and initialise resources
     print(colored("initialisation:", attrs=["bold"]))
     stanza.download(lang="en")
@@ -47,6 +50,16 @@ def main(config: Config) -> None:
     factory = DatasetFactory()
     dataset = factory.create(config)
 
+    print(colored("model:", attrs=["bold"]))
+    model = GCN((300, 600, 1200, 1878))  # 1878 is number of unique answers
+    model.to(device)
+    model.train()
+    print(f"{model=}")
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+    print(f"{optimizer=}")
+    criterion = torch.nn.NLLLoss()
+    print(f"{criterion=}")
+
     # Run model
     print(colored("running:", attrs=["bold"]))
     sampler = ChunkedRandomSampler(dataset.questions)
@@ -56,9 +69,50 @@ def main(config: Config) -> None:
         num_workers=config.dataloader.workers,
         sampler=sampler,
     )
-    for sample in tqdm(dataloader, desc="batch: "):
-        print(sample)
-        break
+    num_epochs = 100
+    for epoch in range(num_epochs):
+        correct = 0
+        for batch, sample in enumerate(dataloader):
+            question = sample["question"]
+            data = question["dependencies"].to(device)
+            targets = question["answer"].to(device)
+            optimizer.zero_grad()
+            preds = model(data)
+            loss = criterion(preds, targets)
+            loss.backward()
+            optimizer.step()
+            preds_np = np.argmax(preds.detach().cpu().numpy(), axis=1)
+            targets_np = targets.detach().cpu().numpy()
+            correct += np.sum(np.equal(preds_np, targets_np))
+
+            # Calculate and log metrics
+            if batch % config.logging.step == config.logging.step - 1:
+                train_acc = correct / ((batch + 1) * dataloader.batch_size)
+                print(
+                    colored("batch:", attrs=["bold"]),
+                    f"{batch + 1}/{len(dataloader)}",
+                    colored("loss:", attrs=["bold"], color="cyan"),
+                    f"{loss:.4f}",
+                    colored("acc:", attrs=["bold"], color="green"),
+                    f"{train_acc:.4f}",
+                    end="\r",
+                )
+                wandb.log(
+                    {
+                        "epoch": epoch + batch / len(dataloader),
+                        "train/loss": loss,
+                        "train/accuracy": train_acc,
+                    }
+                )
+        wandb.log({"epoch": epoch + 1, "train/loss": loss, "train/accuracy": train_acc})
+        print(
+            colored("epoch:", attrs=["bold"]),
+            f"{epoch + 1}",
+            colored("loss:", attrs=["bold"], color="cyan"),
+            f"{loss:.4f}",
+            colored("acc:", attrs=["bold"], color="green"),
+            f"{train_acc:.4f}",
+        )
 
 
 def parse_args() -> argparse.Namespace:

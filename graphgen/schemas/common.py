@@ -1,6 +1,6 @@
 """Common schema definitions."""
 
-from typing import List, TypedDict
+from typing import List, Optional, TypedDict
 
 from torch_geometric.data import Data
 
@@ -10,8 +10,9 @@ class Question(TypedDict):
 
     imageId: str
     question: str
-    tokens: List[int]
+    tokens: List[str]  # List[str] over List[int] for GloVe vector lookup.
     dependencies: List[List[int]]
+    answer: Optional[int]
 
 
 class TrainableQuestion(TypedDict):
@@ -19,3 +20,4 @@ class TrainableQuestion(TypedDict):
 
     imageId: str
     dependencies: Data
+    answer: Optional[int]

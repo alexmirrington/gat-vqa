@@ -10,7 +10,10 @@
     }
   },
   "dataloader": {
-    "batch_size": 2,
+    "batch_size": 64,
     "workers": 0
+  },
+  "logging": {
+    "step": 64
   }
 }

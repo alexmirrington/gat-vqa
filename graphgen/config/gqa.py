@@ -1,4 +1,4 @@
-"""Classes for storing filemap-related configuration information."""
+"""Classes for storing GQA configuration information."""
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path

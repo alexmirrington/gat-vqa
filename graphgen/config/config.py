@@ -6,15 +6,17 @@ from typing import Union
 from .clevr import CLEVRDatasetConfig
 from .dataloader import DataloaderConfig
 from .gqa import GQADatasetConfig
+from .logging import LoggingConfig
 
 
 @dataclass(frozen=True)
 class Config:
     """A class containing configuration information such as model parameters."""
 
+    cache: Path
     dataset: Union[CLEVRDatasetConfig, GQADatasetConfig]
     dataloader: DataloaderConfig
-    cache: Path
+    logging: LoggingConfig
 
     def __post_init__(self) -> None:
         """Perform post-init checks on fields."""
