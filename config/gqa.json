@@ -1,7 +1,7 @@
 {
   "dataset": {
     "name": "gqa",
-    "split": "testdev",
+    "split": "train",
     "version": "balanced",
     "features": ["questions"],
     "filemap": {
@@ -14,10 +14,10 @@
     }]
   },
   "dataloader": {
-    "batch_size": 64,
+    "batch_size": 256,
     "workers": 0
   },
   "logging": {
-    "step": 64
+    "step": 16
   }
 }
