@@ -1,12 +1,12 @@
 """A torch-compatible GQA scene graphs dataset implementation."""
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Tuple
 
 from ...config.gqa import GQAFilemap, GQASplit
-from ..utilities import ChunkedJSONDataset
+from ..utilities import ChunkedDataset, ChunkedJSONDataset, PreprocessedJSONDataset
 
 
-class GQASceneGraphs(ChunkedJSONDataset):
+class GQASceneGraphs(ChunkedDataset):
     """A torch-compatible dataset that retrieves GQA scene graph samples."""
 
     def __init__(
@@ -58,7 +58,12 @@ class GQASceneGraphs(ChunkedJSONDataset):
                 f"file/folder for {split=}."
             )
 
-        super().__init__(root, cache=cache, preprocessor=preprocessor)
+        super().__init__(root)
+        self._data = ChunkedJSONDataset(root)
+        if preprocessor is not None and cache is not None:
+            self._data = PreprocessedJSONDataset(
+                self._data, cache=cache, preprocessor=preprocessor
+            )
 
         self._filemap = filemap
         self._split = split
@@ -74,9 +79,22 @@ class GQASceneGraphs(ChunkedJSONDataset):
         """Get the dataset split."""
         return self._split
 
+    @property
+    def chunk_sizes(self) -> Tuple[int, ...]:
+        """Get the length of each of the chunks in the dataset."""
+        return self._data.chunk_sizes
+
     def __getitem__(self, index: int) -> Any:
         """Get an item from the dataset at a given index."""
-        item = super().__getitem__(index)
+        item = self._data[index]
         if self._transform is not None:
             return self._transform(item)
         return item
+
+    def __len__(self) -> int:
+        """Get the length of the dataset."""
+        return len(self._data)
+
+    def key_to_index(self, key: str) -> int:
+        """Get index of a given key in the dataset."""
+        return self._data.key_to_index(key)

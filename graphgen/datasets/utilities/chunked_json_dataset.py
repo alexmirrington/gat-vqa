@@ -1,8 +1,7 @@
 """Utilities for loading data from one or more JSON files."""
 import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Dict, Tuple
 
 from .chunked_dataset import ChunkedDataset
 
@@ -11,12 +10,7 @@ class ChunkedJSONDataset(ChunkedDataset):
     """A torch-compatible dataset that loads data from one or more JSON files."""
 
     # pylint: disable=too-many-instance-attributes
-    def __init__(
-        self,
-        root: Path,
-        cache: Optional[Path] = None,
-        preprocessor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
-    ) -> None:
+    def __init__(self, root: Path) -> None:
         """Initialise a `ChunkedJSONDataset` instance.
 
         Params:
@@ -25,7 +19,6 @@ class ChunkedJSONDataset(ChunkedDataset):
         JSON files (chunks) at its top level.
 
         `cache`: A path to a directory that preprocessed files can be saved in.
-        If `cache` is `None`, a system temporary directory will be used.
 
         `preprocessor`: A callable that preprocesses a single sample of the data.
         Preprocessing occurs on dataset creation, and preprocessed data is saved
@@ -37,21 +30,9 @@ class ChunkedJSONDataset(ChunkedDataset):
         self._chunk_sizes: Tuple[int, ...] = ()
         self._chunk_cache: Dict[int, Tuple[Any, ...]] = {}
 
-        self._preprocessor = preprocessor
-        self._cache: Path
-        self._tempdir = None
-
-        # Create system tempdir if we are preprocessing and cache is not specified
-        if cache is None:
-            self._tempdir = TemporaryDirectory()
-            self._cache = Path(self._tempdir.name)
-        else:
-            self._cache = cache
-
         # Load top-level JSON keys into `self.chunk_map`
         cum_idx = 0
         chunk_sizes = []
-        preprocessed_chunks = []
         for chunk_idx, chunk_name in enumerate(self._chunks):
             with open(chunk_name, "r") as chunk:
                 chunk_data = json.load(chunk)
@@ -61,25 +42,9 @@ class ChunkedJSONDataset(ChunkedDataset):
                 )
                 chunk_sizes.append(chunk_size)
                 cum_idx += chunk_size
-
-                # Preprocess data
-                preprocessed_data = None
-                if self._preprocessor is not None:
-                    preprocessed_data = self._preprocessor(chunk_data)
                 del chunk_data
 
-                # Save preprocessed data
-                if preprocessed_data is not None:
-                    pchunk = self._cache / f"{chunk_idx}.json"
-                    with open(pchunk, "w") as file:
-                        json.dump(preprocessed_data, file)
-                    preprocessed_chunks.append(pchunk)
-                del preprocessed_data
-
         self._chunk_sizes = tuple(chunk_sizes)
-        if self._preprocessor is not None:
-            self._root = self._cache
-            self._chunks = tuple(preprocessed_chunks)
 
     @property
     def chunk_sizes(self) -> Tuple[int, ...]:

@@ -1,12 +1,12 @@
 """A torch-compatible GQA questions dataset implementation."""
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from ...config.gqa import GQAFilemap, GQASplit, GQAVersion
-from ..utilities import ChunkedJSONDataset
+from ..utilities import ChunkedDataset, ChunkedJSONDataset, PreprocessedJSONDataset
 
 
-class GQAQuestions(ChunkedJSONDataset):
+class GQAQuestions(ChunkedDataset):
     """A torch-compatible dataset that retrieves GQA question samples."""
 
     def __init__(
@@ -64,8 +64,13 @@ class GQAQuestions(ChunkedJSONDataset):
                 f"Parameter {filemap=} does not refer to a valid questions"
                 f"file or directory for {split=} and {version=}."
             )
+        super().__init__(root)
 
-        super().__init__(root, cache=cache, preprocessor=preprocessor)
+        self._data = ChunkedJSONDataset(root)
+        if preprocessor is not None and cache is not None:
+            self._data = PreprocessedJSONDataset(
+                self._data, cache=cache, preprocessor=preprocessor
+            )
 
         self._filemap = filemap
         self._split = split
@@ -87,9 +92,22 @@ class GQAQuestions(ChunkedJSONDataset):
         """Get the dataset version."""
         return self._version
 
+    @property
+    def chunk_sizes(self) -> Tuple[int, ...]:
+        """Get the length of each of the chunks in the dataset."""
+        return self._data.chunk_sizes
+
     def __getitem__(self, index: int) -> Any:
         """Get an item from the dataset at a given index."""
-        item = super().__getitem__(index)
+        item = self._data[index]
         if self._transform is not None:
             return self._transform(item)
         return item
+
+    def __len__(self) -> int:
+        """Get the length of the dataset."""
+        return len(self._data)
+
+    def key_to_index(self, key: str) -> int:
+        """Get index of a given key in the dataset."""
+        return self._data.key_to_index(key)

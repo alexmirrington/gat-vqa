@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 from pathlib import Path, PurePath
 from typing import Any, Tuple
 
@@ -69,7 +70,7 @@ def main(config: Config) -> None:
         num_workers=config.dataloader.workers,
         sampler=sampler,
     )
-    num_epochs = 100
+    num_epochs = 1
     for epoch in range(num_epochs):
         correct = 0
         for batch, sample in enumerate(dataloader):
@@ -131,6 +132,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config", type=str, required=True, help="The config to load settings from."
     )
+    parser.add_argument(
+        "--sync", action="store_true", help="Sync results to wandb if specified."
+    )
     return parser.parse_args()
 
 
@@ -158,9 +162,13 @@ def load_config(filename: str) -> Tuple[Config, Any]:
 
 
 if __name__ == "__main__":
+    # Parse config
     parsed_args = parse_args()
     config_obj, config_dict = load_config(parsed_args.config)
+    # Set up wandb
+    os.environ["WANDB_MODE"] = "run" if parsed_args.sync else "dryrun"
     if not Path(".wandb").exists():
         Path(".wandb").mkdir()
     wandb.init(project="graphgen", dir=".wandb", config=config_dict)
+    # Run main with parsed config
     main(config_obj)

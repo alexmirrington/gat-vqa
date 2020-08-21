@@ -1,4 +1,7 @@
 """Tools for creating datasets given configuration objects."""
+from pathlib import Path
+from typing import Dict, Optional
+
 import torch.utils.data
 
 from ..config import Config
@@ -39,20 +42,37 @@ class DatasetFactory:
                 f"Param {config.dataset=} must be of type {GQADatasetConfig.__name__}."
             )
         dataset_config: GQADatasetConfig = config.dataset
+
+        # Parse preprocessing pipeline caches
+        caches: Dict[str, Optional[Path]] = {
+            feat.value: None for feat in iter(GQAFeatures)
+        }
+        for item in config.preprocessing.pipeline:
+            caches[item.feature] = (
+                Path("cache")
+                / dataset_config.name.value
+                / item.feature
+                / dataset_config.split.value
+                / dataset_config.version.value
+            )  # TODO don't hardcode "cache" path
+
         questions = GQAQuestions(
             dataset_config.filemap,
             dataset_config.split,
             dataset_config.version,
-            cache=config.cache,
+            cache=caches[GQAFeatures.QUESTIONS.value],
             preprocessor=GQAQuestionPreprocessor(),
             transform=QuestionTransformer(),
         )
+
         images = None
         objects = None
         spatial = None
         scene_graphs = None
 
         for feature in config.dataset.features:
+            if feature == GQAFeatures.QUESTIONS:
+                continue
             if feature == GQAFeatures.IMAGES:
                 images = GQAImages(dataset_config.filemap)
             elif feature == GQAFeatures.OBJECTS:
@@ -61,7 +81,9 @@ class DatasetFactory:
                 spatial = GQASpatial(dataset_config.filemap)
             elif feature == GQAFeatures.SCENE_GRAPHS:
                 spatial = GQASceneGraphs(
-                    dataset_config.filemap, dataset_config.split, cache=config.cache
+                    dataset_config.filemap,
+                    dataset_config.split,
+                    cache=caches[GQAFeatures.SCENE_GRAPHS.value],
                 )
             else:
                 raise NotImplementedError()

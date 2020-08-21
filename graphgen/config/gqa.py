@@ -27,6 +27,7 @@ class GQAVersion(Enum):
 class GQAFeatures(Enum):
     """An enum specifying possible values for GQA features."""
 
+    QUESTIONS = "questions"
     IMAGES = "images"
     OBJECTS = "objects"
     SPATIAL = "spatial"
@@ -117,3 +118,7 @@ class GQADatasetConfig(DatasetConfig):
         """Perform post-init checks on fields."""
         if self.name != DatasetName.GQA:
             raise ValueError(f"Field {self.name=} must be equal to {DatasetName.GQA}")
+        if GQAFeatures.QUESTIONS not in self.features:
+            raise ValueError(
+                f'Field {self.features=} must contain "{GQAFeatures.QUESTIONS.value}"'
+            )
