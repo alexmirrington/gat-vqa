@@ -70,7 +70,7 @@ def main(config: Config) -> None:
         num_workers=config.dataloader.workers,
         sampler=sampler,
     )
-    num_epochs = 1
+    num_epochs = 25
     for epoch in range(num_epochs):
         correct = 0
         for batch, sample in enumerate(dataloader):
