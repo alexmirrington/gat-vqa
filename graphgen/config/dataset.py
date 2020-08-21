@@ -8,6 +8,7 @@ class DatasetName(Enum):
     """An enum containing a list of valid dataset names."""
 
     GQA = "gqa"
+    CLEVR = "clevr"
 
 
 @dataclass(frozen=True)

@@ -11,7 +11,6 @@ from graphgen.datasets.gqa.objects import GQAObjects
 from graphgen.datasets.gqa.questions import GQAQuestions
 from graphgen.datasets.gqa.scene_graphs import GQASceneGraphs
 from graphgen.datasets.gqa.spatial import GQASpatial
-from graphgen.schemas.gqa import GQA_QUESTION_SCHEMA, GQA_SCENE_GRAPH_SCHEMA
 
 _SPLIT_VERSION_GRID = [(split, version) for split in GQASplit for version in GQAVersion]
 
@@ -154,29 +153,29 @@ def test_gqa_getitem_all(gqa: Path, split: GQASplit, version: GQAVersion) -> Non
         spatial=spatials,
         scene_graphs=scene_graphs,
     )
-    question, image, spatial, objects, boxes, scene_graph = dataset[0]
+    sample = dataset[0]
 
     # Validate question data
-    GQA_QUESTION_SCHEMA.validate(question)
+    assert isinstance(sample["question"], dict)
 
     # Validate image data
-    assert isinstance(image, Tensor)
+    assert isinstance(sample["image"], Tensor)
 
     # Validate scene graph data
     if split in (GQASplit.TRAIN, GQASplit.VAL):
-        GQA_SCENE_GRAPH_SCHEMA.validate(scene_graph)
+        assert isinstance(sample["scene_graph"], dict)
     else:
-        assert scene_graph is None
+        assert "scene_graph" not in sample.keys()
 
     # Validate spatial features
-    assert isinstance(spatial, Tensor)
-    assert spatial.size() == (2048, 7, 7)
+    assert isinstance(sample["spatial"], Tensor)
+    assert sample["spatial"].size() == (2048, 7, 7)
 
     # Validate object features
-    assert isinstance(objects, Tensor)
-    assert objects.size() == (100, 2048)
-    assert isinstance(boxes, Tensor)
-    assert boxes.size() == (100, 4)
+    assert isinstance(sample["objects"], Tensor)
+    assert sample["objects"].size() == (100, 2048)
+    assert isinstance(sample["boxes"], Tensor)
+    assert sample["boxes"].size() == (100, 4)
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
@@ -187,17 +186,17 @@ def test_gqa_getitem_questions_only(
     filemap = GQAFilemap(gqa)
     questions = GQAQuestions(filemap, split, version)
     dataset = GQA(questions)
-    question, image, spatial, objects, boxes, scene_graph = dataset[0]
+    sample = dataset[0]
 
     # Validate scene question data
-    GQA_QUESTION_SCHEMA.validate(question)
+    assert isinstance(sample["question"], dict)
 
     # Validate all other data
-    assert image is None
-    assert scene_graph is None
-    assert spatial is None
-    assert objects is None
-    assert boxes is None
+    assert "image" not in sample.keys()
+    assert "scene_graph" not in sample.keys()
+    assert "spatial" not in sample.keys()
+    assert "objects" not in sample.keys()
+    assert "boxes" not in sample.keys()
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)

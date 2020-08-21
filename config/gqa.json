@@ -1,8 +1,10 @@
 {
+  "cache": "./cache",
   "dataset": {
     "name": "gqa",
     "split": "train",
     "version": "balanced",
+    "features": [],
     "filemap": {
       "root": "./data/gqa"
     }
@@ -10,5 +12,8 @@
   "dataloader": {
     "batch_size": 64,
     "workers": 0
+  },
+  "logging": {
+    "step": 64
   }
 }

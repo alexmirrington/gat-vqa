@@ -5,7 +5,6 @@ import pytest
 
 from graphgen.config.gqa import GQAFilemap, GQASplit, GQAVersion
 from graphgen.datasets.gqa.questions import GQAQuestions
-from graphgen.schemas.gqa import GQA_QUESTION_SCHEMA
 
 _SPLIT_VERSION_GRID = [(split, version) for split in GQASplit for version in GQAVersion]
 
@@ -92,7 +91,7 @@ def test_questions_getitem(gqa: Path, split: GQASplit, version: GQAVersion) -> N
     """Ensure an item is returned given valid GQA data."""
     dataset = GQAQuestions(GQAFilemap(gqa), split, version)
     question = dataset[0]
-    GQA_QUESTION_SCHEMA.validate(question)
+    assert isinstance(question, dict)
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)

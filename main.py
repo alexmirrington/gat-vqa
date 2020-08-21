@@ -6,16 +6,17 @@ from pathlib import Path, PurePath
 from typing import Any, Tuple
 
 import jsons
+import numpy as np
+import stanza
 import torch
 import wandb
 from termcolor import colored
-from torch.utils.data import DataLoader
-from tqdm import tqdm
+from torch_geometric.data import DataLoader
 
 from graphgen.config import Config
-from graphgen.datasets.gqa import GQA, GQAImages, GQAQuestions
+from graphgen.datasets.factory import DatasetFactory
 from graphgen.datasets.utilities import ChunkedRandomSampler
-from graphgen.utilities.preprocessing import QuestionPreprocessor
+from graphgen.modules.gcn import GCN
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
 
@@ -31,6 +32,12 @@ def main(config: Config) -> None:
     --------
     None.
     """
+    # pylint: disable=too-many-locals
+
+    # Download and initialise resources
+    print(colored("initialisation:", attrs=["bold"]))
+    stanza.download(lang="en")
+
     # Print environment info
     print(colored("environment:", attrs=["bold"]))
     cuda = torch.cuda.is_available()
@@ -40,20 +47,18 @@ def main(config: Config) -> None:
 
     # Preprocess data
     print(colored("preprocessing:", attrs=["bold"]))
-    questions = GQAQuestions(
-        config.dataset.filemap,
-        config.dataset.split,
-        config.dataset.version,
-        preprocessor=QuestionPreprocessor(),
-        tempdir=Path(),
-    )
-    print(f"loaded {questions.__class__.__name__}")
+    factory = DatasetFactory()
+    dataset = factory.create(config)
 
-    images = GQAImages(config.dataset.filemap)
-    print(f"loaded {images.__class__.__name__}")
-
-    dataset = GQA(questions, images=images)
-    print(f"loaded {dataset.__class__.__name__}")
+    print(colored("model:", attrs=["bold"]))
+    model = GCN((300, 600, 1200, 1878))  # 1878 is number of unique answers
+    model.to(device)
+    model.train()
+    print(f"{model=}")
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+    print(f"{optimizer=}")
+    criterion = torch.nn.NLLLoss()
+    print(f"{criterion=}")
 
     # Run model
     print(colored("running:", attrs=["bold"]))
@@ -63,10 +68,51 @@ def main(config: Config) -> None:
         batch_size=config.dataloader.batch_size,
         num_workers=config.dataloader.workers,
         sampler=sampler,
-        collate_fn=lambda batch: list(zip(*batch)),
     )
-    for sample in tqdm(dataloader, desc="batch: "):
-        question, image, spatial, objects, boxes, scene_graph = sample
+    num_epochs = 100
+    for epoch in range(num_epochs):
+        correct = 0
+        for batch, sample in enumerate(dataloader):
+            question = sample["question"]
+            data = question["dependencies"].to(device)
+            targets = question["answer"].to(device)
+            optimizer.zero_grad()
+            preds = model(data)
+            loss = criterion(preds, targets)
+            loss.backward()
+            optimizer.step()
+            preds_np = np.argmax(preds.detach().cpu().numpy(), axis=1)
+            targets_np = targets.detach().cpu().numpy()
+            correct += np.sum(np.equal(preds_np, targets_np))
+
+            # Calculate and log metrics
+            if batch % config.logging.step == config.logging.step - 1:
+                train_acc = correct / ((batch + 1) * dataloader.batch_size)
+                print(
+                    colored("batch:", attrs=["bold"]),
+                    f"{batch + 1}/{len(dataloader)}",
+                    colored("loss:", attrs=["bold"], color="cyan"),
+                    f"{loss:.4f}",
+                    colored("acc:", attrs=["bold"], color="green"),
+                    f"{train_acc:.4f}",
+                    end="\r",
+                )
+                wandb.log(
+                    {
+                        "epoch": epoch + batch / len(dataloader),
+                        "train/loss": loss,
+                        "train/accuracy": train_acc,
+                    }
+                )
+        wandb.log({"epoch": epoch + 1, "train/loss": loss, "train/accuracy": train_acc})
+        print(
+            colored("epoch:", attrs=["bold"]),
+            f"{epoch + 1}",
+            colored("loss:", attrs=["bold"], color="cyan"),
+            f"{loss:.4f}",
+            colored("acc:", attrs=["bold"], color="green"),
+            f"{train_acc:.4f}",
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -85,7 +131,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config", type=str, required=True, help="The config to load settings from."
     )
-
     return parser.parse_args()
 
 

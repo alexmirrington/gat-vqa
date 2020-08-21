@@ -1,6 +1,6 @@
 """A torch-compatible GQA questions dataset implementation."""
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 from ...config.gqa import GQAFilemap, GQASplit, GQAVersion
 from ..utilities import ChunkedJSONDataset
@@ -14,8 +14,8 @@ class GQAQuestions(ChunkedJSONDataset):
         filemap: GQAFilemap,
         split: GQASplit,
         version: GQAVersion,
-        tempdir: Optional[Path] = None,
-        preprocessor: Optional[Callable[[Any], Any]] = None,
+        cache: Optional[Path] = None,
+        preprocessor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
         transform: Optional[Callable[[Any], Any]] = None,
     ) -> None:
         """Initialise a `GQAQuestions` instance.
@@ -28,10 +28,8 @@ class GQAQuestions(ChunkedJSONDataset):
 
         `version`: The dataset version to use.
 
-        `tempdir`: A path to a directory that preprocessed files can be saved in.
-        Preprocessed files are removed when the dataset is unloaded from memory,
-        though files may persist if a process crashes. If `tempdir` is `None`,
-        a system temporary directory will be used.
+        `cache`: A path to a directory that preprocessed files can be saved in.
+        If `cache` is `None`, a system temporary directory will be used.
 
         `preprocessor`: A callable that preprocesses a single sample of the data.
         Preprocessing occurs on dataset creation, and preprocessed data is saved
@@ -67,13 +65,12 @@ class GQAQuestions(ChunkedJSONDataset):
                 f"file or directory for {split=} and {version=}."
             )
 
-        super().__init__(
-            root, tempdir=tempdir, preprocessor=preprocessor, transform=transform
-        )
+        super().__init__(root, cache=cache, preprocessor=preprocessor)
 
         self._filemap = filemap
         self._split = split
         self._version = version
+        self._transform = transform
 
     @property
     def filemap(self) -> GQAFilemap:
@@ -89,3 +86,10 @@ class GQAQuestions(ChunkedJSONDataset):
     def version(self) -> GQAVersion:
         """Get the dataset version."""
         return self._version
+
+    def __getitem__(self, index: int) -> Any:
+        """Get an item from the dataset at a given index."""
+        item = super().__getitem__(index)
+        if self._transform is not None:
+            return self._transform(item)
+        return item
