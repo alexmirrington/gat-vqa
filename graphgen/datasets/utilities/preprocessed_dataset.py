@@ -6,7 +6,6 @@ from typing import Dict, Iterator
 
 import jsons
 import torch.utils.data
-import wandb
 
 from ...utilities.preprocessing import Preprocessor
 from .chunked_json_dataset import ChunkedJSONDataset
@@ -107,12 +106,6 @@ class PreprocessedJSONDataset(ChunkedJSONDataset, KeyedDataset):
         # Pickle preprocessor so we can compare if preprocessors are equal later
         with open(cache / "preprocessor.pkl", "wb") as pkl_file:
             pickle.dump(self._preprocessor, pkl_file)
-
-        artifact = wandb.Artifact(
-            "gqa-preprocessed-dataset", type="dataset"
-        )  # TODO give proper name
-        artifact.add_dir(cache)
-        wandb.log_artifact(artifact)
 
     def keys(self) -> Iterator[str]:
         """Get the dataset's keys."""
