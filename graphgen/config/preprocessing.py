@@ -12,7 +12,6 @@ class PipelineStepConfig:
     feature: str
     split: str
     version: str
-    freeze_vocab: bool
 
 
 @dataclass(frozen=True)

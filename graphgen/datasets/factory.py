@@ -179,7 +179,6 @@ class PreprocessingFactory:
                 raise ValueError("Invalid feature string.")
 
             if item.feature == GQAFeatures.QUESTIONS.value:
-                question_preprocessor.frozen = item.freeze_vocab
                 questions = GQAQuestions(
                     config.dataset.filemap,
                     GQASplit(item.split),

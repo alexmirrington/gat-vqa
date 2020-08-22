@@ -13,6 +13,18 @@
     },
     "pipeline": [{
       "feature": "questions",
+      "split": "train",
+      "version": "balanced",
+      "freeze_vocab": false
+    },
+    {
+      "feature": "questions",
+      "split": "val",
+      "version": "balanced",
+      "freeze_vocab": false
+    },
+    {
+      "feature": "questions",
       "split": "testdev",
       "version": "balanced",
       "freeze_vocab": false
