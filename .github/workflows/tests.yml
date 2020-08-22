@@ -12,6 +12,9 @@ jobs:
         python-version: 3.8
     - name: Install dependencies
       run: |
+        sudo apt update
+        sudo apt install cuda-10–2
+        sudo apt install libcudnn7
         python -m pip install --upgrade pip
         make install
     - name: Run pre-commit hook
