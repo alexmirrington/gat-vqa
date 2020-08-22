@@ -5,6 +5,7 @@ from typing import Union
 from .clevr import CLEVRDatasetConfig
 from .dataloader import DataloaderConfig
 from .gqa import GQADatasetConfig
+from .model import ModelConfig
 from .preprocessing import PreprocessingConfig
 from .training import TrainingConfig
 
@@ -17,3 +18,4 @@ class Config:
     preprocessing: PreprocessingConfig
     dataloader: DataloaderConfig
     training: TrainingConfig
+    model: ModelConfig

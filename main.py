@@ -57,7 +57,11 @@ def main(config: Config) -> None:
     model.to(device)
     model.train()
     print(f"{model=}")
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=config.model.optimiser.learning_rate,
+        weight_decay=config.model.optimiser.weight_decay,
+    )
     print(f"{optimizer=}")
     criterion = torch.nn.NLLLoss()
     print(f"{criterion=}")

@@ -24,12 +24,18 @@
       "feature": "questions"
     }]
   },
-  "dataloader": {
-    "batch_size": 256,
-    "workers": 0
+  "model": {
+    "optimiser": {
+      "learning_rate": 0.001,
+      "weight_decay": 1e-5
+    }
   },
   "training": {
     "epochs": 25,
     "log_step": 16
+  },
+  "dataloader": {
+    "batch_size": 256,
+    "workers": 0
   }
 }
