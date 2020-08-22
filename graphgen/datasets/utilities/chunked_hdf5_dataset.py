@@ -159,8 +159,10 @@ class ChunkedHDF5Dataset(ChunkedDataset, KeyedDataset):
                 key_int = int(key)
                 if 0 <= key_int < len(self):
                     return key_int
-            except ValueError:
-                raise KeyError(f"Parameter {key=} is not a valid key for the dataset.")
+            except ValueError as ex:
+                raise KeyError(
+                    f"Parameter {key=} is not a valid key for the dataset."
+                ) from ex
         elif key in self._key_to_idx:
             return self._key_to_idx[key]
         raise KeyError(f"Parameter {key=} is not a valid key for the dataset.")
