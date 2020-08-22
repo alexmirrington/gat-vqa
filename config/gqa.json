@@ -14,20 +14,17 @@
     "pipeline": [{
       "feature": "questions",
       "split": "train",
-      "version": "balanced",
-      "freeze_vocab": false
+      "version": "balanced"
     },
     {
       "feature": "questions",
       "split": "val",
-      "version": "balanced",
-      "freeze_vocab": false
+      "version": "balanced"
     },
     {
       "feature": "questions",
       "split": "testdev",
-      "version": "balanced",
-      "freeze_vocab": false
+      "version": "balanced"
     }]
   },
   "model": {
