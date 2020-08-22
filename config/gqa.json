@@ -1,14 +1,25 @@
 {
   "dataset": {
     "name": "gqa",
-    "split": "train",
-    "version": "balanced",
     "features": ["questions"],
     "filemap": {
       "root": "./data/gqa"
+    },
+    "train": {
+      "split": "train",
+      "version": "balanced"
+    },
+    "val": {
+      "split": "val",
+      "version": "balanced"
+    },
+    "test": {
+      "split": "testdev",
+      "version": "balanced"
     }
   },
   "preprocessing": {
+    "cache": "./cache",
     "pipeline": [{
       "feature": "questions"
     }]
@@ -17,7 +28,8 @@
     "batch_size": 256,
     "workers": 0
   },
-  "logging": {
-    "step": 16
+  "training": {
+    "epochs": 25,
+    "log_step": 16
   }
 }

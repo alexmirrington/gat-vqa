@@ -4,7 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path, PurePath
-from typing import Any, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 import jsons
 import numpy as np
@@ -18,6 +18,7 @@ from graphgen.config import Config
 from graphgen.datasets.factory import DatasetFactory
 from graphgen.datasets.utilities import ChunkedRandomSampler
 from graphgen.modules.gcn import GCN
+from graphgen.utilities.logging import log_metrics_stdout
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
 
@@ -49,7 +50,7 @@ def main(config: Config) -> None:
     # Preprocess data
     print(colored("preprocessing:", attrs=["bold"]))
     factory = DatasetFactory()
-    dataset = factory.create(config)
+    train_data, val_data, test_data = factory.create(config)
 
     print(colored("model:", attrs=["bold"]))
     model = GCN((300, 600, 1200, 1878))  # 1878 is number of unique answers
@@ -63,57 +64,99 @@ def main(config: Config) -> None:
 
     # Run model
     print(colored("running:", attrs=["bold"]))
-    sampler = ChunkedRandomSampler(dataset.questions)
-    dataloader = DataLoader(
-        dataset,
+    sampler = ChunkedRandomSampler(train_data.questions)
+    train_dataloader = DataLoader(
+        train_data,
         batch_size=config.dataloader.batch_size,
         num_workers=config.dataloader.workers,
         sampler=sampler,
     )
-    num_epochs = 25
-    for epoch in range(num_epochs):
+    val_dataloader = DataLoader(
+        val_data,
+        batch_size=config.dataloader.batch_size,
+        num_workers=config.dataloader.workers,
+    )
+    train(model, criterion, optimizer, train_dataloader, val_dataloader, device, config)
+
+
+def train(
+    model: torch.nn.Module,
+    criterion: Callable[..., torch.Tensor],
+    optimizer: torch.optim.Optimizer,
+    train_dataloader: torch.utils.data.DataLoader,
+    val_dataloader: torch.utils.data.DataLoader,
+    device: torch.device,
+    config: Config,
+) -> None:
+    """Train a model on the data in `train_dataloader`, evaluating every epoch."""
+    # pylint: disable=too-many-locals  # TODO abstract metric calculation logic.
+    for epoch in range(config.training.epochs):
+        metrics: Dict[str, Any] = {}
         correct = 0
-        for batch, sample in enumerate(dataloader):
-            question = sample["question"]
-            data = question["dependencies"].to(device)
-            targets = question["answer"].to(device)
+        total = 0
+        for batch, sample in enumerate(train_dataloader):
+            # Move data to GPU
+            data = sample["question"]["dependencies"].to(device)
+            targets = sample["question"]["answer"].to(device)
+
+            # Learn
             optimizer.zero_grad()
             preds = model(data)
             loss = criterion(preds, targets)
             loss.backward()
             optimizer.step()
+
+            # Calculate and log metrics
             preds_np = np.argmax(preds.detach().cpu().numpy(), axis=1)
             targets_np = targets.detach().cpu().numpy()
             correct += np.sum(np.equal(preds_np, targets_np))
+            total += len(targets_np)
 
-            # Calculate and log metrics
-            if batch % config.logging.step == config.logging.step - 1:
-                train_acc = correct / ((batch + 1) * dataloader.batch_size)
-                print(
-                    colored("batch:", attrs=["bold"]),
-                    f"{batch + 1}/{len(dataloader)}",
-                    colored("loss:", attrs=["bold"], color="cyan"),
-                    f"{loss:.4f}",
-                    colored("acc:", attrs=["bold"], color="green"),
-                    f"{train_acc:.4f}",
-                    end="\r",
+            if (
+                batch % config.training.log_step == config.training.log_step - 1
+                or batch == len(train_dataloader) - 1
+            ):
+                metrics = {
+                    "epoch": epoch + (batch + 1) / len(train_dataloader),
+                    "train/loss": loss.item(),
+                    "train/accuracy": correct / total,
+                }
+                log_metrics_stdout(
+                    metrics, colors=(None, "cyan", "cyan"), newline=False,
                 )
-                wandb.log(
-                    {
-                        "epoch": epoch + batch / len(dataloader),
-                        "train/loss": loss,
-                        "train/accuracy": train_acc,
-                    }
-                )
-        wandb.log({"epoch": epoch + 1, "train/loss": loss, "train/accuracy": train_acc})
-        print(
-            colored("epoch:", attrs=["bold"]),
-            f"{epoch + 1}",
-            colored("loss:", attrs=["bold"], color="cyan"),
-            f"{loss:.4f}",
-            colored("acc:", attrs=["bold"], color="green"),
-            f"{train_acc:.4f}",
-        )
+                wandb.log(metrics)
+        val_metrics = evaluate(model, criterion, val_dataloader, device)
+        metrics.update({f"val/{key}": val for key, val in val_metrics.items()})
+
+        log_metrics_stdout(metrics, colors=(None, "cyan", "cyan", "magenta", "magenta"))
+        wandb.log(metrics)
+
+
+def evaluate(
+    model: torch.nn.Module,
+    criterion: Callable[..., torch.Tensor],
+    dataloader: torch.utils.data.DataLoader,
+    device: torch.device,
+) -> Dict[str, Any]:
+    """Evaluate a model according to a criterion on a given dataset."""
+    correct = 0
+    total = 0
+    model.eval()
+    with torch.no_grad():
+        for batch, sample in enumerate(dataloader):
+            question = sample["question"]
+            data = question["dependencies"].to(device)
+            targets = question["answer"].to(device)
+            preds = model(data)
+            loss = criterion(preds, targets)
+            preds_np = np.argmax(preds.detach().cpu().numpy(), axis=1)
+            targets_np = targets.detach().cpu().numpy()
+            correct += np.sum(np.equal(preds_np, targets_np))
+            total += len(targets_np)
+            print(f"eval: {batch + 1}/{len(dataloader)}", end="\r")
+
+    model.train()
+    return {"loss": loss.item(), "accuracy": correct / total}
 
 
 def parse_args() -> argparse.Namespace:

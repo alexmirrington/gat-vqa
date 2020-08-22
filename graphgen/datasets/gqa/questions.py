@@ -1,8 +1,9 @@
 """A torch-compatible GQA questions dataset implementation."""
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 from ...config.gqa import GQAFilemap, GQASplit, GQAVersion
+from ...utilities.preprocessing import Preprocessor
 from ..utilities import ChunkedDataset, ChunkedJSONDataset, PreprocessedJSONDataset
 
 
@@ -15,7 +16,7 @@ class GQAQuestions(ChunkedDataset):
         split: GQASplit,
         version: GQAVersion,
         cache: Optional[Path] = None,
-        preprocessor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
+        preprocessor: Optional[Preprocessor] = None,
         transform: Optional[Callable[[Any], Any]] = None,
     ) -> None:
         """Initialise a `GQAQuestions` instance.

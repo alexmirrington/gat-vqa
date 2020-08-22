@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional, Tuple
 
 from ...config.gqa import GQAFilemap, GQASplit
+from ...utilities.preprocessing import Preprocessor
 from ..utilities import ChunkedDataset, ChunkedJSONDataset, PreprocessedJSONDataset
 
 
@@ -14,7 +15,7 @@ class GQASceneGraphs(ChunkedDataset):
         filemap: GQAFilemap,
         split: GQASplit,
         cache: Optional[Path] = None,
-        preprocessor: Optional[Callable[[Any], Any]] = None,
+        preprocessor: Optional[Preprocessor] = None,
         transform: Optional[Callable[[Any], Any]] = None,
     ) -> None:
         """Initialise a `GQASceneGraphs` instance.

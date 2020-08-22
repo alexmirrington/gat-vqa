@@ -1,7 +1,7 @@
 """Utilities for loading data from one or more files."""
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Tuple
+from typing import Tuple
 
 import torch.utils.data
 
@@ -51,14 +51,4 @@ class ChunkedDataset(torch.utils.data.Dataset):  # type: ignore
     @abstractmethod
     def chunk_sizes(self) -> Tuple[int, ...]:
         """Get the length of each of the chunks in the dataset."""
-        raise NotImplementedError()
-
-    @abstractmethod
-    def __getitem__(self, index: int) -> Any:
-        """Get an item from the dataset at a given index."""
-        raise NotImplementedError()
-
-    @abstractmethod
-    def __len__(self) -> int:
-        """Get the length of the dataset."""
         raise NotImplementedError()

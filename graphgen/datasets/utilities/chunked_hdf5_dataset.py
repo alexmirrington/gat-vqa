@@ -1,14 +1,15 @@
 """Utilities for loading data from one or more HDF5 files."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import h5py
 
 from .chunked_dataset import ChunkedDataset
+from .keyed_dataset import KeyedDataset
 
 
-class ChunkedHDF5Dataset(ChunkedDataset):
+class ChunkedHDF5Dataset(ChunkedDataset, KeyedDataset):
     """A torch-compatible dataset that loads data from one or more HDF5 files."""
 
     def __init__(
@@ -144,6 +145,12 @@ class ChunkedHDF5Dataset(ChunkedDataset):
         """Get the length of the dataset."""
         key = list(self._data.keys())[0]
         return len(self._data[key])
+
+    def keys(self) -> Iterator[str]:
+        """Get the dataset's keys."""
+        if self._key_to_idx is None:
+            return iter([str(key) for key in range(len(self))])
+        return iter(self._key_to_idx.keys())
 
     def key_to_index(self, key: str) -> int:
         """Get index of a given key in the dataset."""

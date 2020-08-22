@@ -5,8 +5,8 @@ from typing import Union
 from .clevr import CLEVRDatasetConfig
 from .dataloader import DataloaderConfig
 from .gqa import GQADatasetConfig
-from .logging import LoggingConfig
 from .preprocessing import PreprocessingConfig
+from .training import TrainingConfig
 
 
 @dataclass(frozen=True)
@@ -16,4 +16,4 @@ class Config:
     dataset: Union[CLEVRDatasetConfig, GQADatasetConfig]
     preprocessing: PreprocessingConfig
     dataloader: DataloaderConfig
-    logging: LoggingConfig
+    training: TrainingConfig

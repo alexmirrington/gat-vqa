@@ -1,12 +1,13 @@
 """Utilities for loading data from one or more JSON files."""
 import json
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Iterator, Tuple
 
 from .chunked_dataset import ChunkedDataset
+from .keyed_dataset import KeyedDataset
 
 
-class ChunkedJSONDataset(ChunkedDataset):
+class ChunkedJSONDataset(ChunkedDataset, KeyedDataset):
     """A torch-compatible dataset that loads data from one or more JSON files."""
 
     # pylint: disable=too-many-instance-attributes
@@ -91,6 +92,10 @@ class ChunkedJSONDataset(ChunkedDataset):
     def __len__(self) -> int:
         """Get the length of the dataset."""
         return sum(self._chunk_sizes)
+
+    def keys(self) -> Iterator[str]:
+        """Get the dataset's keys."""
+        return iter(self._key_to_idx.keys())
 
     def key_to_index(self, key: str) -> int:
         """Get index of a given key in the dataset."""

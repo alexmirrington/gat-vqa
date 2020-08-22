@@ -1,15 +1,16 @@
 """Utilities for loading data from one or more image files."""
 from pathlib import Path
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, Iterator, Optional, Tuple
 
 import torchvision.transforms as T
 from PIL import Image
 from torch import Tensor
 
 from .chunked_dataset import ChunkedDataset
+from .keyed_dataset import KeyedDataset
 
 
-class ImageFolderDataset(ChunkedDataset):
+class ImageFolderDataset(ChunkedDataset, KeyedDataset):
     """A torch-compatible dataset that loads data from one or more image files."""
 
     def __init__(
@@ -48,6 +49,10 @@ class ImageFolderDataset(ChunkedDataset):
     def __len__(self) -> int:
         """Get the length of the dataset."""
         return len(self._chunks)
+
+    def keys(self) -> Iterator[str]:
+        """Get the dataset's keys."""
+        return iter(self._key_to_idx.keys())
 
     def key_to_index(self, key: str) -> int:
         """Get index of a given key in the dataset."""
