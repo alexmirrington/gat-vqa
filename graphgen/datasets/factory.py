@@ -106,8 +106,9 @@ def process(
     is_file = False
     if cache.suffix != "":
         is_file = True
-        cache.parent.mkdir(parents=True)
-    else:
+        if not cache.parent.exists():
+            cache.parent.mkdir(parents=True)
+    elif not cache.exists():
         cache.mkdir(parents=True)
 
     # Preprocess
