@@ -9,7 +9,7 @@
   "preprocessing": {
     "cache": {
       "root": "./cache",
-      "artifact": "gqa-preprocessed-dataset"
+      "artifact": "gqa-preprocessed"
     },
     "pipeline": [{
       "feature": "questions",
@@ -29,7 +29,7 @@
   },
   "model": {
     "data": {
-      "artifact": "gqa-preprocessed-dataset:latest",
+      "artifact": "gqa-preprocessed:latest",
       "train": {
         "split": "train",
         "version": "balanced"
