@@ -1,7 +1,6 @@
 {
   "dataset": {
     "name": "gqa",
-    "features": ["questions"],
     "filemap": {
       "root": "./data/gqa"
     }
@@ -29,7 +28,12 @@
   },
   "model": {
     "data": {
-      "artifact": "gqa-preprocessed:latest",
+      "features": [
+        {
+          "name": "questions",
+          "artifact": "gqa-preprocessed:latest"
+        }
+      ],
       "train": {
         "split": "train",
         "version": "balanced"
@@ -44,7 +48,7 @@
       }
     },
     "optimiser": {
-      "learning_rate": 0.001,
+      "learning_rate": 0.005,
       "weight_decay": 1e-5
     }
   },

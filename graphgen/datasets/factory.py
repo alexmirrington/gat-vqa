@@ -17,17 +17,17 @@ from ..utilities.preprocessing import (
     Preprocessor,
     QuestionTransformer,
 )
-from .gqa import GQA, GQAQuestions
+from .gqa import GQA, GQAImages, GQAObjects, GQAQuestions, GQASceneGraphs, GQASpatial
 
 
-class DatasetFactory:
+class ModelDatasetFactory:
     """Factory class for creating datasets given a configuration object."""
 
     def __init__(self) -> None:
         """Initialise the dataset factory."""
         self._factory_methods = {
-            DatasetName.GQA: DatasetFactory._create_gqa,
-            DatasetName.CLEVR: DatasetFactory._create_clevr,
+            DatasetName.GQA: ModelDatasetFactory._create_gqa,
+            DatasetName.CLEVR: ModelDatasetFactory._create_clevr,
         }
 
     def create(self, config: Config) -> Tuple[Dataset, Dataset, Dataset]:
@@ -45,18 +45,12 @@ class DatasetFactory:
 
     @staticmethod
     def _create_gqa(config: Config) -> Tuple[GQA, GQA, GQA]:
+        # pylint: disable=too-many-branches
+
         if not isinstance(config.dataset, GQADatasetConfig):
             raise ValueError(
                 f"Param {config.dataset=} must be of type {GQADatasetConfig.__name__}."
             )
-
-        artifact = wandb.run.use_artifact(config.model.data.artifact)
-        artifact_dir = Path(artifact.download())
-
-        new_filemap = GQAFilemap(root=artifact_dir)
-
-        # TODO Fallback to unprocessed data if no data exists
-        # in preprocessed data
 
         datasets = []
 
@@ -72,29 +66,68 @@ class DatasetFactory:
             if subset.version not in [version.value for version in iter(GQAVersion)]:
                 raise ValueError("Invalid version string.")
 
-            questions = GQAQuestions(
-                new_filemap,
-                GQASplit(subset.split),
-                GQAVersion(subset.version),
-                transform=QuestionTransformer(),
-            )
-
+            questions = None
             images = None
             objects = None
             spatial = None
             scene_graphs = None
 
-            for feature in config.dataset.features:
-                if feature != GQAFeatures.QUESTIONS:
+            if GQAFeatures.QUESTIONS.value not in [
+                feat.name for feat in config.model.data.features
+            ]:
+                raise ValueError(
+                    f'List of features must contain "{GQAFeatures.QUESTIONS.value}"'
+                )
+
+            for feature in config.model.data.features:
+                if feature.name not in [feature.value for feature in iter(GQAFeatures)]:
+                    raise ValueError("Invalid feature string.")
+
+                # By default, use unprocessed data.
+                filemap = config.dataset.filemap
+
+                # If an artifact is specified, use it for that feature instead.
+                if feature.artifact is not None:
+                    try:
+                        artifact = wandb.run.use_artifact(feature.artifact)
+                        artifact_dir = Path(artifact.download())
+                        filemap = GQAFilemap(root=artifact_dir)
+                    except (wandb.CommError, AttributeError):
+                        print(
+                            "Could not load artifact for feature",
+                            f'"{feature.name}", using raw dataset instead.',
+                        )
+
+                if feature.name == GQAFeatures.QUESTIONS.value:
+                    questions = GQAQuestions(
+                        filemap,
+                        GQASplit(subset.split),
+                        GQAVersion(subset.version),
+                        transform=QuestionTransformer(),
+                    )
+                elif feature.name == GQAFeatures.IMAGES.value:
+                    images = GQAImages(filemap, transform=None)
+                elif feature.name == GQAFeatures.SCENE_GRAPHS.value:
+                    scene_graphs = GQASceneGraphs(
+                        filemap, GQASplit(subset.split), transform=None
+                    )
+                elif feature.name == GQAFeatures.SPATIAL.value:
+                    spatial = GQASpatial(filemap)
+                elif feature.name == GQAFeatures.OBJECTS.value:
+                    spatial = GQAObjects(filemap)
+                else:
                     raise NotImplementedError()
-            gqa = GQA(
-                questions,
-                images=images,
-                objects=objects,
-                spatial=spatial,
-                scene_graphs=scene_graphs,
-            )
-            datasets.append(gqa)
+
+                gqa = GQA(
+                    GQASplit(subset.split),
+                    GQAVersion(subset.version),
+                    questions=questions,
+                    images=images,
+                    objects=objects,
+                    spatial=spatial,
+                    scene_graphs=scene_graphs,
+                )
+                datasets.append(gqa)
 
         return (datasets[0], datasets[1], datasets[2])
 
@@ -128,22 +161,15 @@ def process(
             keys = []
             data = []
 
-    # # Dump preprocessor object public fields so we can inspect information
-    # # about the preprocessed dataset.
-    # preprocessor = jsons.dump(preprocessor, strip_privates=True)
-    # metadata = {"preprocessor": preprocessor}
-    # with open(cache / "meta.json", "w") as json_file:
-    #     json.dump(metadata, json_file)
 
-
-class PreprocessingFactory:
+class PreprocessingDatasetFactory:
     """Factory class for preprocessing datasets given a configuration object."""
 
     def __init__(self) -> None:
         """Initialise the preprocessing factory."""
         self._factory_methods = {
-            DatasetName.GQA: PreprocessingFactory._process_gqa,
-            DatasetName.CLEVR: PreprocessingFactory._process_clevr,
+            DatasetName.GQA: PreprocessingDatasetFactory._process_gqa,
+            DatasetName.CLEVR: PreprocessingDatasetFactory._process_clevr,
         }
 
     def process(self, config: Config) -> None:

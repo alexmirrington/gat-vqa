@@ -16,7 +16,7 @@ from termcolor import colored
 from torch_geometric.data import DataLoader
 
 from graphgen.config import Config
-from graphgen.datasets.factory import DatasetFactory, PreprocessingFactory
+from graphgen.datasets.factory import ModelDatasetFactory, PreprocessingDatasetFactory
 from graphgen.datasets.utilities import ChunkedRandomSampler
 from graphgen.modules.gcn import GCN
 from graphgen.utilities.logging import log_metrics_stdout
@@ -60,8 +60,11 @@ def main(args: argparse.Namespace, config: Config) -> None:
         preprocess(config)
     elif args.job == JobType.TRAIN:
         print(colored("loading datasets:", attrs=["bold"]))
-        factory = DatasetFactory()
+        factory = ModelDatasetFactory()
         train_data, val_data, test_data = factory.create(config)
+        print(f"train: {len(train_data)}")
+        print(f"val: {len(val_data)}")
+        print(f"test: {len(test_data)}")
 
         print(colored("model:", attrs=["bold"]))
         model = GCN((300, 600, 1200, 1878))  # 1878 is number of unique answers
@@ -109,7 +112,7 @@ def main(args: argparse.Namespace, config: Config) -> None:
 def preprocess(config: Config) -> None:
     """Preprocess `config.dataset` according to the `config.preprocessing` config."""
     print(colored("preprocessing:", attrs=["bold"]))
-    factory = PreprocessingFactory()
+    factory = PreprocessingDatasetFactory()
     factory.process(config)
 
 

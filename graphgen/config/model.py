@@ -1,5 +1,6 @@
 """Classes storing model configuration information."""
 from dataclasses import dataclass
+from typing import List, Optional
 
 
 @dataclass(frozen=True)
@@ -19,10 +20,18 @@ class ModelDataSubsetConfig:
 
 
 @dataclass(frozen=True)
+class ModelFeatureConfig:
+    """Class storing information abeout features used for model training."""
+
+    name: str  # TODO Link to dataset config enums
+    artifact: Optional[str]  # TODO support local paths
+
+
+@dataclass(frozen=True)
 class ModelDataConfig:
     """Class storing dataset information for model training."""
 
-    artifact: str  # TODO support local paths
+    features: List[ModelFeatureConfig]
     train: ModelDataSubsetConfig
     val: ModelDataSubsetConfig
     test: ModelDataSubsetConfig

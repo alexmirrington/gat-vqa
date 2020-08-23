@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Set
+from typing import Optional
 
 from .dataset import DatasetConfig, DatasetFilemap, DatasetName
 
@@ -13,13 +13,6 @@ class CLEVRSplit(Enum):
     TRAIN = "train"
     VAL = "val"
     TEST = "test"
-
-
-class CLEVRFeatures(Enum):
-    """An enum specifying possible values for CLEVR features."""
-
-    IMAGES = "images"
-    SCENE_GRAPHS = "scene_graphs"
 
 
 @dataclass(frozen=True)
@@ -58,7 +51,6 @@ class CLEVRDatasetConfig(DatasetConfig):
     """A class specifying the valid values for a CLEVR dataset config."""
 
     split: CLEVRSplit
-    features: Set[CLEVRFeatures]
     filemap: CLEVRFilemap
 
     def __post_init__(self) -> None:
