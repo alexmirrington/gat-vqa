@@ -19,7 +19,6 @@ class Preprocessor(ABC):
     @abstractmethod
     def __call__(self, data: Sequence[Any]) -> Sequence[Any]:
         """Preprocess a sequence of data."""
-        raise NotImplementedError()
 
 
 def dep_coordinate_list(
