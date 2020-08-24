@@ -178,4 +178,4 @@ class GQA(torch.utils.data.Dataset):  # type: ignore
         ):
             if dataset is not None:
                 return dataset.key_to_index(key)
-        raise IndexError("No keys exist for this dataset.")
+        raise KeyError("No keys exist for this dataset.")

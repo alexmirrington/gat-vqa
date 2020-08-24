@@ -15,6 +15,18 @@ from graphgen.datasets.gqa.spatial import GQASpatial
 _SPLIT_VERSION_GRID = [(split, version) for split in GQASplit for version in GQAVersion]
 
 
+def test_gqa_invalid_split_type() -> None:
+    """Ensure a dataset instance cannot be created with an invalid split type."""
+    with pytest.raises(TypeError):
+        GQA("train", GQAVersion.BALANCED)  # type: ignore
+
+
+def test_gqa_invalid_version_type() -> None:
+    """Ensure a dataset instance cannot be created with an invalid version type."""
+    with pytest.raises(TypeError):
+        GQA(GQASplit.TRAIN, "balanced")  # type: ignore
+
+
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
 def test_gqa_version_property(split: GQASplit, version: GQAVersion) -> None:
     """Ensure the `version` property returns a correct value."""
@@ -27,6 +39,27 @@ def test_gqa_split_property(split: GQASplit, version: GQAVersion) -> None:
     """Ensure the `split` property returns a correct value."""
     dataset = GQA(split, version)
     assert dataset.split == split
+
+
+def test_gqa_mismatched_question_version(gqa: Path) -> None:
+    """Ensure the `split` property returns a correct value."""
+    questions = GQAQuestions(GQAFilemap(gqa), GQASplit.TRAIN, GQAVersion.BALANCED)
+    with pytest.raises(ValueError):
+        GQA(GQASplit.TRAIN, GQAVersion.ALL, questions=questions)
+
+
+def test_gqa_mismatched_question_split(gqa: Path) -> None:
+    """Ensure the `split` property returns a correct value."""
+    questions = GQAQuestions(GQAFilemap(gqa), GQASplit.TRAIN, GQAVersion.BALANCED)
+    with pytest.raises(ValueError):
+        GQA(GQASplit.VAL, GQAVersion.BALANCED, questions=questions)
+
+
+def test_gqa_mismatched_scene_graphs_split(gqa: Path) -> None:
+    """Ensure the `split` property returns a correct value."""
+    scene_graphs = GQASceneGraphs(GQAFilemap(gqa), GQASplit.TRAIN)
+    with pytest.raises(ValueError):
+        GQA(GQASplit.VAL, GQAVersion.BALANCED, scene_graphs=scene_graphs)
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
@@ -188,6 +221,14 @@ def test_gqa_len(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
     assert length == 1
 
 
+def test_gqa_empty_dataset_len() -> None:
+    """Ensure the correct dataset length is returned given an empty dataset."""
+    dataset = GQA(GQASplit.TRAIN, GQAVersion.BALANCED)
+    length = len(dataset)
+    assert isinstance(length, int)
+    assert length == 0
+
+
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
 def test_gqa_key_to_index(gqa: Path, split: GQASplit, version: GQAVersion) -> None:
     """Ensure key_to_index returns the correct index given valid GQA data."""
@@ -199,3 +240,10 @@ def test_gqa_key_to_index(gqa: Path, split: GQASplit, version: GQAVersion) -> No
 
     with pytest.raises(KeyError):
         dataset.key_to_index("abc")
+
+
+def test_gqa_empty_dataset_key_to_index() -> None:
+    """Ensure a KeyError is raised given an empty dataset when calling key_to_index."""
+    dataset = GQA(GQASplit.TRAIN, GQAVersion.BALANCED)
+    with pytest.raises(KeyError):
+        dataset.key_to_index("0")
