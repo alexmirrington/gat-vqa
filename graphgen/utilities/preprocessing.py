@@ -19,13 +19,6 @@ class Preprocessor(ABC):
     @abstractmethod
     def __call__(self, data: Sequence[Any]) -> Sequence[Any]:
         """Preprocess a sequence of data."""
-        raise NotImplementedError()
-
-    @abstractmethod
-    def __eq__(self, other: Any) -> bool:
-        """Determine if this preprocessor is equal to another. Equal \
-        preprocessors should have equal outputs given the same data."""
-        raise NotImplementedError()
 
 
 def dep_coordinate_list(
@@ -82,12 +75,9 @@ class QuestionTransformer:
 class GQAQuestionPreprocessor(Preprocessor):
     """Class for preprocessing questions."""
 
-    def __init__(
-        self, frozen: bool = False, answer_to_index: Optional[Dict[str, int]] = None
-    ) -> None:
+    def __init__(self, answer_to_index: Optional[Dict[str, int]] = None) -> None:
         """Create a `QuestionPreprocessor` instance."""
         self._answer_to_index = answer_to_index if answer_to_index is not None else {}
-        self.frozen = frozen
         self._question_pipeline = stanza.Pipeline(
             lang="en",
             processors={
@@ -120,11 +110,11 @@ class GQAQuestionPreprocessor(Preprocessor):
     def _process_answers(self, answers: List[str]) -> List[int]:
         result: List[int] = []
         for answer in answers:
-            if (
-                answer is not None
-                and answer not in self._answer_to_index
-                and not self.frozen
-            ):
+            if answer is not None and answer not in self._answer_to_index:
+                # Unknown vocab, add to dict. It is OK to add val and test
+                # answers to the dict, as we still have no training signal for
+                # those in the training set, hence there is no reason to freeze
+                # the answer vocab.
                 self._answer_to_index[answer] = len(self._answer_to_index)
             result.append(self._answer_to_index[answer] if answer is not None else None)
         return result
@@ -157,13 +147,3 @@ class GQAQuestionPreprocessor(Preprocessor):
             ]
             start += step
         return result
-
-    def __eq__(self, other: Any) -> bool:
-        """Determine if this preprocessor is equal to another. Equal \
-        preprocessors should have equal outputs given the same data."""
-        if not isinstance(other, self.__class__):
-            return False
-        return (
-            self.frozen == other.frozen
-            and self.answer_to_index == other.answer_to_index
-        )

@@ -1,6 +1,7 @@
 # Data and cache directory
 data
 cache
+artifacts
 .wandb
 .vector_cache
 

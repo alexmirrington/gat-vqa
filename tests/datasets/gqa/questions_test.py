@@ -1,10 +1,12 @@
 """Tests for the GQA questions dataset."""
 from pathlib import Path
+from typing import Any, Dict
 
 import pytest
 
 from graphgen.config.gqa import GQAFilemap, GQASplit, GQAVersion
 from graphgen.datasets.gqa.questions import GQAQuestions
+from graphgen.schemas.gqa import GQAQuestion
 
 _SPLIT_VERSION_GRID = [(split, version) for split in GQASplit for version in GQAVersion]
 
@@ -92,6 +94,23 @@ def test_questions_getitem(gqa: Path, split: GQASplit, version: GQAVersion) -> N
     dataset = GQAQuestions(GQAFilemap(gqa), split, version)
     question = dataset[0]
     assert isinstance(question, dict)
+
+
+@pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)
+def test_questions_transformed_getitem(
+    gqa: Path, split: GQASplit, version: GQAVersion
+) -> None:
+    """Ensure a transformed item is returned given valid GQA data and a transform."""
+
+    def transform(question: GQAQuestion) -> Dict[str, Any]:
+        return {"imageId": question["imageId"], "question": question["question"]}
+
+    dataset = GQAQuestions(GQAFilemap(gqa), split, version, transform=transform)
+    question = dataset[0]
+    assert isinstance(question, dict)
+    assert "imageId" in question.keys()
+    assert "question" in question.keys()
+    assert "isBalanced" not in question.keys()
 
 
 @pytest.mark.parametrize("split, version", _SPLIT_VERSION_GRID)

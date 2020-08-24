@@ -1,10 +1,12 @@
 """Tests for the GQA scene graphs dataset."""
 from pathlib import Path
+from typing import Any, Dict
 
 import pytest
 
 from graphgen.config.gqa import GQAFilemap, GQASplit
 from graphgen.datasets.gqa.scene_graphs import GQASceneGraphs
+from graphgen.schemas.gqa import GQASceneGraph
 
 
 def test_scene_graphs_nonexistent_root(tmp_path: Path) -> None:
@@ -83,6 +85,26 @@ def test_scene_graphs_getitem(gqa: Path, split: GQASplit) -> None:
     dataset = GQASceneGraphs(GQAFilemap(gqa), split)
     scene_graph = dataset[0]
     assert isinstance(scene_graph, dict)
+
+
+@pytest.mark.parametrize("split", [GQASplit.TRAIN, GQASplit.VAL])
+def test_scene_graphs_transformed_getitem(gqa: Path, split: GQASplit) -> None:
+    """Ensure a transformed item is returned given valid GQA data and a transform.
+
+    We can only assume valid GQA data exists for train and val given they are
+    the only splits for which scene graphs are present in the real GQA dataset.
+    """
+
+    def transform(graph: GQASceneGraph) -> Dict[str, Any]:
+        return {"width": graph["width"], "height": graph["height"]}
+
+    dataset = GQASceneGraphs(GQAFilemap(gqa), split, transform=transform)
+    scene_graph = dataset[0]
+    assert isinstance(scene_graph, dict)
+    assert "width" in scene_graph.keys()
+    assert "height" in scene_graph.keys()
+    assert "location" not in scene_graph.keys()
+    assert "objects" not in scene_graph.keys()
 
 
 @pytest.mark.parametrize("split", [GQASplit.TRAIN, GQASplit.VAL])
