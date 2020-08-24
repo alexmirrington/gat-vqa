@@ -16,9 +16,9 @@ from termcolor import colored
 from torch_geometric.data import DataLoader
 
 from graphgen.config import Config
-from graphgen.datasets.factories import ModelDatasetFactory, PreprocessingDatasetFactory
 from graphgen.datasets.utilities import ChunkedRandomSampler
-from graphgen.modules.gcn import GCN
+from graphgen.models.gcn import GCN
+from graphgen.utilities.factories import DatasetFactory, PreprocessingFactory
 from graphgen.utilities.logging import log_metrics_stdout
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
@@ -43,8 +43,6 @@ def main(args: argparse.Namespace, config: Config) -> None:
     --------
     None.
     """
-    # pylint: disable=too-many-locals
-
     # Download and initialise resources
     print(colored("initialisation:", attrs=["bold"]))
     stanza.download(lang="en")
@@ -59,50 +57,7 @@ def main(args: argparse.Namespace, config: Config) -> None:
     if args.job == JobType.PREPROCESS:
         preprocess(config)
     elif args.job == JobType.TRAIN:
-        print(colored("loading datasets:", attrs=["bold"]))
-        factory = ModelDatasetFactory()
-        train_data, val_data, test_data = factory.create(config)
-        print(f"train: {len(train_data)}")
-        print(f"val: {len(val_data)}")
-        print(f"test: {len(test_data)}")
-
-        print(colored("model:", attrs=["bold"]))
-        model = GCN((300, 600, 1200, 1878))  # 1878 is number of unique answers
-        model.to(device)
-        model.train()
-        print(f"{model=}")
-        optimizer = torch.optim.Adam(
-            model.parameters(),
-            lr=config.model.optimiser.learning_rate,
-            weight_decay=config.model.optimiser.weight_decay,
-        )
-        print(f"{optimizer=}")
-        criterion = torch.nn.NLLLoss()
-        print(f"{criterion=}")
-
-        # Run model
-        print(colored("running:", attrs=["bold"]))
-        sampler = ChunkedRandomSampler(train_data.questions)
-        train_dataloader = DataLoader(
-            train_data,
-            batch_size=config.dataloader.batch_size,
-            num_workers=config.dataloader.workers,
-            sampler=sampler,
-        )
-        val_dataloader = DataLoader(
-            val_data,
-            batch_size=config.dataloader.batch_size,
-            num_workers=config.dataloader.workers,
-        )
-        train(
-            model,
-            criterion,
-            optimizer,
-            train_dataloader,
-            val_dataloader,
-            device,
-            config,
-        )
+        run(config, device)
     elif args.job == JobType.TEST:
         raise NotImplementedError()
     else:
@@ -112,8 +67,50 @@ def main(args: argparse.Namespace, config: Config) -> None:
 def preprocess(config: Config) -> None:
     """Preprocess `config.dataset` according to the `config.preprocessing` config."""
     print(colored("preprocessing:", attrs=["bold"]))
-    factory = PreprocessingDatasetFactory()
+    factory = PreprocessingFactory()
     factory.process(config)
+
+
+def run(config: Config, device: torch.device) -> None:
+    """Train a model according to the `config.model` config."""
+    print(colored("loading datasets:", attrs=["bold"]))
+    factory = DatasetFactory()
+    train_data, val_data, test_data = factory.create(config)
+    print(f"train: {len(train_data)}")
+    print(f"val: {len(val_data)}")
+    print(f"test: {len(test_data)}")
+
+    print(colored("model:", attrs=["bold"]))
+    model = GCN((300, 600, 1200, 1878))  # 1878 is number of unique answers
+    model.to(device)
+    model.train()
+    print(f"{model=}")
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=config.model.optimiser.learning_rate,
+        weight_decay=config.model.optimiser.weight_decay,
+    )
+    print(f"{optimizer=}")
+    criterion = torch.nn.NLLLoss()
+    print(f"{criterion=}")
+
+    # Run model
+    print(colored("running:", attrs=["bold"]))
+    sampler = ChunkedRandomSampler(train_data.questions)
+    train_dataloader = DataLoader(
+        train_data,
+        batch_size=config.dataloader.batch_size,
+        num_workers=config.dataloader.workers,
+        sampler=sampler,
+    )
+    val_dataloader = DataLoader(
+        val_data,
+        batch_size=config.dataloader.batch_size,
+        num_workers=config.dataloader.workers,
+    )
+    train(
+        model, criterion, optimizer, train_dataloader, val_dataloader, device, config,
+    )
 
 
 def train(
