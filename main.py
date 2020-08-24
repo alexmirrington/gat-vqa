@@ -16,7 +16,7 @@ from termcolor import colored
 from torch_geometric.data import DataLoader
 
 from graphgen.config import Config
-from graphgen.datasets.factory import ModelDatasetFactory, PreprocessingDatasetFactory
+from graphgen.datasets.factories import ModelDatasetFactory, PreprocessingDatasetFactory
 from graphgen.datasets.utilities import ChunkedRandomSampler
 from graphgen.modules.gcn import GCN
 from graphgen.utilities.logging import log_metrics_stdout
