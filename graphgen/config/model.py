@@ -15,16 +15,16 @@ class OptimiserConfig:
 class ModelDataSubsetConfig:
     """Class storing data subset information for model training."""
 
-    split: str  # TODO Link to existing dataset config enums
-    version: str  # TODO Link to existing dataset config enums
+    split: str
+    version: Optional[str] = None
 
 
 @dataclass(frozen=True)
 class ModelFeatureConfig:
     """Class storing information abeout features used for model training."""
 
-    name: str  # TODO Link to dataset config enums
-    artifact: Optional[str]  # TODO support local paths
+    name: str
+    artifact: Optional[str]
 
 
 @dataclass(frozen=True)
