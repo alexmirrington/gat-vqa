@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Set
+from typing import Optional
 
 from .dataset import DatasetConfig, DatasetFilemap, DatasetName
 
@@ -27,6 +27,7 @@ class GQAVersion(Enum):
 class GQAFeatures(Enum):
     """An enum specifying possible values for GQA features."""
 
+    QUESTIONS = "questions"
     IMAGES = "images"
     OBJECTS = "objects"
     SPATIAL = "spatial"
@@ -108,9 +109,6 @@ class GQAFilemap(DatasetFilemap):
 class GQADatasetConfig(DatasetConfig):
     """A class specifying the valid values for a GQA dataset config."""
 
-    version: GQAVersion
-    split: GQASplit
-    features: Set[GQAFeatures]
     filemap: GQAFilemap
 
     def __post_init__(self) -> None:

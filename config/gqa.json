@@ -1,19 +1,63 @@
 {
-  "cache": "./cache",
   "dataset": {
     "name": "gqa",
-    "split": "train",
-    "version": "balanced",
-    "features": [],
     "filemap": {
       "root": "./data/gqa"
     }
   },
-  "dataloader": {
-    "batch_size": 64,
-    "workers": 0
+  "preprocessing": {
+    "cache": {
+      "root": "./cache",
+      "artifact": "gqa-preprocessed"
+    },
+    "pipeline": [{
+      "feature": "questions",
+      "split": "train",
+      "version": "balanced"
+    },
+    {
+      "feature": "questions",
+      "split": "val",
+      "version": "balanced"
+    },
+    {
+      "feature": "questions",
+      "split": "testdev",
+      "version": "balanced"
+    }]
   },
-  "logging": {
-    "step": 64
+  "model": {
+    "data": {
+      "features": [
+        {
+          "name": "questions",
+          "artifact": "gqa-preprocessed:latest"
+        }
+      ],
+      "train": {
+        "split": "train",
+        "version": "balanced"
+      },
+      "val": {
+        "split": "val",
+        "version": "balanced"
+      },
+      "test": {
+        "split": "testdev",
+        "version": "balanced"
+      }
+    },
+    "optimiser": {
+      "learning_rate": 0.005,
+      "weight_decay": 1e-5
+    }
+  },
+  "training": {
+    "epochs": 25,
+    "log_step": 64
+  },
+  "dataloader": {
+    "batch_size": 256,
+    "workers": 0
   }
 }

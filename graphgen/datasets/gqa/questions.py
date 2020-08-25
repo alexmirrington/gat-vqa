@@ -1,6 +1,5 @@
 """A torch-compatible GQA questions dataset implementation."""
-from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
 
 from ...config.gqa import GQAFilemap, GQASplit, GQAVersion
 from ..utilities import ChunkedJSONDataset
@@ -14,8 +13,6 @@ class GQAQuestions(ChunkedJSONDataset):
         filemap: GQAFilemap,
         split: GQASplit,
         version: GQAVersion,
-        cache: Optional[Path] = None,
-        preprocessor: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
         transform: Optional[Callable[[Any], Any]] = None,
     ) -> None:
         """Initialise a `GQAQuestions` instance.
@@ -28,16 +25,9 @@ class GQAQuestions(ChunkedJSONDataset):
 
         `version`: The dataset version to use.
 
-        `cache`: A path to a directory that preprocessed files can be saved in.
-        If `cache` is `None`, a system temporary directory will be used.
-
         `preprocessor`: A callable that preprocesses a single sample of the data.
         Preprocessing occurs on dataset creation, and preprocessed data is saved
         to disk.
-
-        `transform`: A function that is applied to each sample in __getitem__,
-        i.e. applied to the result of the `preprocessor` function for a sample,
-        or to raw samples if `preprocessor` is `None`.
         """
         # Validate parameters
         if not isinstance(filemap, GQAFilemap):
@@ -64,8 +54,7 @@ class GQAQuestions(ChunkedJSONDataset):
                 f"Parameter {filemap=} does not refer to a valid questions"
                 f"file or directory for {split=} and {version=}."
             )
-
-        super().__init__(root, cache=cache, preprocessor=preprocessor)
+        super().__init__(root)
 
         self._filemap = filemap
         self._split = split

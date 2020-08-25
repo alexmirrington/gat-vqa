@@ -16,7 +16,6 @@ class GCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
         self.conv_layers = torch.nn.ModuleList([])
         for idx in range(1, len(shape)):
             self.conv_layers.append(GCNConv(shape[idx - 1], shape[idx]))
-        print(f"{self.conv_layers=}")
 
     def forward(self, data: Data) -> torch.Tensor:
         """Perform a forward GCN pass."""

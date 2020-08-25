@@ -12,7 +12,7 @@ install: requirements
 	# Refer to: https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html
 	$(eval CUDA_VERSION = $(shell python -c "import torch; print(torch.version.cuda)"))
 	$(eval CUDA_STRING = $(if $(findstring None,$(CUDA_VERSION)),cpu,cu$(subst .,,$(CUDA_VERSION))))
-	$(eval TORCH_VERSION = $(shell python -c "import torch; print(torch.__version__)"))
+	$(eval TORCH_VERSION = $(subst +cpu,,$(shell python -c "import torch; print(torch.__version__)")))
 	@echo "torch: $(TORCH_VERSION)"
 	@echo "cuda: $(CUDA_VERSION) ($(CUDA_STRING))"
 	@pip install torch-scatter==latest+$(CUDA_STRING) -f "https://pytorch-geometric.com/whl/torch-$(TORCH_VERSION).html"

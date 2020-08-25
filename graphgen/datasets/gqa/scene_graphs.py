@@ -1,5 +1,4 @@
 """A torch-compatible GQA scene graphs dataset implementation."""
-from pathlib import Path
 from typing import Any, Callable, Optional
 
 from ...config.gqa import GQAFilemap, GQASplit
@@ -13,8 +12,6 @@ class GQASceneGraphs(ChunkedJSONDataset):
         self,
         filemap: GQAFilemap,
         split: GQASplit,
-        cache: Optional[Path] = None,
-        preprocessor: Optional[Callable[[Any], Any]] = None,
         transform: Optional[Callable[[Any], Any]] = None,
     ) -> None:
         """Initialise a `GQASceneGraphs` instance.
@@ -24,13 +21,6 @@ class GQASceneGraphs(ChunkedJSONDataset):
         `filemap`: The filemap to use when determining where to load data from.
 
         `split`: The dataset split to use.
-
-        `cache`: A path to a directory that preprocessed files can be saved in.
-        If `cache` is `None`, a system temporary directory will be used.
-
-        `preprocessor`: A callable that preprocesses a single sample of the data.
-        Preprocessing occurs on dataset creation, and preprocessed data is saved
-        to disk.
 
         `transform`: A function that is applied to each sample in __getitem__,
         i.e. applied to the result of the `preprocessor` function for a sample,
@@ -58,7 +48,7 @@ class GQASceneGraphs(ChunkedJSONDataset):
                 f"file/folder for {split=}."
             )
 
-        super().__init__(root, cache=cache, preprocessor=preprocessor)
+        super().__init__(root)
 
         self._filemap = filemap
         self._split = split
