@@ -132,7 +132,7 @@ class PreprocessingFactory:
 
         # Dump preprocessors
         with open(root / "preprocessors.json", "w") as json_file:
-            json.dump(jsons.dump(preprocessors), json_file)
+            json.dump(jsons.dump(preprocessors, strip_privates=True), json_file)
 
         # Log artifact
         artifact = wandb.Artifact(
