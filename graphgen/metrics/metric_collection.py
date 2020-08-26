@@ -60,3 +60,9 @@ class MetricCollection:
             )
             for metric in self._metrics
         }
+
+    def reset(self) -> None:
+        """Reset all metrics."""
+        self._ids = []
+        self._preds = []
+        self._targets = []
