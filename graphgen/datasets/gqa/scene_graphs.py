@@ -66,7 +66,7 @@ class GQASceneGraphs(ChunkedJSONDataset):
 
     def __getitem__(self, index: int) -> Any:
         """Get an item from the dataset at a given index."""
-        item = super().__getitem__(index)
+        _, image = super().__getitem__(index)
         if self._transform is not None:
-            return self._transform(item)
-        return item
+            return self._transform(image)
+        return image

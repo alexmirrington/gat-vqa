@@ -88,6 +88,7 @@ class _GQAQuestionBase(TypedDict):
 class GQAQuestion(_GQAQuestionBase, total=False):
     """Class wrapper for GQA question information."""
 
+    questionId: str
     answer: Optional[str]
     fullAnswer: Optional[str]
     groups: Optional[GQAQuestionGroup]

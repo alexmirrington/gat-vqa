@@ -1,5 +1,6 @@
 """Tools for preprocessing datasets given a pipeline in the form of a config object."""
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 import jsons
@@ -16,7 +17,14 @@ from ...config.gqa import (
 )
 from ...datasets.gqa import GQAQuestions
 from ...datasets.utilities import KeyedDataset
-from ..preprocessing import GQAQuestionPreprocessor, Preprocessor
+from ..preprocessing import GQAQuestionPreprocessor, Preprocessor, QuestionPreprocessor
+
+
+@dataclass(frozen=True)
+class PreprocessorCollection:
+    """Wrapper class for storing a preprocessor feature mappings."""
+
+    questions: QuestionPreprocessor
 
 
 class PreprocessingFactory:
@@ -75,7 +83,7 @@ class PreprocessingFactory:
                 f"Param {config.dataset=} must be of type {GQADatasetConfig.__name__}."
             )
 
-        question_preprocessor = GQAQuestionPreprocessor()
+        preprocessors = PreprocessorCollection(questions=GQAQuestionPreprocessor())
 
         root = config.preprocessing.cache.root / wandb.run.id
         if not root.exists():
@@ -103,7 +111,7 @@ class PreprocessingFactory:
                 chunks = len(questions.chunk_sizes)
                 PreprocessingFactory._apply_preprocessor(
                     source=questions,
-                    preprocessor=question_preprocessor,
+                    preprocessor=preprocessors.questions,
                     cache=new_filemap.question_path(
                         GQASplit(item.split),
                         GQAVersion(item.version),
@@ -122,6 +130,11 @@ class PreprocessingFactory:
             else:
                 raise NotImplementedError()
 
+        # Dump preprocessors
+        with open(root / "preprocessors.json", "w") as json_file:
+            json.dump(jsons.dump(preprocessors), json_file)
+
+        # Log artifact
         artifact = wandb.Artifact(
             config.preprocessing.cache.artifact,
             type="dataset",

@@ -21,6 +21,20 @@ class Preprocessor(ABC):
         """Preprocess a sequence of data."""
 
 
+class QuestionPreprocessor(Preprocessor):
+    """Abstract base class for all question preprocessors."""
+
+    @property
+    @abstractmethod
+    def index_to_answer(self) -> List[str]:
+        """Get the `int` to `str` mapping of indices to answers, based on the \
+        data that has been processed so far."""
+
+    @abstractmethod
+    def __call__(self, data: Sequence[Any]) -> Sequence[Question]:
+        """Preprocess a sequence of data."""
+
+
 def dep_coordinate_list(
     doc: stanza.Document, directed: bool = False
 ) -> List[List[List[int]]]:
@@ -52,32 +66,15 @@ def dep_coordinate_list(
     return doc_coords
 
 
-class QuestionTransformer:
-    """Class for applying transformations to questions."""
-
-    def __init__(self) -> None:
-        """Initialise a `QuestionTransformer` instance."""
-        self.vectors = GloVe(name="6B", dim=300)
-
-    def __call__(self, data: Question) -> TrainableQuestion:
-        """Transform data into a trainable format and look up word embeddings."""
-        adjacency = torch.tensor(data["dependencies"])  # pylint: disable=not-callable
-        node_features = self.vectors.get_vecs_by_tokens(
-            data["tokens"], lower_case_backup=True
-        )
-        return {
-            "imageId": data["imageId"],
-            "dependencies": Data(edge_index=adjacency, x=node_features),
-            "answer": data["answer"],
-        }
-
-
-class GQAQuestionPreprocessor(Preprocessor):
+class GQAQuestionPreprocessor(QuestionPreprocessor):
     """Class for preprocessing questions."""
 
     def __init__(self, answer_to_index: Optional[Dict[str, int]] = None) -> None:
         """Create a `QuestionPreprocessor` instance."""
         self._answer_to_index = answer_to_index if answer_to_index is not None else {}
+        self._index_to_answer = (
+            list(answer_to_index.keys()) if answer_to_index is not None else []
+        )
         self._question_pipeline = stanza.Pipeline(
             lang="en",
             processors={
@@ -90,14 +87,16 @@ class GQAQuestionPreprocessor(Preprocessor):
         )
 
     @property
-    def answer_to_index(self) -> Dict[str, int]:
-        """Get the string to int mapping of answers to indices, based on the \
+    def index_to_answer(self) -> List[str]:
+        """Get the `int` to `str` mapping of indices to answers, based on the \
         data that has been processed so far."""
-        return self._answer_to_index.copy()
+        return self._index_to_answer.copy()
 
-    @answer_to_index.setter
-    def answer_to_index(self, value: Dict[str, int]) -> None:
-        self._answer_to_index = value
+    @index_to_answer.setter
+    def index_to_answer(self, value: List[str]) -> None:
+        """Set the int to str mapping of indices to answers."""
+        self._index_to_answer = value
+        self._answer_to_index = {key: idx for idx, key in enumerate(value)}
 
     def _process_questions(
         self, questions: List[str]
@@ -116,6 +115,7 @@ class GQAQuestionPreprocessor(Preprocessor):
                 # those in the training set, hence there is no reason to freeze
                 # the answer vocab.
                 self._answer_to_index[answer] = len(self._answer_to_index)
+                self._index_to_answer.append(answer)
             result.append(self._answer_to_index[answer] if answer is not None else None)
         return result
 
@@ -135,6 +135,7 @@ class GQAQuestionPreprocessor(Preprocessor):
             # If one sample has a multi-sentence question, zip should fail.
             result += [
                 {
+                    "questionId": question["questionId"],
                     "imageId": question["imageId"],
                     "question": question["question"],
                     "answer": answer,
@@ -147,3 +148,24 @@ class GQAQuestionPreprocessor(Preprocessor):
             ]
             start += step
         return result
+
+
+class QuestionTransformer:
+    """Class for applying transformations to questions."""
+
+    def __init__(self) -> None:
+        """Initialise a `QuestionTransformer` instance."""
+        self.vectors = GloVe(name="6B", dim=300)
+
+    def __call__(self, data: Question) -> TrainableQuestion:
+        """Transform data into a trainable format and look up word embeddings."""
+        adjacency = torch.tensor(data["dependencies"])  # pylint: disable=not-callable
+        node_features = self.vectors.get_vecs_by_tokens(
+            data["tokens"], lower_case_backup=True
+        )
+        return {
+            "questionId": data["questionId"],
+            "imageId": data["imageId"],
+            "dependencies": Data(edge_index=adjacency, x=node_features),
+            "answer": data["answer"],
+        }

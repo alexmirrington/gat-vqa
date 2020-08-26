@@ -1,7 +1,7 @@
 """Utilities for loading data from one or more JSON files."""
 import json
 from pathlib import Path
-from typing import Any, Dict, Iterator, Tuple
+from typing import Any, Dict, Iterator, List, Tuple
 
 from .chunked_dataset import ChunkedDataset
 from .keyed_dataset import KeyedDataset
@@ -28,6 +28,7 @@ class ChunkedJSONDataset(ChunkedDataset, KeyedDataset):
         super().__init__(root)
 
         self._key_to_idx: Dict[str, int] = {}
+        self._idx_to_key: List[str] = []
         self._chunk_sizes: Tuple[int, ...] = ()
         self._chunk_cache: Dict[int, Tuple[Any, ...]] = {}
 
@@ -41,6 +42,7 @@ class ChunkedJSONDataset(ChunkedDataset, KeyedDataset):
                 self._key_to_idx.update(
                     {key: cum_idx + idx for idx, key in enumerate(chunk_data.keys())}
                 )
+                self._idx_to_key += list(chunk_data.keys())
                 chunk_sizes.append(chunk_size)
                 cum_idx += chunk_size
                 del chunk_data
@@ -81,13 +83,14 @@ class ChunkedJSONDataset(ChunkedDataset, KeyedDataset):
         # Get the index of the chunk the given index belongs to and its
         # corresponding chunk-local index in the range
         # [0, self._chunk_sizes[chunk_idx]))
+        key = self._idx_to_key[index]
         chunk_idx, local_idx = self._get_chunk_local_idx(index)
         # Load the correct chunk into memory if not cached
         if self._chunk_cache is None or chunk_idx not in self._chunk_cache.keys():
             with open(self._chunks[chunk_idx], "r") as chunk:
                 self._chunk_cache = {chunk_idx: tuple(json.load(chunk).values())}
 
-        return self._chunk_cache[chunk_idx][local_idx]
+        return key, self._chunk_cache[chunk_idx][local_idx]
 
     def __len__(self) -> int:
         """Get the length of the dataset."""

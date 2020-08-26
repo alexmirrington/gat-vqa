@@ -104,9 +104,9 @@ def test_chunkedjson_directory_root_getitem(
     # Test __getitem__ on chunk boundaries
     chunk_start = 0
     for chunk_idx in range(chunk_config.num_chunks):
-        first = dataset[chunk_start]
+        _, first = dataset[chunk_start]
         assert first == chunk_start
-        last = dataset[chunk_start + chunk_size - 1]
+        _, last = dataset[chunk_start + chunk_size - 1]
         assert last == chunk_start + chunk_size - 1
         chunk_start += chunk_size
 
@@ -134,9 +134,9 @@ def test_chunkedjson_file_root_getitem(
     chunk_size = chunk_config.chunk_size
 
     # Test __getitem__ on chunk boundaries
-    first = dataset[0]
+    _, first = dataset[0]
     assert first == 0
-    last = dataset[chunk_size - 1]
+    _, last = dataset[chunk_size - 1]
     assert last == chunk_size - 1
 
     # Test invalid index in __getitem__
