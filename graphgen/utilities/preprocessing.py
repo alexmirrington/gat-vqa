@@ -1,5 +1,4 @@
 """Module containing utilities for preprocessing data."""
-from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import stanza
@@ -13,26 +12,31 @@ from ..schemas.gqa import GQAQuestion
 from .generators import slice_sequence
 
 
-class Preprocessor(ABC):
-    """Abstract base class for all preprocessors."""
-
-    @abstractmethod
-    def __call__(self, data: Sequence[Any]) -> Sequence[Any]:
-        """Preprocess a sequence of data."""
-
-
-class QuestionPreprocessor(Preprocessor):
+class QuestionPreprocessor:
     """Abstract base class for all question preprocessors."""
 
+    def __init__(self, answer_to_index: Optional[Dict[str, int]] = None) -> None:
+        """Create a `QuestionPreprocessor` instance."""
+        self._answer_to_index = answer_to_index if answer_to_index is not None else {}
+        self._index_to_answer = (
+            list(answer_to_index.keys()) if answer_to_index is not None else []
+        )
+
     @property
-    @abstractmethod
     def index_to_answer(self) -> List[str]:
         """Get the `int` to `str` mapping of indices to answers, based on the \
         data that has been processed so far."""
+        return self._index_to_answer.copy()
 
-    @abstractmethod
-    def __call__(self, data: Sequence[Any]) -> Sequence[Question]:
-        """Preprocess a sequence of data."""
+    @index_to_answer.setter
+    def index_to_answer(self, value: List[str]) -> None:
+        """Set the int to str mapping of indices to answers."""
+        self._index_to_answer = value
+        self._answer_to_index = {key: idx for idx, key in enumerate(value)}
+
+    def __call__(self, data: Sequence[Any]) -> List[Question]:
+        """Preprocess a question sample."""
+        raise NotImplementedError()
 
 
 def dep_coordinate_list(
@@ -70,11 +74,8 @@ class GQAQuestionPreprocessor(QuestionPreprocessor):
     """Class for preprocessing questions."""
 
     def __init__(self, answer_to_index: Optional[Dict[str, int]] = None) -> None:
-        """Create a `QuestionPreprocessor` instance."""
-        self._answer_to_index = answer_to_index if answer_to_index is not None else {}
-        self._index_to_answer = (
-            list(answer_to_index.keys()) if answer_to_index is not None else []
-        )
+        """Create a `GQAQuestionPreprocessor` instance."""
+        super().__init__(answer_to_index)
         self._question_pipeline = stanza.Pipeline(
             lang="en",
             processors={

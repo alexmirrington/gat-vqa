@@ -2,6 +2,7 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Callable
 
 import jsons
 import wandb
@@ -17,7 +18,7 @@ from ...config.gqa import (
 )
 from ...datasets.gqa import GQAQuestions
 from ...datasets.utilities import KeyedDataset
-from ..preprocessing import GQAQuestionPreprocessor, Preprocessor, QuestionPreprocessor
+from ..preprocessing import GQAQuestionPreprocessor, QuestionPreprocessor
 
 
 @dataclass(frozen=True)
@@ -44,7 +45,10 @@ class PreprocessingFactory:
 
     @staticmethod
     def _apply_preprocessor(
-        source: KeyedDataset, preprocessor: Preprocessor, cache: Path, chunks: int
+        source: KeyedDataset,
+        preprocessor: Callable[[Any], Any],
+        cache: Path,
+        chunks: int,
     ) -> None:
         """Process a `source` dataset and save it at `cache`."""
         is_file = False

@@ -87,7 +87,9 @@ def run(config: Config, device: torch.device) -> None:
     print(f"test: {len(datasets.test)}")
     print(colored("model:", attrs=["bold"]))
     # TODO Use model factory
-    model = GCN((300, 600, 1200, 1878))  # 1878 is number of unique answers
+    model = GCN(
+        (300, len(preprocessors.questions.index_to_answer))
+    )  # 1878 is number of unique answers
     model.to(device)
     model.train()
     print(f"{model=}")
@@ -150,7 +152,6 @@ def train(
                     for idx in targets.detach().cpu().numpy()
                 ],
             )
-
             if (
                 batch % config.training.log_step == config.training.log_step - 1
                 or batch == len(dataloader) - 1
@@ -163,7 +164,9 @@ def train(
                     {f"train/{key}": val for key, val in metrics.evaluate().items()}
                 )
                 log_metrics_stdout(
-                    results, colors=(None, "cyan", "cyan"), newline=False,
+                    results,
+                    colors=(None, "yellow", "blue", "cyan", "cyan", "cyan"),
+                    newline=False,
                 )
                 wandb.log(results)
         results.update(
@@ -174,7 +177,22 @@ def train(
                 ).items()
             }
         )
-        log_metrics_stdout(results, colors=(None, "cyan", "cyan", "magenta", "magenta"))
+        log_metrics_stdout(
+            results,
+            colors=(
+                None,
+                "yellow",
+                "blue",
+                "cyan",
+                "cyan",
+                "cyan",
+                "yellow",
+                "green",
+                "magenta",
+                "magenta",
+                "magenta",
+            ),
+        )
         wandb.log(results)
 
 
@@ -211,6 +229,11 @@ def evaluate(
                     preprocessors.questions.index_to_answer[idx]
                     for idx in targets.detach().cpu().numpy()
                 ],
+            )
+            metrics.append(
+                sample["question"]["questionId"],
+                np.argmax(preds.detach().cpu().numpy(), axis=1),
+                targets.detach().cpu().numpy(),
             )
             print(f"eval: {batch + 1}/{len(dataloader)}", end="\r")
     model.train()

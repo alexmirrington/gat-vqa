@@ -11,14 +11,14 @@ def accuracy(targets: Iterable[Any], preds: Iterable[Any]) -> Any:
 
 def precision(targets: Iterable[Any], preds: Iterable[Any]) -> Any:
     """Compute standard precision metric."""
-    return float(precision_score(targets, preds))
+    return float(precision_score(targets, preds, average="macro", zero_division=0))
 
 
 def recall(targets: Iterable[Any], preds: Iterable[Any]) -> Any:
     """Compute standard recall metric."""
-    return float(recall_score(targets, preds))
+    return float(recall_score(targets, preds, average="macro", zero_division=0))
 
 
 def f_1(targets: Iterable[Any], preds: Iterable[Any]) -> Any:
     """Compute standard f1 metric."""
-    return float(f1_score(targets, preds))
+    return float(f1_score(targets, preds, average="macro", zero_division=0))
