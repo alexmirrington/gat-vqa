@@ -23,7 +23,6 @@ from graphgen.utilities.factories import (
     DatasetCollection,
     DatasetFactory,
     PreprocessingFactory,
-    PreprocessorCollection,
 )
 from graphgen.utilities.logging import log_metrics_stdout
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
@@ -87,9 +86,10 @@ def run(config: Config, device: torch.device) -> None:
     print(f"test: {len(datasets.test)}")
     print(colored("model:", attrs=["bold"]))
     # TODO Use model factory
-    model = GCN(
-        (300, len(preprocessors.questions.index_to_answer))
-    )  # 1878 is number of unique answers
+    # 1878 is the number of unique answers from the GQA paper
+    # 1843 is the number of answers across train, val and testdev, returned by
+    # len(preprocessors.questions.index_to_answer)
+    model = GCN((300, len(preprocessors.questions.index_to_answer)))
     model.to(device)
     model.train()
     print(f"{model=}")
@@ -101,12 +101,10 @@ def run(config: Config, device: torch.device) -> None:
     print(f"{optimizer=}")
     criterion = torch.nn.NLLLoss()
     print(f"{criterion=}")
-    metrics = MetricCollection(
-        config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
-    )
+
     # Run model
     print(colored("running:", attrs=["bold"]))
-    train(model, criterion, optimizer, datasets, preprocessors, metrics, device, config)
+    train(model, criterion, optimizer, datasets, device, config)
 
 
 def train(
@@ -114,8 +112,6 @@ def train(
     criterion: Callable[..., torch.Tensor],
     optimizer: torch.optim.Optimizer,
     datasets: DatasetCollection,
-    preprocessors: PreprocessorCollection,
-    metrics: MetricCollection,
     device: torch.device,
     config: Config,
 ) -> None:
@@ -126,6 +122,9 @@ def train(
         batch_size=config.dataloader.batch_size,
         num_workers=config.dataloader.workers,
         sampler=ChunkedRandomSampler(datasets.train.questions),
+    )
+    metrics = MetricCollection(
+        config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
     )
     for epoch in range(config.training.epochs):
         for batch, sample in enumerate(dataloader):
@@ -140,17 +139,12 @@ def train(
             loss.backward()
             optimizer.step()
 
-            # Calculate and log metrics
+            # Calculate and log metrics, using answer indices as we only want
+            # basics for train set.
             metrics.append(
                 sample["question"]["questionId"],
-                [
-                    preprocessors.questions.index_to_answer[idx]
-                    for idx in np.argmax(preds.detach().cpu().numpy(), axis=1)
-                ],
-                [
-                    preprocessors.questions.index_to_answer[idx]
-                    for idx in targets.detach().cpu().numpy()
-                ],
+                np.argmax(preds.detach().cpu().numpy(), axis=1),
+                targets.detach().cpu().numpy(),
             )
             if (
                 batch % config.training.log_step == config.training.log_step - 1
@@ -173,7 +167,7 @@ def train(
             {
                 f"val/{key}": val
                 for key, val in evaluate(
-                    model, criterion, datasets, preprocessors, metrics, device, config
+                    model, criterion, datasets, metrics, device, config
                 ).items()
             }
         )
@@ -187,7 +181,7 @@ def train(
                 "cyan",
                 "cyan",
                 "yellow",
-                "green",
+                "magenta",
                 "magenta",
                 "magenta",
                 "magenta",
@@ -200,7 +194,6 @@ def evaluate(
     model: torch.nn.Module,
     criterion: Callable[..., torch.Tensor],
     datasets: DatasetCollection,
-    preprocessors: PreprocessorCollection,
     metrics: MetricCollection,
     device: torch.device,
     config: Config,
@@ -211,6 +204,9 @@ def evaluate(
         batch_size=config.dataloader.batch_size,
         num_workers=config.dataloader.workers,
     )
+    metrics = MetricCollection(
+        config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
+    )
     model.eval()
     with torch.no_grad():
         for batch, sample in enumerate(dataloader):
@@ -219,17 +215,8 @@ def evaluate(
             targets = question["answer"].to(device)
             preds = model(data)
             loss = criterion(preds, targets)
-            metrics.append(
-                sample["question"]["questionId"],
-                [
-                    preprocessors.questions.index_to_answer[idx]
-                    for idx in np.argmax(preds.detach().cpu().numpy(), axis=1)
-                ],
-                [
-                    preprocessors.questions.index_to_answer[idx]
-                    for idx in targets.detach().cpu().numpy()
-                ],
-            )
+            # Calculate and log metrics, using answer indices as we only want
+            # basics for train set.
             metrics.append(
                 sample["question"]["questionId"],
                 np.argmax(preds.detach().cpu().numpy(), axis=1),

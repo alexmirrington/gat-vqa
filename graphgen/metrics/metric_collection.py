@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Any, Dict, Iterable, List, Optional, Union
 
 from ..config import Config
-from .metrics import accuracy, f_1, precision, recall
+from .metrics import accuracy, consistency, f_1, precision, recall
 
 
 class Metric(Enum):
@@ -14,10 +14,6 @@ class Metric(Enum):
     PRECISION = "precision"
     F1 = "f1"
     CONSISTENCY = "consistency"
-    VALIDITY = "validity"
-    PLAUSIBILITY = "plausibility"
-    GROUNDING = "grounding"
-    DISTRIBUTION = "distribution"
 
 
 class MetricCollection:
@@ -39,6 +35,7 @@ class MetricCollection:
             Metric.RECALL: recall,
             Metric.PRECISION: precision,
             Metric.F1: f_1,
+            Metric.CONSISTENCY: consistency,
         }
         self._config = config
         self._ids: List[str] = []
@@ -56,7 +53,10 @@ class MetricCollection:
 
     def evaluate(self) -> Dict[str, Any]:
         """Evaluate all metrics in the collection and return the results."""
+        kwargs = {"ids": self._ids}
         return {
-            metric.value: self._metric_funcs[metric](self._targets, self._preds)
+            metric.value: self._metric_funcs[metric](
+                self._targets, self._preds, **kwargs
+            )
             for metric in self._metrics
         }
