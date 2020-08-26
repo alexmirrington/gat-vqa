@@ -103,11 +103,16 @@ def test_questions_transformed_getitem(
     """Ensure a transformed item is returned given valid GQA data and a transform."""
 
     def transform(question: GQAQuestion) -> Dict[str, Any]:
-        return {"imageId": question["imageId"], "question": question["question"]}
+        return {
+            "questionId": question["questionId"],
+            "imageId": question["imageId"],
+            "question": question["question"],
+        }
 
     dataset = GQAQuestions(GQAFilemap(gqa), split, version, transform=transform)
     question = dataset[0]
     assert isinstance(question, dict)
+    assert "questionId" in question.keys()
     assert "imageId" in question.keys()
     assert "question" in question.keys()
     assert "isBalanced" not in question.keys()

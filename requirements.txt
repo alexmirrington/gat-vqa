@@ -16,3 +16,4 @@ torchtext
 torchvision
 tqdm
 wandb
+sklearn

@@ -17,8 +17,13 @@ from torch_geometric.data import DataLoader
 
 from graphgen.config import Config
 from graphgen.datasets.utilities import ChunkedRandomSampler
+from graphgen.metrics import Metric, MetricCollection
 from graphgen.models.gcn import GCN
-from graphgen.utilities.factories import DatasetFactory, PreprocessingFactory
+from graphgen.utilities.factories import (
+    DatasetCollection,
+    DatasetFactory,
+    PreprocessingFactory,
+)
 from graphgen.utilities.logging import log_metrics_stdout
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
@@ -75,13 +80,16 @@ def run(config: Config, device: torch.device) -> None:
     """Train a model according to the `config.model` config."""
     print(colored("loading datasets:", attrs=["bold"]))
     factory = DatasetFactory()
-    train_data, val_data, test_data = factory.create(config)
-    print(f"train: {len(train_data)}")
-    print(f"val: {len(val_data)}")
-    print(f"test: {len(test_data)}")
-
+    datasets, preprocessors = factory.create(config)
+    print(f"train: {len(datasets.train)}")
+    print(f"val: {len(datasets.val)}")
+    print(f"test: {len(datasets.test)}")
     print(colored("model:", attrs=["bold"]))
-    model = GCN((300, 600, 1200, 1878))  # 1878 is number of unique answers
+    # TODO Use model factory
+    # 1878 is the number of unique answers from the GQA paper
+    # 1843 is the number of answers across train, val and testdev, returned by
+    # len(preprocessors.questions.index_to_answer)
+    model = GCN((300, len(preprocessors.questions.index_to_answer)))
     model.to(device)
     model.train()
     print(f"{model=}")
@@ -96,39 +104,30 @@ def run(config: Config, device: torch.device) -> None:
 
     # Run model
     print(colored("running:", attrs=["bold"]))
-    sampler = ChunkedRandomSampler(train_data.questions)
-    train_dataloader = DataLoader(
-        train_data,
-        batch_size=config.dataloader.batch_size,
-        num_workers=config.dataloader.workers,
-        sampler=sampler,
-    )
-    val_dataloader = DataLoader(
-        val_data,
-        batch_size=config.dataloader.batch_size,
-        num_workers=config.dataloader.workers,
-    )
-    train(
-        model, criterion, optimizer, train_dataloader, val_dataloader, device, config,
-    )
+    train(model, criterion, optimizer, datasets, device, config)
 
 
 def train(
     model: torch.nn.Module,
     criterion: Callable[..., torch.Tensor],
     optimizer: torch.optim.Optimizer,
-    train_dataloader: torch.utils.data.DataLoader,
-    val_dataloader: torch.utils.data.DataLoader,
+    datasets: DatasetCollection,
     device: torch.device,
     config: Config,
 ) -> None:
     """Train a model on the data in `train_dataloader`, evaluating every epoch."""
-    # pylint: disable=too-many-locals  # TODO abstract metric calculation logic.
+    # pylint: disable=too-many-locals
+    dataloader = DataLoader(
+        datasets.train,
+        batch_size=config.dataloader.batch_size,
+        num_workers=config.dataloader.workers,
+        sampler=ChunkedRandomSampler(datasets.train.questions),
+    )
+    metrics = MetricCollection(
+        config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
+    )
     for epoch in range(config.training.epochs):
-        metrics: Dict[str, Any] = {}
-        correct = 0
-        total = 0
-        for batch, sample in enumerate(train_dataloader):
+        for batch, sample in enumerate(dataloader):
             # Move data to GPU
             data = sample["question"]["dependencies"].to(device)
             targets = sample["question"]["answer"].to(device)
@@ -140,41 +139,74 @@ def train(
             loss.backward()
             optimizer.step()
 
-            # Calculate and log metrics
-            preds_np = np.argmax(preds.detach().cpu().numpy(), axis=1)
-            targets_np = targets.detach().cpu().numpy()
-            correct += np.sum(np.equal(preds_np, targets_np))
-            total += len(targets_np)
-
+            # Calculate and log metrics, using answer indices as we only want
+            # basics for train set.
+            metrics.append(
+                sample["question"]["questionId"],
+                np.argmax(preds.detach().cpu().numpy(), axis=1),
+                targets.detach().cpu().numpy(),
+            )
             if (
                 batch % config.training.log_step == config.training.log_step - 1
-                or batch == len(train_dataloader) - 1
+                or batch == len(dataloader) - 1
             ):
-                metrics = {
-                    "epoch": epoch + (batch + 1) / len(train_dataloader),
+                results = {
+                    "epoch": epoch + (batch + 1) / len(dataloader),
                     "train/loss": loss.item(),
-                    "train/accuracy": correct / total,
                 }
-                log_metrics_stdout(
-                    metrics, colors=(None, "cyan", "cyan"), newline=False,
+                results.update(
+                    {f"train/{key}": val for key, val in metrics.evaluate().items()}
                 )
-                wandb.log(metrics)
-        val_metrics = evaluate(model, criterion, val_dataloader, device)
-        metrics.update({f"val/{key}": val for key, val in val_metrics.items()})
-
-        log_metrics_stdout(metrics, colors=(None, "cyan", "cyan", "magenta", "magenta"))
-        wandb.log(metrics)
+                log_metrics_stdout(
+                    results,
+                    colors=(None, "yellow", "blue", "cyan", "cyan", "cyan"),
+                    newline=False,
+                )
+                wandb.log(results)
+        results.update(
+            {
+                f"val/{key}": val
+                for key, val in evaluate(
+                    model, criterion, datasets, metrics, device, config
+                ).items()
+            }
+        )
+        log_metrics_stdout(
+            results,
+            colors=(
+                None,
+                "yellow",
+                "blue",
+                "cyan",
+                "cyan",
+                "cyan",
+                "yellow",
+                "magenta",
+                "magenta",
+                "magenta",
+                "magenta",
+            ),
+        )
+        wandb.log(results)
 
 
 def evaluate(
     model: torch.nn.Module,
     criterion: Callable[..., torch.Tensor],
-    dataloader: torch.utils.data.DataLoader,
+    datasets: DatasetCollection,
+    metrics: MetricCollection,
     device: torch.device,
+    config: Config,
 ) -> Dict[str, Any]:
     """Evaluate a model according to a criterion on a given dataset."""
-    correct = 0
-    total = 0
+    dataloader = DataLoader(
+        datasets.val,
+        batch_size=config.dataloader.batch_size,
+        num_workers=config.dataloader.workers,
+    )
+    metrics = MetricCollection(
+        config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
+    )
     model.eval()
     with torch.no_grad():
         for batch, sample in enumerate(dataloader):
@@ -183,14 +215,19 @@ def evaluate(
             targets = question["answer"].to(device)
             preds = model(data)
             loss = criterion(preds, targets)
-            preds_np = np.argmax(preds.detach().cpu().numpy(), axis=1)
-            targets_np = targets.detach().cpu().numpy()
-            correct += np.sum(np.equal(preds_np, targets_np))
-            total += len(targets_np)
+            # Calculate and log metrics, using answer indices as we only want
+            # basics for train set.
+            metrics.append(
+                sample["question"]["questionId"],
+                np.argmax(preds.detach().cpu().numpy(), axis=1),
+                targets.detach().cpu().numpy(),
+            )
             print(f"eval: {batch + 1}/{len(dataloader)}", end="\r")
-
     model.train()
-    return {"loss": loss.item(), "accuracy": correct / total}
+
+    results = {"loss": loss.item()}
+    results.update(metrics.evaluate())
+    return results
 
 
 def parse_args() -> argparse.Namespace:

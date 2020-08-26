@@ -1,5 +1,4 @@
 """Module containing utilities for preprocessing data."""
-from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import stanza
@@ -13,12 +12,31 @@ from ..schemas.gqa import GQAQuestion
 from .generators import slice_sequence
 
 
-class Preprocessor(ABC):
-    """Abstract base class for all preprocessors."""
+class QuestionPreprocessor:
+    """Abstract base class for all question preprocessors."""
 
-    @abstractmethod
-    def __call__(self, data: Sequence[Any]) -> Sequence[Any]:
-        """Preprocess a sequence of data."""
+    def __init__(self, answer_to_index: Optional[Dict[str, int]] = None) -> None:
+        """Create a `QuestionPreprocessor` instance."""
+        self._answer_to_index = answer_to_index if answer_to_index is not None else {}
+        self._index_to_answer = (
+            list(answer_to_index.keys()) if answer_to_index is not None else []
+        )
+
+    @property
+    def index_to_answer(self) -> List[str]:
+        """Get the `int` to `str` mapping of indices to answers, based on the \
+        data that has been processed so far."""
+        return self._index_to_answer.copy()
+
+    @index_to_answer.setter
+    def index_to_answer(self, value: List[str]) -> None:
+        """Set the int to str mapping of indices to answers."""
+        self._index_to_answer = value
+        self._answer_to_index = {key: idx for idx, key in enumerate(value)}
+
+    def __call__(self, data: Sequence[Any]) -> List[Question]:
+        """Preprocess a question sample."""
+        raise NotImplementedError()
 
 
 def dep_coordinate_list(
@@ -52,32 +70,12 @@ def dep_coordinate_list(
     return doc_coords
 
 
-class QuestionTransformer:
-    """Class for applying transformations to questions."""
-
-    def __init__(self) -> None:
-        """Initialise a `QuestionTransformer` instance."""
-        self.vectors = GloVe(name="6B", dim=300)
-
-    def __call__(self, data: Question) -> TrainableQuestion:
-        """Transform data into a trainable format and look up word embeddings."""
-        adjacency = torch.tensor(data["dependencies"])  # pylint: disable=not-callable
-        node_features = self.vectors.get_vecs_by_tokens(
-            data["tokens"], lower_case_backup=True
-        )
-        return {
-            "imageId": data["imageId"],
-            "dependencies": Data(edge_index=adjacency, x=node_features),
-            "answer": data["answer"],
-        }
-
-
-class GQAQuestionPreprocessor(Preprocessor):
+class GQAQuestionPreprocessor(QuestionPreprocessor):
     """Class for preprocessing questions."""
 
     def __init__(self, answer_to_index: Optional[Dict[str, int]] = None) -> None:
-        """Create a `QuestionPreprocessor` instance."""
-        self._answer_to_index = answer_to_index if answer_to_index is not None else {}
+        """Create a `GQAQuestionPreprocessor` instance."""
+        super().__init__(answer_to_index)
         self._question_pipeline = stanza.Pipeline(
             lang="en",
             processors={
@@ -90,14 +88,16 @@ class GQAQuestionPreprocessor(Preprocessor):
         )
 
     @property
-    def answer_to_index(self) -> Dict[str, int]:
-        """Get the string to int mapping of answers to indices, based on the \
+    def index_to_answer(self) -> List[str]:
+        """Get the `int` to `str` mapping of indices to answers, based on the \
         data that has been processed so far."""
-        return self._answer_to_index.copy()
+        return self._index_to_answer.copy()
 
-    @answer_to_index.setter
-    def answer_to_index(self, value: Dict[str, int]) -> None:
-        self._answer_to_index = value
+    @index_to_answer.setter
+    def index_to_answer(self, value: List[str]) -> None:
+        """Set the int to str mapping of indices to answers."""
+        self._index_to_answer = value
+        self._answer_to_index = {key: idx for idx, key in enumerate(value)}
 
     def _process_questions(
         self, questions: List[str]
@@ -116,6 +116,7 @@ class GQAQuestionPreprocessor(Preprocessor):
                 # those in the training set, hence there is no reason to freeze
                 # the answer vocab.
                 self._answer_to_index[answer] = len(self._answer_to_index)
+                self._index_to_answer.append(answer)
             result.append(self._answer_to_index[answer] if answer is not None else None)
         return result
 
@@ -135,6 +136,7 @@ class GQAQuestionPreprocessor(Preprocessor):
             # If one sample has a multi-sentence question, zip should fail.
             result += [
                 {
+                    "questionId": question["questionId"],
                     "imageId": question["imageId"],
                     "question": question["question"],
                     "answer": answer,
@@ -147,3 +149,24 @@ class GQAQuestionPreprocessor(Preprocessor):
             ]
             start += step
         return result
+
+
+class QuestionTransformer:
+    """Class for applying transformations to questions."""
+
+    def __init__(self) -> None:
+        """Initialise a `QuestionTransformer` instance."""
+        self.vectors = GloVe(name="6B", dim=300)
+
+    def __call__(self, data: Question) -> TrainableQuestion:
+        """Transform data into a trainable format and look up word embeddings."""
+        adjacency = torch.tensor(data["dependencies"])  # pylint: disable=not-callable
+        node_features = self.vectors.get_vecs_by_tokens(
+            data["tokens"], lower_case_backup=True
+        )
+        return {
+            "questionId": data["questionId"],
+            "imageId": data["imageId"],
+            "dependencies": Data(edge_index=adjacency, x=node_features),
+            "answer": data["answer"],
+        }
