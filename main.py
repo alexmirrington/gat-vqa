@@ -165,6 +165,7 @@ def train(
                     newline=False,
                 )
                 wandb.log(results)
+                metrics.reset()
         results.update(
             {
                 f"val/{key}": val
