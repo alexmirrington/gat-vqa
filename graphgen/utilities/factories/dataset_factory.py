@@ -123,7 +123,8 @@ class DatasetFactory:
                             artifact_dir / "preprocessors.json", "r"
                         ) as json_file:
                             preprocessors = jsons.load(
-                                json.load(json_file), PreprocessorCollection,
+                                json.load(json_file),
+                                PreprocessorCollection,
                             )
                     except (wandb.CommError, AttributeError):
                         print(

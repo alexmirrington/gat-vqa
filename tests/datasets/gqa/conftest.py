@@ -84,7 +84,8 @@ _SCENE_GRAPHS: Dict[str, Any] = {
 
 
 def generate_image_files(
-    filenames: List[Path], dimensions: List[Tuple[int, int]],
+    filenames: List[Path],
+    dimensions: List[Tuple[int, int]],
 ) -> None:
     """Create multiple images with given filenames and random sizes."""
     for path, dim in zip(filenames, dimensions):

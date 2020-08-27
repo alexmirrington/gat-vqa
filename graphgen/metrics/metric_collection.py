@@ -43,7 +43,10 @@ class MetricCollection:
         self._targets: List[str] = []
 
     def append(
-        self, ids: Iterable[str], preds: Iterable[str], targets: Iterable[str],
+        self,
+        ids: Iterable[str],
+        preds: Iterable[str],
+        targets: Iterable[str],
     ) -> None:
         """Add a prediction or batch of predictions to the collection to be \
         evaluated in the next `evaluate()` call."""
