@@ -30,7 +30,9 @@ def test_imagefolder_invalid_root_type() -> None:
 
 
 @pytest.mark.parametrize(
-    "image_data", [1, 8], indirect=["image_data"],
+    "image_data",
+    [1, 8],
+    indirect=["image_data"],
 )
 def test_imagefolder_valid_directory_root(image_data: Path) -> None:
     """Ensure a dataset instance can be created with a regular directory root."""
@@ -38,7 +40,9 @@ def test_imagefolder_valid_directory_root(image_data: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "image_data", [1, 8], indirect=["image_data"],
+    "image_data",
+    [1, 8],
+    indirect=["image_data"],
 )
 def test_imagefolder_valid_symlink_directory_root(
     tmp_path: Path, image_data: Path
@@ -50,7 +54,9 @@ def test_imagefolder_valid_symlink_directory_root(
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1)],
+    indirect=["image_data"],
 )
 def test_imagefolder_valid_file_root(image_data: Path, num_images: int) -> None:
     """Ensure a dataset instance can be created with a regular file root."""
@@ -61,7 +67,9 @@ def test_imagefolder_valid_file_root(image_data: Path, num_images: int) -> None:
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1)],
+    indirect=["image_data"],
 )
 def test_imagefolder_valid_symlink_file_root(
     tmp_path: Path, image_data: Path, num_images: int
@@ -76,7 +84,9 @@ def test_imagefolder_valid_symlink_file_root(
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1), (8, 8)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1), (8, 8)],
+    indirect=["image_data"],
 )
 def test_imagefolder_directory_root_getitem(image_data: Path, num_images: int) -> None:
     """Ensure correct items are returned for each chunk given chunked image data."""
@@ -96,7 +106,9 @@ def test_imagefolder_directory_root_getitem(image_data: Path, num_images: int) -
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1)],
+    indirect=["image_data"],
 )
 def test_imagefolder_file_root_getitem(image_data: Path, num_images: int) -> None:
     """Ensure correct items are returned for each chunk given a single image file."""
@@ -123,7 +135,9 @@ def test_imagefolder_file_root_getitem(image_data: Path, num_images: int) -> Non
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1), (8, 8)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1), (8, 8)],
+    indirect=["image_data"],
 )
 def test_imagefolder_directory_root_len(image_data: Path, num_images: int) -> None:
     """Ensure dataset length is correct given chunked image data."""
@@ -132,7 +146,9 @@ def test_imagefolder_directory_root_len(image_data: Path, num_images: int) -> No
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1)],
+    indirect=["image_data"],
 )
 def test_imagefolder_file_root_len(image_data: Path, num_images: int) -> None:
     """Ensure dataset length is correct given a single image file."""
@@ -148,7 +164,9 @@ def test_imagefolder_file_root_len(image_data: Path, num_images: int) -> None:
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1), (8, 8)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1), (8, 8)],
+    indirect=["image_data"],
 )
 def test_imagefolder_directory_root_key_to_index(
     image_data: Path, num_images: int
@@ -167,7 +185,9 @@ def test_imagefolder_directory_root_key_to_index(
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1)],
+    indirect=["image_data"],
 )
 def test_imagefolder_file_root_key_to_index(image_data: Path, num_images: int) -> None:
     """Ensure `key_to_index` returns correct indices given a single image file."""
@@ -190,7 +210,9 @@ def test_imagefolder_file_root_key_to_index(image_data: Path, num_images: int) -
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1), (8, 8)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1), (8, 8)],
+    indirect=["image_data"],
 )
 def test_imagefolder_chunks_property_directory_root(
     image_data: Path, num_images: int
@@ -203,7 +225,9 @@ def test_imagefolder_chunks_property_directory_root(
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1), (8, 8)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1), (8, 8)],
+    indirect=["image_data"],
 )
 def test_imagefolder_chunks_property_symlink_directory_root(
     tmp_path: Path, image_data: Path, num_images: int
@@ -221,7 +245,9 @@ def test_imagefolder_chunks_property_symlink_directory_root(
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1)],
+    indirect=["image_data"],
 )
 def test_imagefolder_chunks_property_file_root(
     image_data: Path, num_images: int
@@ -237,7 +263,9 @@ def test_imagefolder_chunks_property_file_root(
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1)],
+    indirect=["image_data"],
 )
 def test_imagefolder_chunks_property_symlinked_file_root(
     tmp_path: Path, image_data: Path, num_images: int
@@ -256,7 +284,9 @@ def test_imagefolder_chunks_property_symlinked_file_root(
 
 
 @pytest.mark.parametrize(
-    "image_data", [1, 8], indirect=["image_data"],
+    "image_data",
+    [1, 8],
+    indirect=["image_data"],
 )
 def test_imagefolder_root_property_directory_root(image_data: Path) -> None:
     """Ensure the `root` property returns a correct value when created with a \
@@ -266,7 +296,9 @@ def test_imagefolder_root_property_directory_root(image_data: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "image_data", [1, 8], indirect=["image_data"],
+    "image_data",
+    [1, 8],
+    indirect=["image_data"],
 )
 def test_imagefolder_root_property_symlink_directory_root(
     tmp_path: Path, image_data: Path
@@ -281,7 +313,9 @@ def test_imagefolder_root_property_symlink_directory_root(
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1)],
+    indirect=["image_data"],
 )
 def test_imagefolder_root_property_file_root(image_data: Path, num_images: int) -> None:
     """Ensure the `root` property returns a correct value when created with a \
@@ -294,7 +328,9 @@ def test_imagefolder_root_property_file_root(image_data: Path, num_images: int) 
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1)],
+    indirect=["image_data"],
 )
 def test_imagefolder_root_property_symlinked_file_root(
     tmp_path: Path, image_data: Path, num_images: int
@@ -312,7 +348,9 @@ def test_imagefolder_root_property_symlinked_file_root(
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1), (8, 8)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1), (8, 8)],
+    indirect=["image_data"],
 )
 def test_imagefolder_directory_root_keys(image_data: Path, num_images: int) -> None:
     """Ensure `key_to_index` returns correct indices for multiple images."""
@@ -323,7 +361,9 @@ def test_imagefolder_directory_root_keys(image_data: Path, num_images: int) -> N
 
 
 @pytest.mark.parametrize(
-    "image_data, num_images", [(1, 1)], indirect=["image_data"],
+    "image_data, num_images",
+    [(1, 1)],
+    indirect=["image_data"],
 )
 def test_imagefolder_file_root_keys(image_data: Path, num_images: int) -> None:
     """Ensure `key_to_index` returns correct indices given a single image file."""

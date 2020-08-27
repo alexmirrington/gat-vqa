@@ -89,7 +89,9 @@ def run(config: Config, device: torch.device) -> None:
     # 1878 is the number of unique answers from the GQA paper
     # 1843 is the number of answers across train, val and testdev, returned by
     # len(preprocessors.questions.index_to_answer)
-    model = GCN((300, len(preprocessors.questions.index_to_answer)))
+    model = GCN(
+        (300, 600, 900, 1200, 1500, len(preprocessors.questions.index_to_answer))
+    )
     model.to(device)
     model.train()
     print(f"{model=}")
@@ -163,6 +165,7 @@ def train(
                     newline=False,
                 )
                 wandb.log(results)
+                metrics.reset()
         results.update(
             {
                 f"val/{key}": val
@@ -188,6 +191,7 @@ def train(
             ),
         )
         wandb.log(results)
+        metrics.reset()
 
 
 def evaluate(

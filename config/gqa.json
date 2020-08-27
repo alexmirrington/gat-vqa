@@ -31,7 +31,7 @@
       "features": [
         {
           "name": "questions",
-          "artifact": "gqa-preprocessed:latest"
+          "artifact": "gqa-preprocessed:v1"
         }
       ],
       "train": {

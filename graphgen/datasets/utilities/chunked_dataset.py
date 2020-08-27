@@ -33,9 +33,11 @@ class ChunkedDataset(ABC, torch.utils.data.Dataset):  # type: ignore
             raise ValueError(f"Parameter {root=} must point to a non-empty directory.")
 
         self._root = root
-        self._chunks: Tuple[Path, ...] = tuple(
-            sorted(self._root.iterdir())
-        ) if self._root.is_dir() else (self._root,)
+        self._chunks: Tuple[Path, ...] = (
+            tuple(sorted(self._root.iterdir()))
+            if self._root.is_dir()
+            else (self._root,)
+        )
 
     @property
     def root(self) -> Path:

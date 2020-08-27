@@ -52,7 +52,9 @@ class ChunkedHDF5Dataset(ChunkedDataset, KeyedDataset):
             chunk_start = 0
             for chunk_idx, chunk_size in enumerate(self._chunk_sizes):
                 source = h5py.VirtualSource(
-                    self._chunks[chunk_idx], dataset, shape=(chunk_size,) + shape,
+                    self._chunks[chunk_idx],
+                    dataset,
+                    shape=(chunk_size,) + shape,
                 )
                 layouts[dataset][chunk_start : chunk_start + chunk_size] = source
                 chunk_start += chunk_size

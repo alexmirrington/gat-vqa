@@ -250,7 +250,9 @@ def test_chunkedhdf5_datasets_equal_shape_nonequal_length(tmp_path: Path) -> Non
 
 
 @pytest.mark.parametrize(
-    "chunked_json_data", [ChunkedDataConfig(1)], indirect=["chunked_json_data"],
+    "chunked_json_data",
+    [ChunkedDataConfig(1)],
+    indirect=["chunked_json_data"],
 )
 def test_chunkedhdf5_directory_root_ignore_bad_files(chunked_json_data: Path) -> None:
     """Ensure a dataset can be created if a two chunks have datasets with the \
@@ -261,7 +263,9 @@ def test_chunkedhdf5_directory_root_ignore_bad_files(chunked_json_data: Path) ->
 
 
 @pytest.mark.parametrize(
-    "chunked_json_data", [ChunkedDataConfig(1)], indirect=["chunked_json_data"],
+    "chunked_json_data",
+    [ChunkedDataConfig(1)],
+    indirect=["chunked_json_data"],
 )
 def test_chunkedhdf5_file_root_ignore_bad_files(chunked_json_data: Path) -> None:
     """Ensure a dataset can be created if a two chunks have datasets with the \
