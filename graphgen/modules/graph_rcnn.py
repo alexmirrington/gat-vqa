@@ -36,4 +36,25 @@ class GraphRCNN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-me
         if self.training and targets is None:
             raise ValueError("No targets given but model is in training mode.")
 
-        return self.faster_rcnn(images, targets)
+        bbox_intermediate = []
+        self.faster_rcnn.roi_heads.box_predictor.register_forward_hook(
+            lambda module, input, output: bbox_intermediate.append(
+                output
+            )  # TODO replace hook with forward method of the next part of the model
+        )
+        rcnn_out = self.faster_rcnn(images, targets)
+        # Capture intermediate outputs of ROI head bboxes
+        # [
+        #   losses: torch.Size([num_rois, num_classes]),
+        #   boxes: torch.Size([num_rois, 4*num_classes])
+        # ]
+        bbox_losses, bbox_preds = bbox_intermediate.pop()
+        print(f"{bbox_losses=}")
+        print(f"{bbox_preds=}")
+
+        # TODO retrieve intermediate pooled features from after ROI pooling
+        # layer but before class predictor and bbox regressor via hook
+
+        # TODO retrieve class predictor loss and preds via hook
+
+        return rcnn_out

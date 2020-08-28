@@ -151,9 +151,6 @@ def train(
             # Learn
             optimizer.zero_grad()
             dep_gcn_preds, grcnn_out = model(deps, images, bbox_targets)
-            print(grcnn_out)
-            print(dep_gcn_preds.size())
-            print(targets.size())
             loss = criterion(dep_gcn_preds, targets)  # TODO incorporate grcnn loss
             loss.backward()
             optimizer.step()

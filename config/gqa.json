@@ -70,10 +70,10 @@
   },
   "training": {
     "epochs": 25,
-    "log_step": 4096
+    "log_step": 8192
   },
   "dataloader": {
-    "batch_size": 4,
+    "batch_size": 2,
     "workers": 1
   }
 }
