@@ -26,7 +26,7 @@ from ...datasets.gqa import (
     GQASceneGraphs,
     GQASpatial,
 )
-from ..preprocessing import QuestionTransformer
+from ..preprocessing import QuestionTransformer, SceneGraphTransformer
 from .preprocessing_factory import PreprocessorCollection
 
 
@@ -146,11 +146,13 @@ class DatasetFactory:
                     )
                 elif feature.name == GQAFeatures.IMAGES.value:
                     images = GQAImages(filemap, transform=None)
-                    print(GQAImages.__name__)
                 elif feature.name == GQAFeatures.SCENE_GRAPHS.value:
-                    scene_graphs = GQASceneGraphs(
-                        filemap, GQASplit(subset.split), transform=None
-                    )
+                    if GQASplit(subset.split) in (GQASplit.TRAIN, GQASplit.VAL):
+                        scene_graphs = GQASceneGraphs(
+                            filemap,
+                            GQASplit(subset.split),
+                            transform=SceneGraphTransformer(),
+                        )
                 elif feature.name == GQAFeatures.SPATIAL.value:
                     spatial = GQASpatial(filemap)
                 elif feature.name == GQAFeatures.OBJECTS.value:

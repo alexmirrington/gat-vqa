@@ -196,8 +196,8 @@ class GQASceneGraphPreprocessor(SceneGraphPreprocessor):
                     (
                         obj_data["x"],
                         obj_data["y"],
-                        obj_data["w"] - obj_data["x"],
-                        obj_data["h"] - obj_data["y"],
+                        obj_data["x"] + obj_data["w"],
+                        obj_data["y"] + obj_data["h"],
                     )
                 )
         return boxes, labels
@@ -256,6 +256,6 @@ class SceneGraphTransformer:
                 data["boxes"], dtype=torch.float
             ),
             "labels": torch.tensor(  # pylint: disable=not-callable
-                data["labels"], dtype=torch.int
+                data["labels"], dtype=torch.int64
             ),
         }

@@ -20,12 +20,12 @@ class GraphRCNNTarget(TypedDict):
 class GraphRCNN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
     """A GraphRCNN model."""
 
-    def __init__(self) -> None:
+    def __init__(self, num_classes: int) -> None:
         """Initialise the graph RCNN."""
         super().__init__()
 
         # TODO allow customisation of backbone etc.
-        self.faster_rcnn = fasterrcnn_resnet50_fpn()
+        self.faster_rcnn = fasterrcnn_resnet50_fpn(num_classes=num_classes)
 
     def forward(
         self,

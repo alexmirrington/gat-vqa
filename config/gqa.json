@@ -39,7 +39,11 @@
       "features": [
         {
           "name": "questions",
-          "artifact": "gqa-preprocessed:v1"
+          "artifact": "gqa-preprocessed:latest"
+        },
+        {
+          "name": "scene_graphs",
+          "artifact": "gqa-preprocessed:latest"
         },
         {
           "name": "images",
@@ -66,10 +70,10 @@
   },
   "training": {
     "epochs": 25,
-    "log_step": 64
+    "log_step": 4096
   },
   "dataloader": {
-    "batch_size": 256,
+    "batch_size": 4,
     "workers": 1
   }
 }

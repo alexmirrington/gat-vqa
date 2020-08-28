@@ -20,7 +20,7 @@ from graphgen.config import Config
 from graphgen.datasets.collators import VariableSizeTensorCollator
 from graphgen.datasets.utilities import ChunkedRandomSampler
 from graphgen.metrics import Metric, MetricCollection
-from graphgen.modules import GraphRCNN
+from graphgen.modules import GCN, GraphRCNN, Placeholder
 from graphgen.utilities.factories import (
     DatasetCollection,
     DatasetFactory,
@@ -91,8 +91,10 @@ def run(config: Config, device: torch.device) -> None:
     # 1878 is the number of unique answers from the GQA paper
     # 1843 is the number of answers across train, val and testdev, returned by
     # len(preprocessors.questions.index_to_answer)
-    # GCN((300, 600, 900, 1200, 1500, len(preprocessors.questions.index_to_answer)))
-    model = GraphRCNN()
+    model = Placeholder(
+        GraphRCNN(len(preprocessors.scene_graphs.index_to_object)),
+        GCN((300, 600, 900, 1200, 1500, len(preprocessors.questions.index_to_answer))),
+    )
     model.to(device)
     model.train()
     print(f"{model=}")
@@ -124,7 +126,6 @@ def train(
     wandb.watch(
         model, log_freq=math.ceil(config.training.epochs / config.dataloader.batch_size)
     )
-    print(datasets.train)
     dataloader = DataLoader(
         datasets.train,
         batch_size=config.dataloader.batch_size,
@@ -141,11 +142,19 @@ def train(
             deps = sample["question"]["dependencies"].to(device)
             targets = sample["question"]["answer"].to(device)
             images = [img.to(device) for img in sample["image"]]
-
+            bbox_targets = [
+                {"boxes": b.to(device), "labels": l.to(device)}
+                for b, l in zip(
+                    sample["scene_graph"]["boxes"], sample["scene_graph"]["labels"]
+                )
+            ]
             # Learn
             optimizer.zero_grad()
-            preds = model(images, deps)
-            loss = criterion(preds, targets)
+            dep_gcn_preds, grcnn_out = model(deps, images, bbox_targets)
+            print(grcnn_out)
+            print(dep_gcn_preds.size())
+            print(targets.size())
+            loss = criterion(dep_gcn_preds, targets)  # TODO incorporate grcnn loss
             loss.backward()
             optimizer.step()
 
@@ -153,7 +162,7 @@ def train(
             # basics for train set.
             metrics.append(
                 sample["question"]["questionId"],
-                np.argmax(preds.detach().cpu().numpy(), axis=1),
+                np.argmax(dep_gcn_preds.detach().cpu().numpy(), axis=1),
                 targets.detach().cpu().numpy(),
             )
             if (
