@@ -7,8 +7,13 @@ from torch_geometric.data import Data
 from torchtext.vocab import GloVe
 from tqdm import tqdm
 
-from ..schemas.common import Question, TrainableQuestion
-from ..schemas.gqa import GQAQuestion
+from ..schemas.common import (
+    Question,
+    SceneGraph,
+    TrainableQuestion,
+    TrainableSceneGraph,
+)
+from ..schemas.gqa import GQAQuestion, GQASceneGraph, GQASceneGraphObject
 from .generators import slice_sequence
 
 
@@ -36,6 +41,33 @@ class QuestionPreprocessor:
 
     def __call__(self, data: Sequence[Any]) -> List[Question]:
         """Preprocess a question sample."""
+        raise NotImplementedError()
+
+
+class SceneGraphPreprocessor:
+    """Abstract base class for all scene graph preprocessors."""
+
+    def __init__(self, object_to_index: Optional[Dict[str, int]] = None) -> None:
+        """Create a `SceneGraphPreprocessor` instance."""
+        self._object_to_index = object_to_index if object_to_index is not None else {}
+        self._index_to_object = (
+            list(object_to_index.keys()) if object_to_index is not None else []
+        )
+
+    @property
+    def index_to_object(self) -> List[str]:
+        """Get the `int` to `str` mapping of indices to object classes, based \
+        on the data that has been processed so far."""
+        return self._index_to_object.copy()
+
+    @index_to_object.setter
+    def index_to_object(self, value: List[str]) -> None:
+        """Set the int to str mapping of indices to objects."""
+        self._index_to_object = value
+        self._object_to_index = {key: idx for idx, key in enumerate(value)}
+
+    def __call__(self, data: Sequence[Any]) -> List[SceneGraph]:
+        """Preprocess a scene graph sample."""
         raise NotImplementedError()
 
 
@@ -71,7 +103,7 @@ def dep_coordinate_list(
 
 
 class GQAQuestionPreprocessor(QuestionPreprocessor):
-    """Class for preprocessing questions."""
+    """Class for preprocessing GQA questions."""
 
     def __init__(self, answer_to_index: Optional[Dict[str, int]] = None) -> None:
         """Create a `GQAQuestionPreprocessor` instance."""
@@ -86,18 +118,6 @@ class GQAQuestionPreprocessor(QuestionPreprocessor):
             },
             verbose=False,
         )
-
-    @property
-    def index_to_answer(self) -> List[str]:
-        """Get the `int` to `str` mapping of indices to answers, based on the \
-        data that has been processed so far."""
-        return self._index_to_answer.copy()
-
-    @index_to_answer.setter
-    def index_to_answer(self, value: List[str]) -> None:
-        """Set the int to str mapping of indices to answers."""
-        self._index_to_answer = value
-        self._answer_to_index = {key: idx for idx, key in enumerate(value)}
 
     def _process_questions(
         self, questions: List[str]
@@ -151,6 +171,56 @@ class GQAQuestionPreprocessor(QuestionPreprocessor):
         return result
 
 
+class GQASceneGraphPreprocessor(SceneGraphPreprocessor):
+    """Class for preprocessing GQA scene graphs."""
+
+    def _process_objects(
+        self, objects: List[Dict[str, GQASceneGraphObject]]
+    ) -> Tuple[List[List[Tuple[int, int, int, int]]], List[List[int]]]:
+        boxes: List[List[Tuple[int, int, int, int]]] = []
+        labels: List[List[int]] = []
+        for obj_dict in objects:
+            labels.append([])
+            boxes.append([])
+            for obj_data in obj_dict.values():
+                name = obj_data["name"]
+                if name is not None and name not in self._object_to_index:
+                    # Unknown vocab, add to dict. It is OK to add val
+                    # object names to the dict, as we still have no training
+                    # signal for those in the training set, hence there is no
+                    # reason to freeze the object vocab.
+                    self._object_to_index[name] = len(self._object_to_index)
+                    self._index_to_object.append(name)
+                labels[-1].append(self._object_to_index[name])
+                boxes[-1].append(
+                    (
+                        obj_data["x"],
+                        obj_data["y"],
+                        obj_data["w"] - obj_data["x"],
+                        obj_data["h"] - obj_data["y"],
+                    )
+                )
+        return boxes, labels
+
+    def __call__(self, data: Sequence[GQASceneGraph]) -> List[SceneGraph]:
+        """Preprocess a scene graph sample."""
+        result: List[SceneGraph] = []
+        step = 1024
+        start = 0
+        for questions in tqdm(
+            slice_sequence(data, step),
+            total=len(data) // step + 1,
+            desc="preprocessing: ",
+        ):
+            boxes, labels = self._process_objects([d["objects"] for d in data])
+            result += [
+                {"imageId": scene["imageId"], "boxes": boxes_, "labels": labels_}
+                for scene, boxes_, labels_ in zip(data, boxes, labels)
+            ]
+            start += step
+        return result
+
+
 class QuestionTransformer:
     """Class for applying transformations to questions."""
 
@@ -169,4 +239,23 @@ class QuestionTransformer:
             "imageId": data["imageId"],
             "dependencies": Data(edge_index=adjacency, x=node_features),
             "answer": data["answer"],
+        }
+
+
+class SceneGraphTransformer:
+    """Class for applying transformations to scene graphs."""
+
+    def __init__(self) -> None:
+        """Initialise a `SceneGraphTransformer` instance."""
+
+    def __call__(self, data: SceneGraph) -> TrainableSceneGraph:
+        """Transform data into a trainable format."""
+        return {
+            "imageId": data["imageId"],
+            "boxes": torch.tensor(  # pylint: disable=not-callable
+                data["boxes"], dtype=torch.float
+            ),
+            "labels": torch.tensor(  # pylint: disable=not-callable
+                data["labels"], dtype=torch.int
+            ),
         }

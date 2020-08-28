@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import math
 import os
 from enum import Enum
 from pathlib import Path, PurePath
@@ -13,12 +14,13 @@ import stanza
 import torch
 import wandb
 from termcolor import colored
-from torch_geometric.data import DataLoader
+from torch.utils.data import DataLoader
 
 from graphgen.config import Config
+from graphgen.datasets.collators import VariableSizeTensorCollator
 from graphgen.datasets.utilities import ChunkedRandomSampler
 from graphgen.metrics import Metric, MetricCollection
-from graphgen.models.gcn import GCN
+from graphgen.modules import GraphRCNN
 from graphgen.utilities.factories import (
     DatasetCollection,
     DatasetFactory,
@@ -89,9 +91,8 @@ def run(config: Config, device: torch.device) -> None:
     # 1878 is the number of unique answers from the GQA paper
     # 1843 is the number of answers across train, val and testdev, returned by
     # len(preprocessors.questions.index_to_answer)
-    model = GCN(
-        (300, 600, 900, 1200, 1500, len(preprocessors.questions.index_to_answer))
-    )
+    # GCN((300, 600, 900, 1200, 1500, len(preprocessors.questions.index_to_answer)))
+    model = GraphRCNN()
     model.to(device)
     model.train()
     print(f"{model=}")
@@ -119,11 +120,17 @@ def train(
 ) -> None:
     """Train a model on the data in `train_dataloader`, evaluating every epoch."""
     # pylint: disable=too-many-locals
+    # Log gradients each epoch
+    wandb.watch(
+        model, log_freq=math.ceil(config.training.epochs / config.dataloader.batch_size)
+    )
+    print(datasets.train)
     dataloader = DataLoader(
         datasets.train,
         batch_size=config.dataloader.batch_size,
         num_workers=config.dataloader.workers,
         sampler=ChunkedRandomSampler(datasets.train.questions),
+        collate_fn=VariableSizeTensorCollator(),
     )
     metrics = MetricCollection(
         config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
@@ -131,12 +138,13 @@ def train(
     for epoch in range(config.training.epochs):
         for batch, sample in enumerate(dataloader):
             # Move data to GPU
-            data = sample["question"]["dependencies"].to(device)
+            deps = sample["question"]["dependencies"].to(device)
             targets = sample["question"]["answer"].to(device)
+            images = [img.to(device) for img in sample["image"]]
 
             # Learn
             optimizer.zero_grad()
-            preds = model(data)
+            preds = model(images, deps)
             loss = criterion(preds, targets)
             loss.backward()
             optimizer.step()
@@ -164,8 +172,10 @@ def train(
                     colors=(None, "yellow", "blue", "cyan", "cyan", "cyan"),
                     newline=False,
                 )
-                wandb.log(results)
-                metrics.reset()
+                # Delay logging until after val metrics come in if end of epoch
+                if batch != len(dataloader) - 1:
+                    wandb.log(results)
+                    metrics.reset()
         results.update(
             {
                 f"val/{key}": val
@@ -207,6 +217,7 @@ def evaluate(
         datasets.val,
         batch_size=config.dataloader.batch_size,
         num_workers=config.dataloader.workers,
+        collate_fn=VariableSizeTensorCollator(),
     )
     metrics = MetricCollection(
         config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]

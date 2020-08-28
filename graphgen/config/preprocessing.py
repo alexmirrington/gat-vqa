@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 
 @dataclass(frozen=True)
@@ -11,7 +11,7 @@ class PipelineStepConfig:
 
     feature: str
     split: str
-    version: str
+    version: Optional[str]
 
 
 @dataclass(frozen=True)

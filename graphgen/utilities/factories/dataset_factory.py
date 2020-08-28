@@ -70,7 +70,7 @@ class DatasetFactory:
     def _create_gqa(
         config: Config,
     ) -> Tuple[DatasetCollection, PreprocessorCollection]:
-        # pylint: disable=too-many-branches
+        # pylint: disable=too-many-branches,too-many-locals
 
         if not isinstance(config.dataset, GQADatasetConfig):
             raise ValueError(
@@ -146,6 +146,7 @@ class DatasetFactory:
                     )
                 elif feature.name == GQAFeatures.IMAGES.value:
                     images = GQAImages(filemap, transform=None)
+                    print(GQAImages.__name__)
                 elif feature.name == GQAFeatures.SCENE_GRAPHS.value:
                     scene_graphs = GQASceneGraphs(
                         filemap, GQASplit(subset.split), transform=None
@@ -157,17 +158,17 @@ class DatasetFactory:
                 else:
                     raise NotImplementedError()
 
-                datasets.append(
-                    GQA(
-                        GQASplit(subset.split),
-                        GQAVersion(subset.version),
-                        questions=questions,
-                        images=images,
-                        objects=objects,
-                        spatial=spatial,
-                        scene_graphs=scene_graphs,
-                    )
+            datasets.append(
+                GQA(
+                    GQASplit(subset.split),
+                    GQAVersion(subset.version),
+                    questions=questions,
+                    images=images,
+                    objects=objects,
+                    spatial=spatial,
+                    scene_graphs=scene_graphs,
                 )
+            )
 
         return (
             DatasetCollection(train=datasets[0], val=datasets[1], test=datasets[2]),

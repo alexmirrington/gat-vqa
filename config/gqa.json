@@ -11,6 +11,14 @@
       "artifact": "gqa-preprocessed"
     },
     "pipeline": [{
+      "feature": "scene_graphs",
+      "split": "train"
+    },
+    {
+      "feature": "scene_graphs",
+      "split": "val"
+    },
+    {
       "feature": "questions",
       "split": "train",
       "version": "balanced"
@@ -32,6 +40,10 @@
         {
           "name": "questions",
           "artifact": "gqa-preprocessed:v1"
+        },
+        {
+          "name": "images",
+          "artifact": null
         }
       ],
       "train": {
@@ -58,6 +70,6 @@
   },
   "dataloader": {
     "batch_size": 256,
-    "workers": 0
+    "workers": 1
   }
 }

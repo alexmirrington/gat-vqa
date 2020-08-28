@@ -16,9 +16,14 @@ from ...config.gqa import (
     GQASplit,
     GQAVersion,
 )
-from ...datasets.gqa import GQAQuestions
+from ...datasets.gqa import GQAQuestions, GQASceneGraphs
 from ...datasets.utilities import KeyedDataset
-from ..preprocessing import GQAQuestionPreprocessor, QuestionPreprocessor
+from ..preprocessing import (
+    GQAQuestionPreprocessor,
+    GQASceneGraphPreprocessor,
+    QuestionPreprocessor,
+    SceneGraphPreprocessor,
+)
 
 
 @dataclass(frozen=True)
@@ -26,6 +31,7 @@ class PreprocessorCollection:
     """Wrapper class for storing a preprocessor feature mappings."""
 
     questions: QuestionPreprocessor
+    scene_graphs: SceneGraphPreprocessor
 
 
 class PreprocessingFactory:
@@ -87,7 +93,10 @@ class PreprocessingFactory:
                 f"Param {config.dataset=} must be of type {GQADatasetConfig.__name__}."
             )
 
-        preprocessors = PreprocessorCollection(questions=GQAQuestionPreprocessor())
+        preprocessors = PreprocessorCollection(
+            questions=GQAQuestionPreprocessor(),
+            scene_graphs=GQASceneGraphPreprocessor(),
+        )
 
         root = config.preprocessing.cache.root / wandb.run.id
         if not root.exists():
@@ -99,11 +108,16 @@ class PreprocessingFactory:
             if item.split not in [split.value for split in iter(GQASplit)]:
                 raise ValueError("Invalid split string.")
 
-            if item.version not in [version.value for version in iter(GQAVersion)]:
-                raise ValueError("Invalid version string.")
-
             if item.feature not in [feat.value for feat in iter(GQAFeatures)]:
                 raise ValueError("Invalid feature string.")
+
+            # Ensure version is specified for GQA questions
+            if item.feature == GQAFeatures.QUESTIONS.value and item.version not in [
+                version.value for version in iter(GQAVersion)
+            ]:
+                raise ValueError("Invalid version string.")
+
+            print(f"processing {item}.")
 
             if item.feature == GQAFeatures.QUESTIONS.value:
                 questions = GQAQuestions(
@@ -130,9 +144,18 @@ class PreprocessingFactory:
             elif item.feature == GQAFeatures.SPATIAL.value:
                 raise NotImplementedError()
             elif item.feature == GQAFeatures.SCENE_GRAPHS.value:
-                raise NotImplementedError()
-            else:
-                raise NotImplementedError()
+                scene_graphs = GQASceneGraphs(
+                    config.dataset.filemap,
+                    GQASplit(item.split),
+                    transform=None,
+                )
+                chunks = len(scene_graphs.chunk_sizes)
+                PreprocessingFactory._apply_preprocessor(
+                    source=scene_graphs,
+                    preprocessor=preprocessors.scene_graphs,
+                    cache=new_filemap.scene_graph_path(GQASplit(item.split)),
+                    chunks=chunks,
+                )
 
         # Dump preprocessors
         with open(root / "preprocessors.json", "w") as json_file:
