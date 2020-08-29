@@ -36,7 +36,6 @@ class DatasetCollection:
 
     train: Dataset
     val: Dataset
-    test: Dataset
 
 
 class DatasetFactory:
@@ -61,7 +60,7 @@ class DatasetFactory:
     ) -> Tuple[DatasetCollection, PreprocessorCollection]:
         if not isinstance(config.dataset, CLEVRDatasetConfig):
             raise ValueError(
-                f"Param {config.dataset=} must be of type",
+                f"Param {config.dataset} must be of type",
                 f"{CLEVRDatasetConfig.__name__}.",
             )
         raise NotImplementedError()
@@ -74,15 +73,14 @@ class DatasetFactory:
 
         if not isinstance(config.dataset, GQADatasetConfig):
             raise ValueError(
-                f"Param {config.dataset=} must be of type {GQADatasetConfig.__name__}."
+                f"Param {config.dataset} must be of type {GQADatasetConfig.__name__}."
             )
 
         datasets: List[GQA] = []
 
         for split_key, subset in {
-            "train": config.model.data.train,
-            "val": config.model.data.val,
-            "test": config.model.data.test,
+            "train": config.training.data.train,
+            "val": config.training.data.val,
         }.items():
 
             if subset.split not in [split.value for split in iter(GQASplit)]:
@@ -98,13 +96,13 @@ class DatasetFactory:
             scene_graphs = None
 
             if GQAFeatures.QUESTIONS.value not in [
-                feat.name for feat in config.model.data.features
+                feat.name for feat in config.training.data.features
             ]:
                 raise ValueError(
                     f'List of features must contain "{GQAFeatures.QUESTIONS.value}"'
                 )
 
-            for feature in config.model.data.features:
+            for feature in config.training.data.features:
                 if feature.name not in [feature.value for feature in iter(GQAFeatures)]:
                     raise ValueError("Invalid feature string.")
 
@@ -173,6 +171,6 @@ class DatasetFactory:
             )
 
         return (
-            DatasetCollection(train=datasets[0], val=datasets[1], test=datasets[2]),
+            DatasetCollection(train=datasets[0], val=datasets[1]),
             preprocessors,
         )

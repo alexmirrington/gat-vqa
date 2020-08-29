@@ -36,25 +36,28 @@ class GraphRCNN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-me
         if self.training and targets is None:
             raise ValueError("No targets given but model is in training mode.")
 
-        bbox_intermediate = []
+        bbox_preds_stack = []
+        pooled_roi_feats_stack = []
+
         self.faster_rcnn.roi_heads.box_predictor.register_forward_hook(
-            lambda module, input, output: bbox_intermediate.append(
+            lambda module, input, output: bbox_preds_stack.append(
+                output
+            )  # TODO replace hook with forward method of the next part of the model
+        )
+        self.faster_rcnn.roi_heads.box_head.register_forward_hook(
+            lambda module, input, output: pooled_roi_feats_stack.append(
                 output
             )  # TODO replace hook with forward method of the next part of the model
         )
         rcnn_out = self.faster_rcnn(images, targets)
-        # Capture intermediate outputs of ROI head bboxes
-        # [
-        #   losses: torch.Size([num_rois, num_classes]),
-        #   boxes: torch.Size([num_rois, 4*num_classes])
-        # ]
-        bbox_losses, bbox_preds = bbox_intermediate.pop()
-        print(f"{bbox_losses=}")
-        print(f"{bbox_preds=}")
 
-        # TODO retrieve intermediate pooled features from after ROI pooling
-        # layer but before class predictor and bbox regressor via hook
-
-        # TODO retrieve class predictor loss and preds via hook
+        bbox_scores, bbox_deltas = bbox_preds_stack.pop()
+        pooled_roi_feats = pooled_roi_feats_stack.pop()
+        print(f"{pooled_roi_feats.size()}")
+        print(f"{bbox_scores.size()}")
+        print(f"{bbox_deltas.size()}")
+        print(f"{torch.argmax(bbox_scores, dim=1)}")
+        print(f"{bbox_deltas}")
+        print(f"{pooled_roi_feats}")
 
         return rcnn_out

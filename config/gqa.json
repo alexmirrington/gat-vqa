@@ -35,6 +35,23 @@
     }]
   },
   "model": {
+    "rcnn": {
+      "rpn": {
+        "proposals": 256
+      }
+    }
+  },
+  "training": {
+    "epochs": 25,
+    "log_step": 16384,
+    "dataloader": {
+      "batch_size": 1,
+      "workers": 1
+    },
+    "optimiser": {
+      "learning_rate": 0.005,
+      "weight_decay": 1e-5
+    },
     "data": {
       "features": [
         {
@@ -62,18 +79,6 @@
         "split": "testdev",
         "version": "balanced"
       }
-    },
-    "optimiser": {
-      "learning_rate": 0.005,
-      "weight_decay": 1e-5
     }
-  },
-  "training": {
-    "epochs": 25,
-    "log_step": 8192
-  },
-  "dataloader": {
-    "batch_size": 2,
-    "workers": 1
   }
 }

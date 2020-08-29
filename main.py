@@ -52,7 +52,7 @@ def main(args: argparse.Namespace, config: Config) -> None:
     """
     # Download and initialise resources
     print(colored("initialisation:", attrs=["bold"]))
-    stanza.download(lang="en")
+    stanza.download(lang="en", dir=".stanza")
 
     # Print environment info
     print(colored("environment:", attrs=["bold"]))
@@ -85,7 +85,6 @@ def run(config: Config, device: torch.device) -> None:
     datasets, preprocessors = factory.create(config)
     print(f"train: {len(datasets.train)}")
     print(f"val: {len(datasets.val)}")
-    print(f"test: {len(datasets.test)}")
     print(colored("model:", attrs=["bold"]))
     # TODO Use model factory
     # 1878 is the number of unique answers from the GQA paper
@@ -97,15 +96,12 @@ def run(config: Config, device: torch.device) -> None:
     )
     model.to(device)
     model.train()
-    print(f"{model=}")
     optimizer = torch.optim.Adam(
         model.parameters(),
-        lr=config.model.optimiser.learning_rate,
-        weight_decay=config.model.optimiser.weight_decay,
+        lr=config.training.optimiser.learning_rate,
+        weight_decay=config.training.optimiser.weight_decay,
     )
-    print(f"{optimizer=}")
     criterion = torch.nn.NLLLoss()
-    print(f"{criterion=}")
 
     # Run model
     print(colored("running:", attrs=["bold"]))
@@ -124,12 +120,15 @@ def train(
     # pylint: disable=too-many-locals
     # Log gradients each epoch
     wandb.watch(
-        model, log_freq=math.ceil(config.training.epochs / config.dataloader.batch_size)
+        model,
+        log_freq=math.ceil(
+            config.training.epochs / config.training.dataloader.batch_size
+        ),
     )
     dataloader = DataLoader(
         datasets.train,
-        batch_size=config.dataloader.batch_size,
-        num_workers=config.dataloader.workers,
+        batch_size=config.training.dataloader.batch_size,
+        num_workers=config.training.dataloader.workers,
         sampler=ChunkedRandomSampler(datasets.train.questions),
         collate_fn=VariableSizeTensorCollator(),
     )
@@ -221,8 +220,8 @@ def evaluate(
     """Evaluate a model according to a criterion on a given dataset."""
     dataloader = DataLoader(
         datasets.val,
-        batch_size=config.dataloader.batch_size,
-        num_workers=config.dataloader.workers,
+        batch_size=config.training.dataloader.batch_size,
+        num_workers=config.training.dataloader.workers,
         collate_fn=VariableSizeTensorCollator(),
     )
     metrics = MetricCollection(
