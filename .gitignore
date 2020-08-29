@@ -4,6 +4,7 @@ cache
 artifacts
 .wandb
 .vector_cache
+.stanza
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
