@@ -222,7 +222,8 @@ def train(
                     wandb.log(results)
                     metrics.reset()
         torch.save(
-            model.state_dict(), str(Path(wandb.run.dir) / "checkpoints" / f"{epoch}.pt")
+            model.state_dict(),
+            str(Path(wandb.run.dir) / "checkpoints" / f"{epoch+1}.pt"),
         )
         results.update(
             {
