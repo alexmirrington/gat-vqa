@@ -16,6 +16,100 @@ from ..schemas.common import (
 from ..schemas.gqa import GQAQuestion, GQASceneGraph, GQASceneGraphObject
 from .generators import slice_sequence
 
+COCO_INSTANCE_CATEGORY_NAMES = [
+    "__background__",
+    "person",
+    "bicycle",
+    "car",
+    "motorcycle",
+    "airplane",
+    "bus",
+    "train",
+    "truck",
+    "boat",
+    "traffic light",
+    "fire hydrant",
+    "N/A",
+    "stop sign",
+    "parking meter",
+    "bench",
+    "bird",
+    "cat",
+    "dog",
+    "horse",
+    "sheep",
+    "cow",
+    "elephant",
+    "bear",
+    "zebra",
+    "giraffe",
+    "N/A",
+    "backpack",
+    "umbrella",
+    "N/A",
+    "N/A",
+    "handbag",
+    "tie",
+    "suitcase",
+    "frisbee",
+    "skis",
+    "snowboard",
+    "sports ball",
+    "kite",
+    "baseball bat",
+    "baseball glove",
+    "skateboard",
+    "surfboard",
+    "tennis racket",
+    "bottle",
+    "N/A",
+    "wine glass",
+    "cup",
+    "fork",
+    "knife",
+    "spoon",
+    "bowl",
+    "banana",
+    "apple",
+    "sandwich",
+    "orange",
+    "broccoli",
+    "carrot",
+    "hot dog",
+    "pizza",
+    "donut",
+    "cake",
+    "chair",
+    "couch",
+    "potted plant",
+    "bed",
+    "N/A",
+    "dining table",
+    "N/A",
+    "N/A",
+    "toilet",
+    "N/A",
+    "tv",
+    "laptop",
+    "mouse",
+    "remote",
+    "keyboard",
+    "cell phone",
+    "microwave",
+    "oven",
+    "toaster",
+    "sink",
+    "refrigerator",
+    "N/A",
+    "book",
+    "clock",
+    "vase",
+    "scissors",
+    "teddy bear",
+    "hair drier",
+    "toothbrush",
+]
+
 
 class QuestionPreprocessor:
     """Abstract base class for all question preprocessors."""
@@ -50,21 +144,17 @@ class SceneGraphPreprocessor:
     def __init__(self, object_to_index: Optional[Dict[str, int]] = None) -> None:
         """Create a `SceneGraphPreprocessor` instance."""
         self._object_to_index = object_to_index if object_to_index is not None else {}
-        self._index_to_object = (
-            list(object_to_index.keys()) if object_to_index is not None else []
-        )
 
     @property
-    def index_to_object(self) -> List[str]:
+    def object_to_index(self) -> Dict[str, int]:
         """Get the `int` to `str` mapping of indices to object classes, based \
         on the data that has been processed so far."""
-        return self._index_to_object.copy()
+        return self._object_to_index.copy()
 
-    @index_to_object.setter
-    def index_to_object(self, value: List[str]) -> None:
+    @object_to_index.setter
+    def object_to_index(self, value: Dict[str, int]) -> None:
         """Set the int to str mapping of indices to objects."""
-        self._index_to_object = value
-        self._object_to_index = {key: idx for idx, key in enumerate(value)}
+        self._object_to_index = value
 
     def __call__(self, data: Sequence[Any]) -> List[SceneGraph]:
         """Preprocess a scene graph sample."""
@@ -117,6 +207,7 @@ class GQAQuestionPreprocessor(QuestionPreprocessor):
                 "depparse": "default",
             },
             verbose=False,
+            dir=".stanza",
         )
 
     def _process_questions(
@@ -174,6 +265,29 @@ class GQAQuestionPreprocessor(QuestionPreprocessor):
 class GQASceneGraphPreprocessor(SceneGraphPreprocessor):
     """Class for preprocessing GQA scene graphs."""
 
+    def __init__(
+        self,
+        object_to_index: Optional[Dict[str, int]] = None,
+        use_coco_classes: bool = True,
+    ) -> None:
+        """Create a `GQASceneGraphPreprocessor` instance."""
+        super().__init__(object_to_index)
+
+        self._coco_vectors: Optional[torch.Tensor] = None
+
+        self._glove = GloVe(name="6B", dim=300)
+
+        if use_coco_classes:
+            self._coco_vectors = torch.stack(
+                [self._embed_word(word) for word in COCO_INSTANCE_CATEGORY_NAMES]
+            )
+            self._similarity = torch.nn.CosineSimilarity(dim=1)
+
+    def _embed_word(self, word: str) -> torch.Tensor:
+        return torch.sum(
+            self._glove.get_vecs_by_tokens(word.split(), lower_case_backup=True), dim=0
+        )
+
     def _process_objects(
         self, objects: List[Dict[str, GQASceneGraphObject]]
     ) -> Tuple[List[List[Tuple[int, int, int, int]]], List[List[int]]]:
@@ -184,22 +298,39 @@ class GQASceneGraphPreprocessor(SceneGraphPreprocessor):
             boxes.append([])
             for obj_data in obj_dict.values():
                 name = obj_data["name"]
-                if name is not None and name not in self._object_to_index:
-                    # Unknown vocab, add to dict. It is OK to add val
-                    # object names to the dict, as we still have no training
-                    # signal for those in the training set, hence there is no
-                    # reason to freeze the object vocab.
-                    self._object_to_index[name] = len(self._object_to_index)
-                    self._index_to_object.append(name)
-                labels[-1].append(self._object_to_index[name])
-                boxes[-1].append(
-                    (
-                        obj_data["x"],
-                        obj_data["y"],
-                        obj_data["x"] + obj_data["w"],
-                        obj_data["y"] + obj_data["h"],
-                    )
+                box = (
+                    obj_data["x"],
+                    obj_data["y"],
+                    obj_data["x"] + obj_data["w"],
+                    obj_data["y"] + obj_data["h"],
                 )
+                if box[2] - box[0] > 0 and box[3] - box[1] > 0:
+                    if name is not None and name not in self._object_to_index:
+                        if (
+                            self._coco_vectors is not None
+                            and self._similarity is not None
+                        ):
+                            # Map word to COCO class via cosine similarity
+                            name_embedding = (
+                                self._embed_word(name)
+                                .unsqueeze(0)
+                                .repeat(self._coco_vectors.size(0), 1)
+                                .unsqueeze(-1)
+                            )
+                            similarities = self._similarity(
+                                self._coco_vectors.unsqueeze(-1), name_embedding
+                            )
+                            idx = int(torch.argmax(similarities, dim=0))
+                            self._object_to_index[name] = idx
+                        else:
+                            # Unknown vocab, add to dict. It is OK to add val
+                            # object names to the dict, as we still have no training
+                            # signal for those in the training set, hence there is no
+                            # reason to freeze the object vocab.
+                            self._object_to_index[name] = len(self._object_to_index)
+                    labels[-1].append(self._object_to_index[name])
+                    boxes[-1].append(box)
+
         return boxes, labels
 
     def __call__(self, data: Sequence[GQASceneGraph]) -> List[SceneGraph]:
@@ -250,10 +381,14 @@ class SceneGraphTransformer:
 
     def __call__(self, data: SceneGraph) -> TrainableSceneGraph:
         """Transform data into a trainable format."""
+        boxes = [
+            box for box in data["boxes"] if box[2] - box[0] > 0 and box[3] - box[1] > 0
+        ]  # TODO move to preprocessing step
+
         return {
             "imageId": data["imageId"],
             "boxes": torch.tensor(  # pylint: disable=not-callable
-                data["boxes"], dtype=torch.float
+                boxes, dtype=torch.float
             ),
             "labels": torch.tensor(  # pylint: disable=not-callable
                 data["labels"], dtype=torch.int64

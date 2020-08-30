@@ -90,8 +90,9 @@ def run(config: Config, device: torch.device) -> None:
     # 1878 is the number of unique answers from the GQA paper
     # 1843 is the number of answers across train, val and testdev, returned by
     # len(preprocessors.questions.index_to_answer)
+    print(f"{len(set(preprocessors.scene_graphs.object_to_index.values()))}")
     model = Placeholder(
-        GraphRCNN(len(preprocessors.scene_graphs.index_to_object)),
+        GraphRCNN(num_classes=91, pretrained=True),
         GCN((300, 600, 900, 1200, 1500, len(preprocessors.questions.index_to_answer))),
     )
     model.to(device)
@@ -150,7 +151,12 @@ def train(
             # Learn
             optimizer.zero_grad()
             dep_gcn_preds, grcnn_out = model(deps, images, bbox_targets)
-            loss = criterion(dep_gcn_preds, targets)  # TODO incorporate grcnn loss
+            dep_gcn_loss = criterion(dep_gcn_preds, targets)
+
+            # Compute multi-task loss
+            loss = dep_gcn_loss
+            for partial_loss in grcnn_out.values():
+                loss += partial_loss
             loss.backward()
             optimizer.step()
 
@@ -168,7 +174,19 @@ def train(
                 results = {
                     "epoch": epoch + (batch + 1) / len(dataloader),
                     "train/loss": loss.item(),
+                    "train/depgcn/loss": dep_gcn_loss.item(),
+                    "train/rcnn/roi-classifier/loss": grcnn_out[
+                        "loss_classifier"
+                    ].item(),
+                    "train/rcnn/roi-regression/loss": grcnn_out["loss_box_reg"].item(),
+                    "train/rcnn/rpn-objectness/loss": grcnn_out[
+                        "loss_objectness"
+                    ].item(),
+                    "train/rcnn/rpn-regression/loss": grcnn_out[
+                        "loss_rpn_box_reg"
+                    ].item(),
                 }
+
                 results.update(
                     {f"train/{key}": val for key, val in metrics.evaluate().items()}
                 )
