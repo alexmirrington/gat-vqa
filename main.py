@@ -151,11 +151,9 @@ def train(
     )
 
     wandb.save(str(Path(wandb.run.dir) / "checkpoints/**/*"))
+    torch.save(model.state_dict(), str(Path(wandb.run.dir) / "checkpoints" / "0.pt"))
 
     for epoch in range(config.training.epochs):
-        torch.save(
-            model.state_dict(), str(Path(wandb.run.dir) / "checkpoints" / f"{epoch}.pt")
-        )
         for batch, sample in enumerate(dataloader):
             # Move data to GPU
             deps = sample["question"]["dependencies"].to(device)
@@ -223,6 +221,9 @@ def train(
                 if batch != len(dataloader) - 1:
                     wandb.log(results)
                     metrics.reset()
+        torch.save(
+            model.state_dict(), str(Path(wandb.run.dir) / "checkpoints" / f"{epoch}.pt")
+        )
         results.update(
             {
                 f"val/{key}": val
