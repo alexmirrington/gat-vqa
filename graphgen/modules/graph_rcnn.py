@@ -1,8 +1,11 @@
 """Module containing code for a FasterRCNN object detector."""
-from typing import Any, List, Optional, TypedDict
+from typing import Any, List, Optional, Tuple, TypedDict
 
 import torch
+from torch_geometric.data import Batch, Data
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
+
+from .relpn import RelPN
 
 
 class GraphRCNNTarget(TypedDict):
@@ -12,11 +15,6 @@ class GraphRCNNTarget(TypedDict):
     labels: torch.IntTensor
 
 
-# REFER TO: https://github.com/pytorch/vision/issues/2500
-# This will enable e2e training :D
-
-
-# TODO consider whether to inherit from GeneralisedRCNN
 class GraphRCNN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
     """A GraphRCNN model."""
 
@@ -24,11 +22,40 @@ class GraphRCNN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-me
         """Initialise the graph RCNN."""
         super().__init__()
 
-        # TODO allow customisation of backbone etc.
-        self.faster_rcnn = fasterrcnn_resnet50_fpn(
+        # Create submodules
+        self.faster_rcnn = fasterrcnn_resnet50_fpn(  # TODO allow customisation
             pretrained=pretrained, num_classes=num_classes
         )
-        self.repn = RePN(num_classes)
+        self.relpn = RelPN(num_classes)
+
+        # Register forward hooks
+        self.__bbox_head_outputs: List[Tuple[torch.Tensor, torch.Tensor]] = []
+        self.faster_rcnn.roi_heads.box_predictor.register_forward_hook(
+            lambda module, input, output: self._rcnn_bbox_head_hook(*output)
+        )
+
+        self.__bbox_roi_pool_inputs: List[Any] = []
+        self.faster_rcnn.roi_heads.box_roi_pool.register_forward_hook(
+            self._rcnn_box_roi_pool_hook
+        )
+
+    def _rcnn_bbox_head_hook(
+        self, class_logits: torch.Tensor, box_regression: torch.Tensor
+    ) -> None:
+        self.__bbox_head_outputs.append((class_logits, box_regression))
+
+    def _rcnn_box_roi_pool_hook(
+        self, module: Any, inputs: Any, outputs: Any  # pylint: disable=unused-argument
+    ) -> None:
+        # features, proposals, image_shapes = inputs
+        # features is collections.OrderedDict, feature maps from FPN layers.
+        # proposals list of tensors of shape [512, 4] each.
+        # image_shapes is a list of tuples
+
+        # box_features = outputs
+        # box_features has shape [num_proposals * num_images, 256, 7, 7], output of FPN
+        # Last 3 dims are flattened and passed to box_predictor
+        self.__bbox_roi_pool_inputs.append(inputs)
 
     def forward(
         self,
@@ -39,88 +66,45 @@ class GraphRCNN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-me
         if self.training and targets is None:
             raise ValueError("No targets given but model is in training mode.")
 
-        # Register forward hooks
-        # rpn_output_stack = []
-        # bbox_head_output_stack = []
-        # pooled_roi_feats_stack = []
+        # TODO Capture sub-targets in targets dict? RCNN will work on COCO
+        # classes but we can use sub-targets to help fine-tune?
 
-        # self.faster_rcnn.roi_heads.box_predictor.register_forward_hook(
-        #     lambda module, input, output: bbox_head_output_stack.append(
-        #         output
-        #     )  # TODO replace hook with forward method of the next part of the model
-        # )
-        # self.faster_rcnn.roi_heads.box_head.register_forward_hook(
-        #     lambda module, input, output: pooled_roi_feats_stack.append(
-        #         output
-        #     )  # TODO replace hook with forward method of the next part of the model
-        # )
-        # self.faster_rcnn.rpn.register_forward_hook(
-        #     lambda module, input, output: rpn_output_stack.append(
-        #         output
-        #     )
-        # )
-
-        # Perform RCNN forward pass
+        # Perform RCNN forward pass, triggering forward hooks
         rcnn_out = self.faster_rcnn(images, targets)
 
-        # boxes, losses = rpn_output_stack.pop()  # Input to roi_head forward
-        # class_logits, box_regression = bbox_head_output_stack.pop()
-        # pooled_roi_feats = pooled_roi_feats_stack.pop()
+        # Retrieve tensors
+        class_logits, box_regression = self.__bbox_head_outputs.pop()
+        (
+            features,
+            proposals,
+            image_shapes,
+        ) = self.__bbox_roi_pool_inputs.pop()  # features, proposals, image_shapes
 
-        # Get relatedness between class logits. Entry i, j refers to relatedness
-        # between subject i and object j
-        # relatedness = self.repn(class_logits)
+        # Ensure empty stacks to avoid running out of memory and prevent
+        # recursive behaviour
+        assert len(self.__bbox_head_outputs) == 0
+        assert len(self.__bbox_roi_pool_inputs) == 0
 
-        # TODO filter i, i entries first?
-        # TODO non-maximal suppression\
-        # torch.sort(relatedness.view(-1), descending=True)
-        # print(f"{pooled_roi_feats.size()=}")
+        # class_logits is aTensor of shape (num_proposals * num_images, num_classes),
+        # we need to split it up to perform per-image processing in RelPN
+        per_image_class_logits = torch.chunk(class_logits, chunks=len(images), dim=0)
+        # assert torch.all(torch.cat(per_image_class_logits, dim=0) == class_logits)
 
-        # print(f"{class_logits.size()=}")
-        # print(f"{box_regression.size()=}")
-        # print(f"{len(boxes)=}")
-        # print(f"{boxes[0].size()}")
+        # Get RelPN relationship predictions
+        relations, scores = self.relpn(per_image_class_logits, proposals)
 
-        # print(f"{torch.argmax(class_logits, dim=1)=}")
-        # print(f"{box_regression=}")
-        # print(f"{pooled_roi_feats=}")
-
-        # print(f"{boxes=}")
-        # print(f"{box_regression=}")
-
-        return rcnn_out
-
-
-class RePN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
-    """Relation Proposal Network from "Graph R-CNN for Scene Graph Generation".
-
-    References:
-    -----------
-    Graph R-CNN for Scene Graph Generation.
-    Jianwei Yang, Jiasen Lu, Stefan Lee, Dhruv Batra and Devi Parikh.
-    https://arxiv.org/pdf/1808.00191.pdf
-    """
-
-    def __init__(self, in_features: int) -> None:
-        """Create a RePN module."""
-        super().__init__()
-        # TODO positional encoding?
-        # https://github.com/alexmirrington/graph-rcnn.pytorch/blob/master/
-        # lib/scene_parser/rcnn/modeling/relation_heads/relpn/relpn.py
-        self.subject_projection = torch.nn.Sequential(  # phi in the paper
-            torch.nn.Linear(in_features, 64),
-            torch.nn.ReLU(True),
-            torch.nn.Linear(64, 64),
-        )
-        self.object_projection = torch.nn.Sequential(  # psi in the paper
-            torch.nn.Linear(in_features, 64),
-            torch.nn.ReLU(True),
-            torch.nn.Linear(64, 64),
-        )
-
-    def forward(self, data: torch.Tensor) -> torch.Tensor:
-        """Propagate data through the model."""
-        subj_data = self.subject_projection(data)  # k x 64, k is number of classes
-        obj_data = self.object_projection(data)  # k x 64
-        scores = torch.mm(subj_data, obj_data.t())  # k x k
-        return torch.sigmoid(scores)  # Sigmoid for 0-1 clamp
+        # Use img_logits directly, as img_relations are indexed relative to
+        # number of proposals
+        semantic_adjacency = Batch.from_data_list(
+            [
+                Data(
+                    edge_index=img_relations.t(),
+                    edge_attr=img_scores.unsqueeze(-1),
+                    x=img_logits,
+                )
+                for img_relations, img_scores, img_logits in zip(
+                    relations, scores, per_image_class_logits
+                )
+            ]
+        )  # x has shape [num_nodes, num_node_features]
+        return rcnn_out, semantic_adjacency

@@ -20,7 +20,7 @@ from graphgen.config import Config
 from graphgen.datasets.collators import VariableSizeTensorCollator
 from graphgen.datasets.utilities import ChunkedRandomSampler
 from graphgen.metrics import Metric, MetricCollection
-from graphgen.modules import GCN, GraphRCNN, Placeholder
+from graphgen.modules import GCN, GraphRCNN, MultiGCN
 from graphgen.utilities.factories import (
     DatasetCollection,
     DatasetFactory,
@@ -90,10 +90,23 @@ def run(config: Config, device: torch.device) -> None:
     # 1878 is the number of unique answers from the GQA paper
     # 1843 is the number of answers across train, val and testdev, returned by
     # len(preprocessors.questions.index_to_answer)
-    print(f"{len(set(preprocessors.scene_graphs.object_to_index.values()))}")
-    model = Placeholder(
+    model = MultiGCN(
+        len(preprocessors.questions.index_to_answer),
         GraphRCNN(num_classes=91, pretrained=True),
-        GCN((300, 600, 900, 1200, 1500, len(preprocessors.questions.index_to_answer))),
+        dep_gcn=GCN(
+            (300, 600, 900, 1200, 1500, len(preprocessors.questions.index_to_answer))
+        ),
+        obj_semantic_gcn=GCN(
+            (
+                91,
+                300,
+                600,
+                900,
+                1200,
+                1500,
+                len(preprocessors.questions.index_to_answer),
+            )
+        ),
     )
     model.to(device)
     model.train()
@@ -150,12 +163,12 @@ def train(
             ]
             # Learn
             optimizer.zero_grad()
-            dep_gcn_preds, grcnn_out = model(deps, images, bbox_targets)
-            dep_gcn_loss = criterion(dep_gcn_preds, targets)
+            rcnn_loss, preds = model(deps, images, bbox_targets)
+            pred_loss = criterion(preds, targets)
 
             # Compute multi-task loss
-            loss = dep_gcn_loss
-            for partial_loss in grcnn_out.values():
+            loss = pred_loss
+            for partial_loss in rcnn_loss.values():
                 loss += partial_loss
             loss.backward()
             optimizer.step()
@@ -164,7 +177,7 @@ def train(
             # basics for train set.
             metrics.append(
                 sample["question"]["questionId"],
-                np.argmax(dep_gcn_preds.detach().cpu().numpy(), axis=1),
+                np.argmax(preds.detach().cpu().numpy(), axis=1),
                 targets.detach().cpu().numpy(),
             )
             if (
@@ -174,17 +187,11 @@ def train(
                 results = {
                     "epoch": epoch + (batch + 1) / len(dataloader),
                     "train/loss": loss.item(),
-                    "train/depgcn/loss": dep_gcn_loss.item(),
-                    "train/rcnn/roi-classifier/loss": grcnn_out[
-                        "loss_classifier"
-                    ].item(),
-                    "train/rcnn/roi-regression/loss": grcnn_out["loss_box_reg"].item(),
-                    "train/rcnn/rpn-objectness/loss": grcnn_out[
-                        "loss_objectness"
-                    ].item(),
-                    "train/rcnn/rpn-regression/loss": grcnn_out[
-                        "loss_rpn_box_reg"
-                    ].item(),
+                    "train/alignment/loss": pred_loss.item(),
+                    "train/roi-classifier/loss": rcnn_loss["loss_classifier"].item(),
+                    "train/roi-regression/loss": rcnn_loss["loss_box_reg"].item(),
+                    "train/rpn-objectness/loss": rcnn_loss["loss_objectness"].item(),
+                    "train/rpn-regression/loss": rcnn_loss["loss_rpn_box_reg"].item(),
                 }
 
                 results.update(
@@ -192,7 +199,19 @@ def train(
                 )
                 log_metrics_stdout(
                     results,
-                    colors=(None, "yellow", "blue", "cyan", "cyan", "cyan"),
+                    colors=(
+                        None,
+                        "red",
+                        "yellow",
+                        "yellow",
+                        "yellow",
+                        "yellow",
+                        "yellow",
+                        "blue",
+                        "cyan",
+                        "cyan",
+                        "cyan",
+                    ),
                     newline=False,
                 )
                 # Delay logging until after val metrics come in if end of epoch
@@ -211,6 +230,11 @@ def train(
             results,
             colors=(
                 None,
+                "red",
+                "yellow",
+                "yellow",
+                "yellow",
+                "yellow",
                 "yellow",
                 "blue",
                 "cyan",

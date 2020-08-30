@@ -29,4 +29,4 @@ class GCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
 
         # Simple mean pooling over nodes
         pooled_feats = global_mean_pool(feats, data.batch)
-        return F.log_softmax(pooled_feats, dim=0)
+        return pooled_feats
