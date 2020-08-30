@@ -150,6 +150,9 @@ def train(
         config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
     )
 
+    if not (Path(wandb.run.dir) / "checkpoints").exists():
+        (Path(wandb.run.dir) / "checkpoints").mkdir(parents=True)
+
     wandb.save(str(Path(wandb.run.dir) / "checkpoints/**/*"))
     torch.save(model.state_dict(), str(Path(wandb.run.dir) / "checkpoints" / "0.pt"))
 
