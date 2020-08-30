@@ -93,20 +93,8 @@ def run(config: Config, device: torch.device) -> None:
     model = MultiGCN(
         len(preprocessors.questions.index_to_answer),
         GraphRCNN(num_classes=91, pretrained=True),
-        dep_gcn=GCN(
-            (300, 600, 900, 1200, 1500, len(preprocessors.questions.index_to_answer))
-        ),
-        obj_semantic_gcn=GCN(
-            (
-                91,
-                300,
-                600,
-                900,
-                1200,
-                1500,
-                len(preprocessors.questions.index_to_answer),
-            )
-        ),
+        dep_gcn=GCN((300, 512, 768, 1024)),
+        obj_semantic_gcn=GCN((91, 256, 512, 1024)),
     )
     model.to(device)
     model.train()
