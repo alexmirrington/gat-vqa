@@ -149,7 +149,13 @@ def train(
     metrics = MetricCollection(
         config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
     )
+
+    wandb.save(str(Path(wandb.run.dir) / "checkpoints/**/*"))
+
     for epoch in range(config.training.epochs):
+        torch.save(
+            model.state_dict(), str(Path(wandb.run.dir) / "checkpoints" / f"{epoch}.pt")
+        )
         for batch, sample in enumerate(dataloader):
             # Move data to GPU
             deps = sample["question"]["dependencies"].to(device)
@@ -186,8 +192,7 @@ def train(
             ):
                 results = {
                     "epoch": epoch + (batch + 1) / len(dataloader),
-                    "train/loss": loss.item(),
-                    "train/alignment/loss": pred_loss.item(),
+                    "train/loss": pred_loss.item(),
                     "train/roi-classifier/loss": rcnn_loss["loss_classifier"].item(),
                     "train/roi-regression/loss": rcnn_loss["loss_box_reg"].item(),
                     "train/rpn-objectness/loss": rcnn_loss["loss_objectness"].item(),
@@ -251,7 +256,7 @@ def train(
         metrics.reset()
 
 
-def evaluate(
+def evaluate(  # pylint: disable=too-many-locals
     model: torch.nn.Module,
     criterion: Callable[..., torch.Tensor],
     datasets: DatasetCollection,
@@ -270,13 +275,26 @@ def evaluate(
         config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
     )
     model.eval()
+
+    eval_count = 8192  # len(dataloader)
+
     with torch.no_grad():
         for batch, sample in enumerate(dataloader):
-            question = sample["question"]
-            data = question["dependencies"].to(device)
-            targets = question["answer"].to(device)
-            preds = model(data)
+            # Move data to GPU
+            deps = sample["question"]["dependencies"].to(device)
+            targets = sample["question"]["answer"].to(device)
+            images = [img.to(device) for img in sample["image"]]
+            bbox_targets = [
+                {"boxes": b.to(device), "labels": l.to(device)}
+                for b, l in zip(
+                    sample["scene_graph"]["boxes"], sample["scene_graph"]["labels"]
+                )
+            ]
+            _, preds = model(deps, images, bbox_targets)  # First is rcnn_preds
             loss = criterion(preds, targets)
+
+            # TODO add bbox logging
+
             # Calculate and log metrics, using answer indices as we only want
             # basics for train set.
             metrics.append(
@@ -284,9 +302,10 @@ def evaluate(
                 np.argmax(preds.detach().cpu().numpy(), axis=1),
                 targets.detach().cpu().numpy(),
             )
-            print(f"eval: {batch + 1}/{len(dataloader)}", end="\r")
+            print(f"eval: {batch + 1}/{eval_count}", end="\r")
+            if batch + 1 == eval_count:
+                break
     model.train()
-
     results = {"loss": loss.item()}
     results.update(metrics.evaluate())
     return results
