@@ -33,6 +33,13 @@ class RunnerFactory:
                 lr=config.training.optimiser.learning_rate,
                 weight_decay=config.training.optimiser.weight_decay,
             )
+        elif config.training.optimiser.name == OptimiserName.SGD:
+            optimiser = torch.optim.SGD(
+                model.parameters(),
+                lr=config.training.optimiser.learning_rate,
+                momentum=config.training.optimiser.momentum,
+                weight_decay=config.training.optimiser.weight_decay,
+            )
         else:
             raise NotImplementedError()
 
