@@ -4,7 +4,7 @@ from typing import Union
 
 from .clevr import CLEVRDatasetConfig
 from .gqa import GQADatasetConfig
-from .model import ModelConfig
+from .model import FasterRCNNModelConfig, MultiGCNModelConfig
 from .preprocessing import PreprocessingConfig
 from .training import TrainingConfig
 
@@ -16,4 +16,4 @@ class Config:
     dataset: Union[CLEVRDatasetConfig, GQADatasetConfig]
     preprocessing: PreprocessingConfig
     training: TrainingConfig
-    model: ModelConfig
+    model: Union[FasterRCNNModelConfig, MultiGCNModelConfig]

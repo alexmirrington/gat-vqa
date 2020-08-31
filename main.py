@@ -2,31 +2,24 @@
 
 import argparse
 import json
-import math
 import os
 from enum import Enum
 from pathlib import Path, PurePath
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Optional, Tuple
 
 import jsons
-import numpy as np
 import stanza
 import torch
 import wandb
 from termcolor import colored
-from torch.utils.data import DataLoader
 
 from graphgen.config import Config
-from graphgen.datasets.collators import VariableSizeTensorCollator
-from graphgen.datasets.utilities import ChunkedRandomSampler
-from graphgen.metrics import Metric, MetricCollection
-from graphgen.modules import GCN, GraphRCNN, MultiGCN
 from graphgen.utilities.factories import (
-    DatasetCollection,
     DatasetFactory,
     PreprocessingFactory,
+    RunnerFactory,
 )
-from graphgen.utilities.logging import log_metrics_stdout
+from graphgen.utilities.runners import ResumeInfo
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
 
@@ -50,6 +43,10 @@ def main(args: argparse.Namespace, config: Config) -> None:
     --------
     None.
     """
+    # Notes:
+    # - 1878 is the number of unique answers from the GQA paper
+    # - 1843 is the number of answers across train, val and testdev
+
     # Download and initialise resources
     print(colored("initialisation:", attrs=["bold"]))
     stanza.download(lang="en", dir=".stanza")
@@ -64,7 +61,11 @@ def main(args: argparse.Namespace, config: Config) -> None:
     if args.job == JobType.PREPROCESS:
         preprocess(config)
     elif args.job == JobType.TRAIN:
-        run(config, device)
+        resume = None
+        if args.resume != "":
+            run_id, checkpoint = args.resume.split(":")
+            resume = ResumeInfo(run_id, checkpoint)
+        run(config, device, resume)
     elif args.job == JobType.TEST:
         raise NotImplementedError()
     else:
@@ -78,230 +79,26 @@ def preprocess(config: Config) -> None:
     factory.process(config)
 
 
-def run(config: Config, device: torch.device) -> None:
+def run(config: Config, device: torch.device, resume: Optional[ResumeInfo]) -> None:
     """Train a model according to the `config.model` config."""
+    # Load datasets
     print(colored("loading datasets:", attrs=["bold"]))
-    factory = DatasetFactory()
-    datasets, preprocessors = factory.create(config)
+    dataset_factory = DatasetFactory()
+    datasets, preprocessors = dataset_factory.create(config)
     print(f"train: {len(datasets.train)}")
     print(f"val: {len(datasets.val)}")
+
+    # Create model runner
     print(colored("model:", attrs=["bold"]))
-    # TODO Use model factory
-    # 1878 is the number of unique answers from the GQA paper
-    # 1843 is the number of answers across train, val and testdev, returned by
-    # len(preprocessors.questions.index_to_answer)
-    model = MultiGCN(
-        len(preprocessors.questions.index_to_answer),
-        GraphRCNN(num_classes=91, pretrained=True),
-        dep_gcn=GCN((300, 512, 768, 1024)),
-        obj_semantic_gcn=GCN((91, 256, 512, 1024)),
-    )
-    model.to(device)
-    model.train()
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=config.training.optimiser.learning_rate,
-        weight_decay=config.training.optimiser.weight_decay,
-    )
-    criterion = torch.nn.NLLLoss()
+    runner_factory = RunnerFactory()
+    runner = runner_factory.create(config, device, preprocessors, datasets, resume)
+    print(f"{runner.model=}")
+    print(f"{runner.criterion=}")
+    print(f"{runner.optimiser=}")
 
     # Run model
     print(colored("running:", attrs=["bold"]))
-    train(model, criterion, optimizer, datasets, device, config)
-
-
-def train(
-    model: torch.nn.Module,
-    criterion: Callable[..., torch.Tensor],
-    optimizer: torch.optim.Optimizer,
-    datasets: DatasetCollection,
-    device: torch.device,
-    config: Config,
-) -> None:
-    """Train a model on the data in `train_dataloader`, evaluating every epoch."""
-    # pylint: disable=too-many-locals
-    # Log gradients each epoch
-    wandb.watch(
-        model,
-        log_freq=math.ceil(
-            config.training.epochs / config.training.dataloader.batch_size
-        ),
-    )
-    dataloader = DataLoader(
-        datasets.train,
-        batch_size=config.training.dataloader.batch_size,
-        num_workers=config.training.dataloader.workers,
-        sampler=ChunkedRandomSampler(datasets.train.questions),
-        collate_fn=VariableSizeTensorCollator(),
-    )
-    metrics = MetricCollection(
-        config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
-    )
-
-    if not (Path(wandb.run.dir) / "checkpoints").exists():
-        (Path(wandb.run.dir) / "checkpoints").mkdir(parents=True)
-
-    wandb.save(str(Path(wandb.run.dir) / "checkpoints/**/*"))
-    torch.save(model.state_dict(), str(Path(wandb.run.dir) / "checkpoints" / "0.pt"))
-
-    for epoch in range(config.training.epochs):
-        for batch, sample in enumerate(dataloader):
-            # Move data to GPU
-            deps = sample["question"]["dependencies"].to(device)
-            targets = sample["question"]["answer"].to(device)
-            images = [img.to(device) for img in sample["image"]]
-            bbox_targets = [
-                {"boxes": b.to(device), "labels": l.to(device)}
-                for b, l in zip(
-                    sample["scene_graph"]["boxes"], sample["scene_graph"]["labels"]
-                )
-            ]
-            # Learn
-            optimizer.zero_grad()
-            rcnn_loss, preds = model(deps, images, bbox_targets)
-            pred_loss = criterion(preds, targets)
-
-            # Compute multi-task loss
-            loss = pred_loss
-            for partial_loss in rcnn_loss.values():
-                loss += partial_loss
-            loss.backward()
-            optimizer.step()
-
-            # Calculate and log metrics, using answer indices as we only want
-            # basics for train set.
-            metrics.append(
-                sample["question"]["questionId"],
-                np.argmax(preds.detach().cpu().numpy(), axis=1),
-                targets.detach().cpu().numpy(),
-            )
-            if (
-                batch % config.training.log_step == config.training.log_step - 1
-                or batch == len(dataloader) - 1
-            ):
-                results = {
-                    "epoch": epoch + (batch + 1) / len(dataloader),
-                    "train/loss": pred_loss.item(),
-                    "train/roi-classifier/loss": rcnn_loss["loss_classifier"].item(),
-                    "train/roi-regression/loss": rcnn_loss["loss_box_reg"].item(),
-                    "train/rpn-objectness/loss": rcnn_loss["loss_objectness"].item(),
-                    "train/rpn-regression/loss": rcnn_loss["loss_rpn_box_reg"].item(),
-                }
-
-                results.update(
-                    {f"train/{key}": val for key, val in metrics.evaluate().items()}
-                )
-                log_metrics_stdout(
-                    results,
-                    colors=(
-                        None,
-                        "red",
-                        "yellow",
-                        "yellow",
-                        "yellow",
-                        "yellow",
-                        "yellow",
-                        "blue",
-                        "cyan",
-                        "cyan",
-                        "cyan",
-                    ),
-                    newline=False,
-                )
-                # Delay logging until after val metrics come in if end of epoch
-                if batch != len(dataloader) - 1:
-                    wandb.log(results)
-                    metrics.reset()
-        torch.save(
-            model.state_dict(),
-            str(Path(wandb.run.dir) / "checkpoints" / f"{epoch+1}.pt"),
-        )
-        results.update(
-            {
-                f"val/{key}": val
-                for key, val in evaluate(
-                    model, criterion, datasets, metrics, device, config
-                ).items()
-            }
-        )
-        log_metrics_stdout(
-            results,
-            colors=(
-                None,
-                "red",
-                "yellow",
-                "yellow",
-                "yellow",
-                "yellow",
-                "yellow",
-                "blue",
-                "cyan",
-                "cyan",
-                "cyan",
-                "yellow",
-                "magenta",
-                "magenta",
-                "magenta",
-                "magenta",
-            ),
-        )
-        wandb.log(results)
-        metrics.reset()
-
-
-def evaluate(  # pylint: disable=too-many-locals
-    model: torch.nn.Module,
-    criterion: Callable[..., torch.Tensor],
-    datasets: DatasetCollection,
-    metrics: MetricCollection,
-    device: torch.device,
-    config: Config,
-) -> Dict[str, Any]:
-    """Evaluate a model according to a criterion on a given dataset."""
-    dataloader = DataLoader(
-        datasets.val,
-        batch_size=config.training.dataloader.batch_size,
-        num_workers=config.training.dataloader.workers,
-        collate_fn=VariableSizeTensorCollator(),
-    )
-    metrics = MetricCollection(
-        config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
-    )
-    model.eval()
-
-    eval_count = 8192  # len(dataloader)
-
-    with torch.no_grad():
-        for batch, sample in enumerate(dataloader):
-            # Move data to GPU
-            deps = sample["question"]["dependencies"].to(device)
-            targets = sample["question"]["answer"].to(device)
-            images = [img.to(device) for img in sample["image"]]
-            bbox_targets = [
-                {"boxes": b.to(device), "labels": l.to(device)}
-                for b, l in zip(
-                    sample["scene_graph"]["boxes"], sample["scene_graph"]["labels"]
-                )
-            ]
-            _, preds = model(deps, images, bbox_targets)  # First is rcnn_preds
-            loss = criterion(preds, targets)
-
-            # TODO add bbox logging
-
-            # Calculate and log metrics, using answer indices as we only want
-            # basics for train set.
-            metrics.append(
-                sample["question"]["questionId"],
-                np.argmax(preds.detach().cpu().numpy(), axis=1),
-                targets.detach().cpu().numpy(),
-            )
-            print(f"eval: {batch + 1}/{eval_count}", end="\r")
-            if batch + 1 == eval_count:
-                break
-    model.train()
-    results = {"loss": loss.item()}
-    results.update(metrics.evaluate())
-    return results
+    runner.train()
 
 
 def parse_args() -> argparse.Namespace:
@@ -326,6 +123,13 @@ def parse_args() -> argparse.Namespace:
         choices=list(iter(JobType)),
         metavar=str({str(job.value) for job in iter(JobType)}),
         help="Job type for this run.",
+    )
+    parser.add_argument(
+        "--resume",
+        type=str,
+        default="",
+        help="A wandb run and filename to resume training a model from, \
+        e.g. graphgen/a1b2c3d:latest.pt",
     )
     parser.add_argument(
         "--sync", action="store_true", help="Sync results to wandb if specified."

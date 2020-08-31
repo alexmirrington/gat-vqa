@@ -35,22 +35,26 @@
     }]
   },
   "model": {
-    "rcnn": {
-      "rpn": {
-        "proposals": 256
-      }
+    "name": "faster_rcnn",
+    "pretrained": false,
+    "backbone": {
+      "name": "resnet50",
+      "pretrained": true
     }
   },
   "training": {
     "epochs": 25,
     "log_step": 512,
+    "eval_subset": 8192,
     "dataloader": {
       "batch_size": 1,
       "workers": 1
     },
     "optimiser": {
-      "learning_rate": 0.0001,
-      "weight_decay": 1e-5
+      "name": "sgd",
+      "learning_rate": 0.001,
+      "momentum": 0.9,
+      "weight_decay": 5e-4
     },
     "data": {
       "features": [

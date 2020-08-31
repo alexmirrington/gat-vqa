@@ -32,13 +32,13 @@ class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-met
 
     def forward(
         self,
-        deps: Data,
+        dependencies: Data,
         images: List[torch.Tensor],
-        bbox_targets: Optional[List[GraphRCNNTarget]] = None,
+        targets: Optional[List[GraphRCNNTarget]] = None,
     ) -> Any:
         """Propagate data through the model."""
-        rcnn_loss, semantic_gcn_batch = self.grcnn(images, bbox_targets)
-        dep_gcn_results = self.dep_gcn(deps)
+        rcnn_loss, semantic_gcn_batch = self.grcnn(images, targets)
+        dep_gcn_results = self.dep_gcn(dependencies)
         semantic_gcn_batch = semantic_gcn_batch.to("cuda")  # TODO handle devices better
         semantic_gcn_results = self.obj_semantic_gcn(semantic_gcn_batch)
 

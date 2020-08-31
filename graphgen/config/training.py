@@ -1,6 +1,14 @@
 """Classes for storing training configuration information."""
 from dataclasses import dataclass
+from enum import Enum
 from typing import List, Optional
+
+
+class OptimiserName(Enum):
+    """An enum specifying supported optimiser types."""
+
+    ADAM = "adam"
+    SGD = "sgd"
 
 
 @dataclass(frozen=True)
@@ -25,8 +33,17 @@ class DataloaderConfig:
 class OptimiserConfig:
     """Class storing optimiser configuration information."""
 
+    name: OptimiserName
+    momentum: Optional[float]
     learning_rate: float
     weight_decay: float
+
+    def __post_init__(self) -> None:
+        """Validate fields after dataclass construction."""
+        if self.name == OptimiserName.ADAM and self.momentum is not None:
+            raise ValueError(
+                f"Field {self.momentum=} must be {None} when using an Adam optimiser."
+            )
 
 
 @dataclass(frozen=True)
@@ -61,6 +78,7 @@ class TrainingConfig:
 
     epochs: int
     log_step: int
+    eval_subset: int
     dataloader: DataloaderConfig
     optimiser: OptimiserConfig
     data: TrainingDataConfig
@@ -72,3 +90,6 @@ class TrainingConfig:
 
         if self.log_step <= 0:
             raise ValueError(f"Field {self.log_step} must be strictly positive.")
+
+        if self.log_step <= 0:
+            raise ValueError(f"Field {self.eval_subset} must be strictly positive.")
