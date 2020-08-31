@@ -3,7 +3,7 @@ import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import torch
@@ -14,7 +14,7 @@ from ..config import Config
 from ..datasets.collators import VariableSizeTensorCollator
 from ..datasets.utilities import ChunkedRandomSampler
 from ..metrics import Metric, MetricCollection
-from ..utilities.factories import DatasetCollection
+from ..utilities.factories import DatasetCollection, PreprocessorCollection
 from .logging import log_metrics_stdout
 
 
@@ -29,7 +29,9 @@ class ResumeInfo:
 class Runner(ABC):
     """Abstract runner class for running models."""
 
-    def __init__(
+    # pylint: disable=too-many-instance-attributes
+
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         config: Config,
         device: torch.device,
@@ -37,6 +39,7 @@ class Runner(ABC):
         optimiser: torch.optim.Optimizer,
         criterion: Optional[Callable[..., torch.Tensor]],
         datasets: DatasetCollection,
+        preprocessors: PreprocessorCollection,
         resume: Optional[ResumeInfo],
     ) -> None:
         """Create a Runner instance."""
@@ -46,6 +49,7 @@ class Runner(ABC):
         self.optimiser = optimiser
         self.criterion = criterion
         self.datasets = datasets
+        self.preprocessors = preprocessors
         self.resume = resume
 
         self._start_epoch = 0
@@ -123,6 +127,8 @@ class FasterRCNNRunner(Runner):
         self.model.train()
         self.model.to(self.device)
 
+        wandb.log({"epoch": 0}.update(self.evaluate()))
+
         for epoch in range(self._start_epoch, self.config.training.epochs):
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU, filtering if there are no bounding boxes,
@@ -174,9 +180,9 @@ class FasterRCNNRunner(Runner):
                         wandb.log(results)
 
             self.save(epoch + 1, f"{epoch+1}.pt")
-            results.update({f"val/{key}": val for key, val in self.evaluate().items()})
             log_metrics_stdout(results)
-            wandb.log(results)
+            bbox_images = self.evaluate()
+            wandb.log(results.update(bbox_images))
 
     def evaluate(self) -> Dict[str, Any]:
         """Evaluate a model according to a criterion on a given dataset."""
@@ -194,6 +200,12 @@ class FasterRCNNRunner(Runner):
             else len(dataloader)
         )
 
+        image_sample_limit = 25
+        all_images: List[wandb.Image] = []
+        obj_classes = {
+            idx: obj
+            for obj, idx in self.preprocessors.scene_graphs.object_to_index.items()
+        }
         with torch.no_grad():
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
@@ -213,23 +225,70 @@ class FasterRCNNRunner(Runner):
                     if len(boxes.size()) == 2
                 ]
                 images, targets = list(zip(*data))
-                _ = self.model(images=images, targets=targets)
+                preds = self.model(images=images, targets=targets)
 
-                # TODO add bbox logging
+                for pred, image, target in zip(preds, images, targets):
+                    if len(all_images) >= image_sample_limit:
+                        break
+                    log_img = wandb.Image(
+                        image,
+                        boxes={
+                            "predictions": {
+                                "box_data": [
+                                    {
+                                        "position": {
+                                            "minX": box[0].item(),
+                                            "maxX": box[2].item(),
+                                            "minY": box[1].item(),
+                                            "maxY": box[3].item(),
+                                        },
+                                        "class_id": lbl.item(),
+                                        "box_caption": f"{obj_classes[lbl.item()]} ({score.item()})",  # noqa: B950
+                                        "domain": "pixel",
+                                        "scores": {"score": score.item()},
+                                    }
+                                    for box, lbl, score in zip(
+                                        pred["boxes"], pred["labels"], pred["scores"]
+                                    )
+                                ],
+                                "class_labels": obj_classes,
+                            },
+                            "ground_truth": {
+                                "box_data": [
+                                    {
+                                        "position": {
+                                            "minX": box[0].item(),
+                                            "maxX": box[2].item(),
+                                            "minY": box[1].item(),
+                                            "maxY": box[3].item(),
+                                        },
+                                        "class_id": lbl.item(),
+                                        "box_caption": obj_classes[lbl.item()],
+                                        "domain": "pixel",
+                                    }
+                                    for box, lbl in zip(
+                                        target["boxes"], target["labels"]
+                                    )
+                                ],
+                                "class_labels": obj_classes,
+                                "domain": "pixel",
+                            },
+                        },
+                    )
+                    all_images.append(log_img)
 
                 print(f"eval: {batch + 1}/{eval_limit}", end="\r")
                 if batch + 1 == eval_limit:
                     break
 
         self.model.train()
-        results: Dict[str, Any] = {}
-        return results
+        return {"boxes": all_images}
 
 
 class EndToEndMultiChannelGCNRunner(Runner):
     """Runner class for training a MultiChannelGCN model."""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         config: Config,
         device: torch.device,
@@ -237,12 +296,15 @@ class EndToEndMultiChannelGCNRunner(Runner):
         optimiser: torch.optim.Optimizer,
         criterion: Optional[Callable[..., torch.Tensor]],
         datasets: DatasetCollection,
+        preprocessors: PreprocessorCollection,
         resume: Optional[ResumeInfo],
     ) -> None:
         """Create a MultiChannelGCNRunner instance."""
         if criterion is None:
             raise ValueError("This model requires a criterion.")
-        super().__init__(config, device, model, optimiser, criterion, datasets, resume)
+        super().__init__(
+            config, device, model, optimiser, criterion, datasets, preprocessors, resume
+        )
 
     def train(self) -> None:
         """Train a model according to a criterion and optimiser on a dataset."""

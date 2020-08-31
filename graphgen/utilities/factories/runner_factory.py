@@ -98,7 +98,7 @@ class RunnerFactory:
 
         optimiser = RunnerFactory._build_optimiser(config, model)
         runner = FasterRCNNRunner(
-            config, device, model, optimiser, None, datasets, resume
+            config, device, model, optimiser, None, datasets, preprocessors, resume
         )
 
         return runner
@@ -127,7 +127,7 @@ class RunnerFactory:
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()
         runner = EndToEndMultiChannelGCNRunner(
-            config, device, model, optimiser, criterion, datasets, resume
+            config, device, model, optimiser, criterion, datasets, preprocessors, resume
         )
 
         return runner
