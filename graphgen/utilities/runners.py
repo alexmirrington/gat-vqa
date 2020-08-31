@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 import torch
 import wandb
+from termcolor import colored
 from torch.utils.data import DataLoader
 
 from ..config import Config
@@ -83,19 +84,24 @@ class Runner(ABC):
 
     def load(self) -> int:
         """Load a model's state dict from file."""
+        print(colored("loading checkpoint:", attrs=["bold"]))
         if self.resume is None:
             raise ValueError("Cannot load model without resume information.")
         root = Path(wandb.run.dir) / "checkpoints"
+        print(root)
         if not root.exists():
             root.mkdir(parents=True)
-        restored = wandb.restore(self.resume.checkpoint, run_path=self.resume.run)
+        restored = wandb.restore(
+            self.resume.checkpoint, run_path=self.resume.run, root=root
+        )
+        print(restored.name)
         checkpoint = torch.load(restored.name)
         self.model.load_state_dict(checkpoint["model_state_dict"])
         self.optimiser.load_state_dict(checkpoint["optimizer_state_dict"])
 
         epoch: int = checkpoint["epoch"]
 
-        print(f"Loaded state dict from {restored.name}.")
+        print(f"loaded checkpoint from {restored.name}")
         return epoch
 
 
@@ -127,10 +133,6 @@ class FasterRCNNRunner(Runner):
         self.model.train()
         self.model.to(self.device)
 
-        images = self.evaluate()
-        print(images)
-        wandb.log(images)
-
         for epoch in range(self._start_epoch, self.config.training.epochs):
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU, filtering if there are no bounding boxes,
@@ -149,13 +151,17 @@ class FasterRCNNRunner(Runner):
                         sample["scene_graph"]["boxes"],
                         sample["scene_graph"]["labels"],
                     )
-                    if len(boxes.size()) == 2
+                    if len(boxes) >= 1 and len(labels) >= 1
                 ]
+                if len(data) == 0:
+                    continue
+
                 images, targets = list(zip(*data))
 
                 # Learn
                 self.optimiser.zero_grad()
                 output = self.model(images=images, targets=targets)
+
                 loss: torch.Tensor = sum(list(output.values()))
                 loss.backward()
                 self.optimiser.step()
@@ -166,6 +172,7 @@ class FasterRCNNRunner(Runner):
                     == self.config.training.log_step - 1
                     or batch == len(dataloader) - 1
                 ):
+
                     results = {
                         "epoch": epoch + (batch + 1) / len(dataloader),
                         "train/loss": loss.item(),
@@ -202,7 +209,7 @@ class FasterRCNNRunner(Runner):
             else len(dataloader)
         )
 
-        image_sample_limit = 24
+        image_sample_limit = 32
         all_images: List[wandb.Image] = []
         obj_classes = {
             idx: obj
@@ -224,9 +231,14 @@ class FasterRCNNRunner(Runner):
                         sample["scene_graph"]["boxes"],
                         sample["scene_graph"]["labels"],
                     )
-                    if len(boxes.size()) == 2
+                    if len(boxes) >= 1 and len(labels) >= 1
                 ]
+
+                if len(data) == 0:
+                    continue
+
                 images, targets = list(zip(*data))
+
                 preds = self.model(images=images, targets=targets)
 
                 for pred, image, target in zip(preds, images, targets):
@@ -245,14 +257,14 @@ class FasterRCNNRunner(Runner):
                                             "maxY": box[3].item(),
                                         },
                                         "class_id": lbl.item(),
-                                        "box_caption": f"{obj_classes[lbl.item()]} ({score.item()})",  # noqa: B950
+                                        "box_caption": f"{obj_classes[lbl.item()]} ({score.item():.2f})",  # noqa: B950
                                         "domain": "pixel",
-                                        "scores": {"score": score},
+                                        "scores": {"score": score.item()},
                                     }
                                     for box, lbl, score in zip(
                                         pred["boxes"],
                                         pred["labels"],
-                                        list(pred["scores"]),
+                                        pred["scores"],
                                     )
                                 ],
                                 "class_labels": obj_classes,
