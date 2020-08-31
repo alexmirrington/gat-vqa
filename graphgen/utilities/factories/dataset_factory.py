@@ -95,13 +95,6 @@ class DatasetFactory:
             spatial = None
             scene_graphs = None
 
-            if GQAFeatures.QUESTIONS.value not in [
-                feat.name for feat in config.training.data.features
-            ]:
-                raise ValueError(
-                    f'List of features must contain "{GQAFeatures.QUESTIONS.value}"'
-                )
-
             for feature in config.training.data.features:
                 if feature.name not in [feature.value for feature in iter(GQAFeatures)]:
                     raise ValueError("Invalid feature string.")

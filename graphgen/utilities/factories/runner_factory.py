@@ -73,11 +73,12 @@ class RunnerFactory:
                 but got {config.model.__class__.__name__}"
             )
 
+        # Add one for background
         num_classes = len(set(preprocessors.scene_graphs.object_to_index.values()))
-        print(f"{num_classes=}")
+
         if config.model.backbone.name == Backbone.RESNET50:
             model = fasterrcnn_resnet50_fpn(
-                config.model.pretrained,
+                pretrained=config.model.pretrained,
                 num_classes=num_classes,
                 pretrained_backbone=config.model.backbone.pretrained,
             )

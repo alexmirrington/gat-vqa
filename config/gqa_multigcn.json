@@ -8,7 +8,7 @@
   "preprocessing": {
     "cache": {
       "root": "./cache",
-      "artifact": "gqa-rcnn"
+      "artifact": "gqa-preprocessed"
     },
     "pipeline": [{
       "feature": "scene_graphs",
@@ -17,39 +17,48 @@
     {
       "feature": "scene_graphs",
       "split": "val"
+    },
+    {
+      "feature": "questions",
+      "split": "train",
+      "version": "balanced"
+    },
+    {
+      "feature": "questions",
+      "split": "val",
+      "version": "balanced"
+    },
+    {
+      "feature": "questions",
+      "split": "testdev",
+      "version": "balanced"
     }]
   },
   "model": {
-    "name": "faster_rcnn",
-    "pretrained": false,
-    "backbone": {
-      "name": "resnet50",
-      "pretrained": true
-    }
+    "name": "unkown"
   },
   "training": {
     "epochs": 25,
-    "log_step": 512,
-    "eval_subset": 8192,
+    "log_step": 8192,
     "dataloader": {
-      "batch_size": 2,
+      "batch_size": 1,
       "workers": 1
     },
     "optimiser": {
-      "name": "sgd",
+      "name": "adam",
       "learning_rate": 0.001,
-      "momentum": 0.9,
+      "momentum": null,
       "weight_decay": 5e-4
     },
     "data": {
       "features": [
         {
-          "name": "scene_graphs",
-          "artifact": "gqa-rcnn:latest"
+          "name": "questions",
+          "artifact": "gqa-preprocessed:latest"
         },
         {
-          "name": "images",
-          "artifact": null
+          "name": "scene_graphs",
+          "artifact": "gqa-preprocessed:latest"
         }
       ],
       "train": {

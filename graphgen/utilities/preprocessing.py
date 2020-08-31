@@ -268,7 +268,7 @@ class GQASceneGraphPreprocessor(SceneGraphPreprocessor):
     def __init__(
         self,
         object_to_index: Optional[Dict[str, int]] = None,
-        use_coco_classes: bool = True,
+        use_coco_classes: bool = False,
     ) -> None:
         """Create a `GQASceneGraphPreprocessor` instance."""
         super().__init__(object_to_index)

@@ -133,10 +133,12 @@ class FasterRCNNRunner(Runner):
                         sample["scene_graph"]["boxes"], sample["scene_graph"]["labels"]
                     )
                 ]
+                print(images)
+                print(targets)
 
                 # Learn
                 self.optimiser.zero_grad()
-                output = self.model(images, targets)
+                output = self.model(images=images, targets=targets)
                 loss: torch.Tensor = sum(list(output.values()))
                 loss.backward()
                 self.optimiser.step()
