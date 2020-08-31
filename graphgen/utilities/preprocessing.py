@@ -304,7 +304,7 @@ class GQASceneGraphPreprocessor(SceneGraphPreprocessor):
                     obj_data["x"] + obj_data["w"],
                     obj_data["y"] + obj_data["h"],
                 )
-                if box[2] - box[0] > 0 and box[3] - box[1] > 0:
+                if obj_data["w"] > 0 and obj_data["h"] > 0:
                     if name is not None and name not in self._object_to_index:
                         if (
                             self._coco_vectors is not None
@@ -381,14 +381,10 @@ class SceneGraphTransformer:
 
     def __call__(self, data: SceneGraph) -> TrainableSceneGraph:
         """Transform data into a trainable format."""
-        boxes = [
-            box for box in data["boxes"] if box[2] - box[0] > 0 and box[3] - box[1] > 0
-        ]  # TODO move to preprocessing step
-
         return {
             "imageId": data["imageId"],
             "boxes": torch.tensor(  # pylint: disable=not-callable
-                boxes, dtype=torch.float
+                data["boxes"], dtype=torch.float
             ),
             "labels": torch.tensor(  # pylint: disable=not-callable
                 data["labels"], dtype=torch.int64

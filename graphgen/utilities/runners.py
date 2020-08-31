@@ -125,14 +125,25 @@ class FasterRCNNRunner(Runner):
 
         for epoch in range(self._start_epoch, self.config.training.epochs):
             for batch, sample in enumerate(dataloader):
-                # Move data to GPU
-                images = [img.to(self.device) for img in sample["image"]]
-                targets = [
-                    {"boxes": b.to(self.device), "labels": l.to(self.device)}
-                    for b, l in zip(
-                        sample["scene_graph"]["boxes"], sample["scene_graph"]["labels"]
+                # Move data to GPU, filtering if there are no bounding boxes,
+                # as GQA bboxes with zero width or height were removed in
+                # preprocessing step.
+                data = [
+                    (
+                        img.to(self.device),
+                        {
+                            "boxes": boxes.to(self.device),
+                            "labels": labels.to(self.device),
+                        },
                     )
+                    for img, boxes, labels in zip(
+                        sample["image"],
+                        sample["scene_graph"]["boxes"],
+                        sample["scene_graph"]["labels"],
+                    )
+                    if len(boxes.size()) == 2
                 ]
+                images, targets = list(zip(*data))
 
                 # Learn
                 self.optimiser.zero_grad()
@@ -177,18 +188,31 @@ class FasterRCNNRunner(Runner):
         )
         self.model.eval()
 
-        eval_limit = self.config.training.eval_subset
+        eval_limit = (
+            self.config.training.eval_subset
+            if self.config.training.eval_subset is not None
+            else len(dataloader)
+        )
 
         with torch.no_grad():
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
-                images = [img.to(self.device) for img in sample["image"]]
-                targets = [
-                    {"boxes": b.to(self.device), "labels": l.to(self.device)}
-                    for b, l in zip(
-                        sample["scene_graph"]["boxes"], sample["scene_graph"]["labels"]
+                data = [
+                    (
+                        img.to(self.device),
+                        {
+                            "boxes": boxes.to(self.device),
+                            "labels": labels.to(self.device),
+                        },
                     )
+                    for img, boxes, labels in zip(
+                        sample["image"],
+                        sample["scene_graph"]["boxes"],
+                        sample["scene_graph"]["labels"],
+                    )
+                    if len(boxes.size()) == 2
                 ]
+                images, targets = list(zip(*data))
                 _ = self.model(images=images, targets=targets)
 
                 # TODO add bbox logging
@@ -330,7 +354,11 @@ class EndToEndMultiChannelGCNRunner(Runner):
         )
         self.model.eval()
 
-        eval_limit = self.config.training.eval_subset
+        eval_limit = (
+            self.config.training.eval_subset
+            if self.config.training.eval_subset is not None
+            else len(dataloader)
+        )
 
         with torch.no_grad():
             for batch, sample in enumerate(dataloader):

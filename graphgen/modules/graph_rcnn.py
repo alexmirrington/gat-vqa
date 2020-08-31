@@ -1,18 +1,12 @@
 """Module containing code for a FasterRCNN object detector."""
-from typing import Any, List, Optional, Tuple, TypedDict
+from typing import Any, List, Optional, Tuple
 
 import torch
 from torch_geometric.data import Batch, Data
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
 
+from .faster_rcnn import FasterRCNNTarget
 from .relpn import RelPN
-
-
-class GraphRCNNTarget(TypedDict):
-    """TypedDict specifying required fields for training a faster RCNN model."""
-
-    boxes: torch.FloatTensor
-    labels: torch.IntTensor
 
 
 class GraphRCNN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
@@ -60,7 +54,7 @@ class GraphRCNN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-me
     def forward(
         self,
         images: List[torch.Tensor],
-        targets: Optional[List[GraphRCNNTarget]] = None,
+        targets: Optional[List[FasterRCNNTarget]] = None,
     ) -> Any:
         """Propagate data through the model."""
         if self.training and targets is None:

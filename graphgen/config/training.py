@@ -78,7 +78,7 @@ class TrainingConfig:
 
     epochs: int
     log_step: int
-    eval_subset: int
+    eval_subset: Optional[int]
     dataloader: DataloaderConfig
     optimiser: OptimiserConfig
     data: TrainingDataConfig

@@ -1,7 +1,6 @@
 """Classes storing model configuration information."""
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
 
 
 class ModelName(Enum):
@@ -50,8 +49,6 @@ class FasterRCNNModelConfig(ModelConfig):
 @dataclass(frozen=True)
 class MultiGCNModelConfig(ModelConfig):
     """Class for storing model configuration information."""
-
-    depgcn: Any
 
     def __post_init__(self) -> None:
         """Perform post-init checks on fields."""

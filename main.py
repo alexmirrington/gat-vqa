@@ -92,9 +92,9 @@ def run(config: Config, device: torch.device, resume: Optional[ResumeInfo]) -> N
     print(colored("model:", attrs=["bold"]))
     runner_factory = RunnerFactory()
     runner = runner_factory.create(config, device, preprocessors, datasets, resume)
-    print(f"{runner.model=}")
-    print(f"{runner.criterion=}")
-    print(f"{runner.optimiser=}")
+    # print(f"{runner.model=}")
+    # print(f"{runner.criterion=}")
+    # print(f"{runner.optimiser=}")
 
     # Run model
     print(colored("running:", attrs=["bold"]))

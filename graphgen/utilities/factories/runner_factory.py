@@ -3,12 +3,22 @@
 from typing import Optional
 
 import torch.nn
-from torchvision.models.detection import fasterrcnn_resnet50_fpn
 
 from ...config import Config
-from ...config.model import Backbone, FasterRCNNModelConfig, ModelName
+from ...config.model import (
+    Backbone,
+    FasterRCNNModelConfig,
+    ModelName,
+    MultiGCNModelConfig,
+)
 from ...config.training import OptimiserName
-from ...utilities.runners import FasterRCNNRunner, ResumeInfo, Runner
+from ...modules import GCN, FasterRCNN, GraphRCNN, MultiGCN
+from ...utilities.runners import (
+    EndToEndMultiChannelGCNRunner,
+    FasterRCNNRunner,
+    ResumeInfo,
+    Runner,
+)
 from .dataset_factory import DatasetCollection
 from .preprocessing_factory import PreprocessorCollection
 
@@ -19,7 +29,8 @@ class RunnerFactory:
     def __init__(self) -> None:
         """Create a RunnerFactory instance."""
         self._factory_methods = {
-            ModelName.FASTER_RCNN: RunnerFactory.create_faster_rcnn
+            ModelName.FASTER_RCNN: RunnerFactory.create_faster_rcnn,
+            ModelName.MULTICHANNEL_GCN: RunnerFactory.create_multichannel_gcn,
         }
 
     @staticmethod
@@ -77,7 +88,7 @@ class RunnerFactory:
         num_classes = len(set(preprocessors.scene_graphs.object_to_index.values()))
 
         if config.model.backbone.name == Backbone.RESNET50:
-            model = fasterrcnn_resnet50_fpn(
+            model = FasterRCNN(
                 pretrained=config.model.pretrained,
                 num_classes=num_classes,
                 pretrained_backbone=config.model.backbone.pretrained,
@@ -92,25 +103,31 @@ class RunnerFactory:
 
         return runner
 
-    # @staticmethod
-    # def create_multichannel_gcn(
-    #     args: argparse.Namespace,
-    #     config: Config,
-    #     device: torch.device,
-    #     preprocessors: PreprocessorCollection,
-    #     datasets: DatasetCollection,
-    #     metrics: MetricCollection,
-    # ) -> Runner:
-    #     model = MultiGCN(
-    #         len(preprocessors.questions.index_to_answer),
-    #         GraphRCNN(num_classes=91, pretrained=True),
-    #         dep_gcn=GCN((300, 512, 768, 1024)),
-    #         obj_semantic_gcn=GCN((91, 256, 512, 1024)),
-    #     )
-    #     optimizer = torch.optim.Adam(
-    #         model.parameters(),
-    #         lr=config.training.optimiser.learning_rate,
-    #         weight_decay=config.training.optimiser.weight_decay,
-    #     )
-    #     criterion = torch.nn.NLLLoss()
-    #     return model, optimizer, criterion
+    @staticmethod
+    def create_multichannel_gcn(
+        config: Config,
+        device: torch.device,
+        preprocessors: PreprocessorCollection,
+        datasets: DatasetCollection,
+        resume: Optional[ResumeInfo],
+    ) -> Runner:
+        """Create an End-to-end multi-channel GCN runner from a config."""
+        if not isinstance(config.model, MultiGCNModelConfig):
+            raise TypeError(
+                f"Expected model config of type {MultiGCNModelConfig.__name__} \
+                but got {config.model.__class__.__name__}"
+            )
+
+        model = MultiGCN(
+            len(preprocessors.questions.index_to_answer),
+            GraphRCNN(num_classes=91, pretrained=True),
+            dep_gcn=GCN((300, 512, 768, 1024)),
+            obj_semantic_gcn=GCN((91, 256, 512, 1024)),
+        )
+        optimiser = RunnerFactory._build_optimiser(config, model)
+        criterion = torch.nn.NLLLoss()
+        runner = EndToEndMultiChannelGCNRunner(
+            config, device, model, optimiser, criterion, datasets, resume
+        )
+
+        return runner

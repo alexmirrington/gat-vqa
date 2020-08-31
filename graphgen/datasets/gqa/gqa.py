@@ -109,45 +109,46 @@ class GQA(torch.utils.data.Dataset):  # type: ignore
     def __getitem__(self, index: int) -> Any:
         """Get an item from the dataset at a given index."""
         result = {}
+        image_key = None
         if self._questions is not None:
             question = self._questions[index]
             result["question"] = question
+            image_key = question["imageId"]
+
+        if self._scene_graphs is not None:
+            image_id = (
+                self._scene_graphs.key_to_index(image_key)
+                if image_key is not None
+                else index
+            )
+            scene_graph = self._scene_graphs[image_id]
+            result["scene_graph"] = scene_graph
+            image_key = scene_graph["imageId"]
 
         if self._images is not None:
             image_id = (
-                self._images.key_to_index(question["imageId"])
-                if self._questions is not None
-                else index
+                self._images.key_to_index(image_key) if image_key is not None else index
             )
             result["image"] = self._images[image_id]
 
-        if self._objects is not None:
-            image_id = (
-                self._objects.key_to_index(question["imageId"])
-                if self._questions is not None
-                else index
-            )
-            objects, boxes = self._objects[image_id]
-            result["objects"] = objects
-            result["boxes"] = boxes
-
         if self._spatial is not None:
             image_id = (
-                self._spatial.key_to_index(question["imageId"])
-                if self._questions is not None
+                self._spatial.key_to_index(image_key)
+                if image_key is not None
                 else index
             )
             spatial = self._spatial[image_id]
             result["spatial"] = spatial
 
-        if self._scene_graphs is not None:
+        if self._objects is not None:
             image_id = (
-                self._scene_graphs.key_to_index(question["imageId"])
-                if self._questions is not None
+                self._objects.key_to_index(image_key)
+                if image_key is not None
                 else index
             )
-            scene_graph = self._scene_graphs[image_id]
-            result["scene_graph"] = scene_graph
+            objects, boxes = self._objects[image_id]
+            result["objects"] = objects
+            result["boxes"] = boxes
 
         if len(result) == 0:
             raise IndexError("No keys exist for this dataset.")
@@ -158,10 +159,10 @@ class GQA(torch.utils.data.Dataset):  # type: ignore
         """Get the length of the dataset."""
         for dataset in (
             self._questions,
+            self._scene_graphs,
             self._images,
             self._spatial,
             self._objects,
-            self.scene_graphs,
         ):
             if dataset is not None:
                 return len(dataset)
@@ -171,10 +172,10 @@ class GQA(torch.utils.data.Dataset):  # type: ignore
         """Get the index of the question in the dataset with a given question id."""
         for dataset in (
             self._questions,
+            self._scene_graphs,
             self._images,
             self._spatial,
             self._objects,
-            self.scene_graphs,
         ):
             if dataset is not None:
                 return dataset.key_to_index(key)

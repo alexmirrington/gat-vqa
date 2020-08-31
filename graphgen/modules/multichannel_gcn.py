@@ -5,8 +5,9 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.data import Data
 
+from .faster_rcnn import FasterRCNNTarget
 from .gcn import GCN
-from .graph_rcnn import GraphRCNN, GraphRCNNTarget
+from .graph_rcnn import GraphRCNN
 
 
 class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
@@ -34,7 +35,7 @@ class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-met
         self,
         dependencies: Data,
         images: List[torch.Tensor],
-        targets: Optional[List[GraphRCNNTarget]] = None,
+        targets: Optional[List[FasterRCNNTarget]] = None,
     ) -> Any:
         """Propagate data through the model."""
         rcnn_loss, semantic_gcn_batch = self.grcnn(images, targets)

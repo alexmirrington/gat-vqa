@@ -35,11 +35,12 @@
     }]
   },
   "model": {
-    "name": "unkown"
+    "name": "multichannel_gcn"
   },
   "training": {
     "epochs": 25,
-    "log_step": 8192,
+    "log_step": 512,
+    "eval_subset": null,
     "dataloader": {
       "batch_size": 1,
       "workers": 1
@@ -59,6 +60,10 @@
         {
           "name": "scene_graphs",
           "artifact": "gqa-preprocessed:latest"
+        },
+        {
+          "name": "images",
+          "artifact": null
         }
       ],
       "train": {
