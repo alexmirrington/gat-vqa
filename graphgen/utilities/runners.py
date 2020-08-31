@@ -113,7 +113,7 @@ class FasterRCNNRunner(Runner):
             self.datasets.train,
             batch_size=self.config.training.dataloader.batch_size,
             num_workers=self.config.training.dataloader.workers,
-            sampler=ChunkedRandomSampler(self.datasets.train.questions),
+            shuffle=True,
             collate_fn=VariableSizeTensorCollator(),
         )
 
@@ -133,8 +133,6 @@ class FasterRCNNRunner(Runner):
                         sample["scene_graph"]["boxes"], sample["scene_graph"]["labels"]
                     )
                 ]
-                print(images)
-                print(targets)
 
                 # Learn
                 self.optimiser.zero_grad()
