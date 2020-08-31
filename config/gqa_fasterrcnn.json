@@ -28,9 +28,9 @@
     }
   },
   "training": {
-    "epochs": 25,
+    "epochs": 20,
     "log_step": 128,
-    "eval_subset": 32,
+    "eval_subset": 24,
     "dataloader": {
       "batch_size": 2,
       "workers": 1

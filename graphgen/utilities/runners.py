@@ -127,7 +127,9 @@ class FasterRCNNRunner(Runner):
         self.model.train()
         self.model.to(self.device)
 
-        wandb.log({"epoch": 0}.update(self.evaluate()))
+        images = self.evaluate()
+        print(images)
+        wandb.log(images)
 
         for epoch in range(self._start_epoch, self.config.training.epochs):
             for batch, sample in enumerate(dataloader):
@@ -200,7 +202,7 @@ class FasterRCNNRunner(Runner):
             else len(dataloader)
         )
 
-        image_sample_limit = 25
+        image_sample_limit = 24
         all_images: List[wandb.Image] = []
         obj_classes = {
             idx: obj
@@ -245,10 +247,12 @@ class FasterRCNNRunner(Runner):
                                         "class_id": lbl.item(),
                                         "box_caption": f"{obj_classes[lbl.item()]} ({score.item()})",  # noqa: B950
                                         "domain": "pixel",
-                                        "scores": {"score": score.item()},
+                                        "scores": {"score": score},
                                     }
                                     for box, lbl, score in zip(
-                                        pred["boxes"], pred["labels"], pred["scores"]
+                                        pred["boxes"],
+                                        pred["labels"],
+                                        list(pred["scores"]),
                                     )
                                 ],
                                 "class_labels": obj_classes,
@@ -271,7 +275,6 @@ class FasterRCNNRunner(Runner):
                                     )
                                 ],
                                 "class_labels": obj_classes,
-                                "domain": "pixel",
                             },
                         },
                     )
