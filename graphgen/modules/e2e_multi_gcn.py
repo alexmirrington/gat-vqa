@@ -10,13 +10,13 @@ from .gcn import GCN
 from .graph_rcnn import GraphRCNN
 
 
-class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
-    """Placeholder model for wrapping submodules during development."""
+class E2EMultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
+    """End to end multi-gcn model with built in FasterRCNN object detector."""
 
     def __init__(
         self, out_dim: int, grcnn: GraphRCNN, dep_gcn: GCN, obj_semantic_gcn: GCN
     ) -> None:
-        """Create a placeholder model."""
+        """Create an `E2EMultiGCN` model."""
         super().__init__()
         self.dep_gcn = dep_gcn
         self.obj_semantic_gcn = obj_semantic_gcn

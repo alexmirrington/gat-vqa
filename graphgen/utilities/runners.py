@@ -301,7 +301,8 @@ class FasterRCNNRunner(Runner):
 
 
 class EndToEndMultiChannelGCNRunner(Runner):
-    """Runner class for training a MultiChannelGCN model."""
+    """Runner class for training a MultiChannelGCN model with built in FasterRCNN \
+    object detector."""
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
@@ -455,6 +456,162 @@ class EndToEndMultiChannelGCNRunner(Runner):
                 loss = self.criterion(preds, targets)  # type: ignore
 
                 # TODO add bbox logging
+
+                # Calculate and log metrics, using answer indices as we only want
+                # basics for train set.
+                metrics.append(
+                    sample["question"]["questionId"],
+                    np.argmax(preds.detach().cpu().numpy(), axis=1),
+                    targets.detach().cpu().numpy(),
+                )
+                print(f"eval: {batch + 1}/{eval_limit}", end="\r")
+                if batch + 1 == eval_limit:
+                    break
+
+        self.model.train()
+        results = {"loss": loss.item()}
+        results.update(metrics.evaluate())
+        return results
+
+
+class MultiChannelGCNRunner(Runner):
+    """Runner class for training a MultiChannelGCN model."""
+
+    def __init__(  # pylint: disable=too-many-arguments
+        self,
+        config: Config,
+        device: torch.device,
+        model: torch.nn.Module,
+        optimiser: torch.optim.Optimizer,
+        criterion: Optional[Callable[..., torch.Tensor]],
+        datasets: DatasetCollection,
+        preprocessors: PreprocessorCollection,
+        resume: Optional[ResumeInfo],
+    ) -> None:
+        """Create a MultiChannelGCNRunner instance."""
+        if criterion is None:
+            raise ValueError("This model requires a criterion.")
+        super().__init__(
+            config, device, model, optimiser, criterion, datasets, preprocessors, resume
+        )
+
+    def train(self) -> None:
+        """Train a model according to a criterion and optimiser on a dataset."""
+        # Log gradients each epoch
+        wandb.watch(
+            self.model,
+            log_freq=math.ceil(
+                self.config.training.epochs / self.config.training.dataloader.batch_size
+            ),
+        )
+        dataloader = DataLoader(
+            self.datasets.train,
+            batch_size=self.config.training.dataloader.batch_size,
+            num_workers=self.config.training.dataloader.workers,
+            sampler=ChunkedRandomSampler(self.datasets.train.questions),
+            collate_fn=VariableSizeTensorCollator(),
+        )
+        metrics = MetricCollection(
+            self.config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
+        )
+
+        if self._start_epoch == 0:
+            self.save(self._start_epoch, "0.pt")
+
+        self.model.train()
+        self.model.to(self.device)
+
+        for epoch in range(self._start_epoch, self.config.training.epochs):
+            for batch, sample in enumerate(dataloader):
+                # Move data to GPU
+                dependencies = sample["question"]["dependencies"].to(self.device)
+                targets = sample["question"]["answer"].to(self.device)
+                boxes = [box.to(self.device) for box in sample["scene_graph"]["boxes"]]
+                labels = [
+                    lbl.to(self.device) for lbl in sample["scene_graph"]["labels"]
+                ]
+
+                # Labels can be indices or a object class probability distribution.
+
+                # Learn
+                self.optimiser.zero_grad()
+                preds = self.model(
+                    dependencies=dependencies, boxes=boxes, labels=labels
+                )
+                loss = self.criterion(preds, targets)  # type: ignore
+                loss.backward()
+                self.optimiser.step()
+
+                # Calculate and log metrics, using answer indices as we only want
+                # basics for train set.
+                metrics.append(
+                    sample["question"]["questionId"],
+                    np.argmax(preds.detach().cpu().numpy(), axis=1),
+                    targets.detach().cpu().numpy(),
+                )
+                if (
+                    batch % self.config.training.log_step
+                    == self.config.training.log_step - 1
+                    or batch == len(dataloader) - 1
+                ):
+                    results = {
+                        "epoch": epoch + (batch + 1) / len(dataloader),
+                        "train/loss": loss.item(),
+                    }
+                    results.update(
+                        {f"train/{key}": val for key, val in metrics.evaluate().items()}
+                    )
+                    log_metrics_stdout(
+                        results,
+                        newline=False,
+                    )
+                    # Delay logging until after val metrics come in if end of epoch
+                    if batch != len(dataloader) - 1:
+                        wandb.log(results)
+                        metrics.reset()
+
+            # Save and log at end of epoch
+            self.save(epoch + 1, f"{epoch+1}.pt")
+            results.update({f"val/{key}": val for key, val in self.evaluate().items()})
+            log_metrics_stdout(results)
+            wandb.log(results)
+            metrics.reset()
+
+    def evaluate(self) -> Dict[str, Any]:
+        """Evaluate a model according to a criterion on a given dataset."""
+        dataloader = DataLoader(
+            self.datasets.val,
+            batch_size=self.config.training.dataloader.batch_size,
+            num_workers=self.config.training.dataloader.workers,
+            collate_fn=VariableSizeTensorCollator(),
+        )
+        metrics = MetricCollection(
+            self.config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
+        )
+        self.model.eval()
+
+        eval_limit = (
+            self.config.training.eval_subset
+            if self.config.training.eval_subset is not None
+            else len(dataloader)
+        )
+
+        with torch.no_grad():
+            for batch, sample in enumerate(dataloader):
+                # Move data to GPU
+                dependencies = sample["question"]["dependencies"].to(self.device)
+                targets = sample["question"]["answer"].to(self.device)
+                boxes = [box.to(self.device) for box in sample["scene_graph"]["boxes"]]
+                labels = [
+                    lbl.to(self.device) for lbl in sample["scene_graph"]["labels"]
+                ]
+
+                # Labels can be indices or a object class probability distribution.
+
+                preds = self.model(
+                    dependencies=dependencies, boxes=boxes, labels=labels
+                )
+                loss = self.criterion(preds, targets)  # type: ignore
 
                 # Calculate and log metrics, using answer indices as we only want
                 # basics for train set.

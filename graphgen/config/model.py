@@ -7,7 +7,8 @@ class ModelName(Enum):
     """Enum specifying possible model names."""
 
     FASTER_RCNN = "faster_rcnn"
-    MULTICHANNEL_GCN = "multichannel_gcn"
+    E2E_MULTI_GCN = "e2e_multi_gcn"
+    MULTI_GCN = "multi_gcn"
 
 
 class Backbone(Enum):
@@ -47,12 +48,24 @@ class FasterRCNNModelConfig(ModelConfig):
 
 
 @dataclass(frozen=True)
+class E2EMultiGCNModelConfig(ModelConfig):
+    """Class for storing model configuration information."""
+
+    def __post_init__(self) -> None:
+        """Perform post-init checks on fields."""
+        if self.name != ModelName.E2E_MULTI_GCN:
+            raise ValueError(
+                f"Field {self.name=} must be equal to {ModelName.E2E_MULTI_GCN}"
+            )
+
+
+@dataclass(frozen=True)
 class MultiGCNModelConfig(ModelConfig):
     """Class for storing model configuration information."""
 
     def __post_init__(self) -> None:
         """Perform post-init checks on fields."""
-        if self.name != ModelName.MULTICHANNEL_GCN:
+        if self.name != ModelName.MULTI_GCN:
             raise ValueError(
-                f"Field {self.name=} must be equal to {ModelName.MULTICHANNEL_GCN}"
+                f"Field {self.name=} must be equal to {ModelName.MULTI_GCN}"
             )

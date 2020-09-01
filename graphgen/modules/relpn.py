@@ -60,7 +60,7 @@ class RelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
                 0,
                 -1,
             )  # TODO consider if we can keep a meshgrid with no grad and share it?
-            meshgrid = meshgrid.reshape(-1, 2).to(relatedness.device)
+            meshgrid = meshgrid.reshape(-1, 2).to("cuda")
 
             # Assert meshgrid matches up with relatedness after changing the view.
             # for idx in range(relatedness.view(-1).size(0)):
@@ -146,7 +146,7 @@ class RelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
 
         Params:
         -------
-        `class_logits`: Tensor of shape `(num_proposals * num_images, num_classes)`,
+        `class_logits`: List of tensors of shape `(num_proposals, num_classes)`,
         the softmax outputs of the box head classifier for all boxes for all images.
         `proposals`: List of tensors each of shape `(num_boxes, 4)`,
         the bounding box proposals in the original image space for each image.

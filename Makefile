@@ -3,7 +3,7 @@
 
 
 test:
-	@pytest ./tests/ --cov-report term-missing --cov=graphgen
+	@pytest ./tests/ --cov-report=term-missing --cov=graphgen
 
 requirements:
 	@pip install -r requirements.txt
