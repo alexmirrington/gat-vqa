@@ -160,7 +160,7 @@ class RunnerFactory:
             num_answer_classes,
             num_object_classes,
             txt_dependency_gcn=GCN((300, 512, 768, 1024)),
-            obj_semantic_gcn=GCN((num_object_classes, 1536, 1024)),
+            obj_semantic_gcn=GCN((num_object_classes, 1600, 1400, 1200, 1024)),
         )
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()
