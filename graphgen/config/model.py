@@ -16,6 +16,7 @@ class GCNName(Enum):
     """Enum specifying possible GCN model names."""
 
     GCN = "gcn"
+    GAT = "gat"
 
 
 class GCNPoolingName(Enum):
