@@ -3,12 +3,16 @@
 from typing import Optional
 
 import torch.nn
+from torch_geometric.nn import global_mean_pool
 
 from ...config import Config
 from ...config.model import (
     Backbone,
     E2EMultiGCNModelConfig,
     FasterRCNNModelConfig,
+    GCNModelConfig,
+    GCNName,
+    GCNPoolingName,
     ModelName,
     MultiGCNModelConfig,
 )
@@ -125,8 +129,8 @@ class RunnerFactory:
         model = E2EMultiGCN(
             len(preprocessors.questions.index_to_answer),
             GraphRCNN(num_classes=91, pretrained=True),
-            dep_gcn=GCN((300, 512, 768, 1024)),
-            obj_semantic_gcn=GCN((91, 256, 512, 1024)),
+            dep_gcn=GCN((300, 512, 768, 1024), global_mean_pool),
+            obj_semantic_gcn=GCN((91, 256, 512, 1024), global_mean_pool),
         )
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()
@@ -156,11 +160,33 @@ class RunnerFactory:
             set(preprocessors.scene_graphs.object_to_index.values())
         )
 
+        txt_dependency_gcn = None
+        obj_semantic_gcn = None
+
+        def create_gcn(config: GCNModelConfig) -> torch.nn.Module:
+            # Determine pooling function
+            if config.pooling == GCNPoolingName.GLOBAL_MEAN:
+                pool_func = global_mean_pool
+            else:
+                raise NotImplementedError()
+            # Create GCN
+            if config.gcn == GCNName.GCN:
+                gcn = GCN(config.layer_sizes, pool_func)
+            else:
+                raise NotImplementedError()
+            return gcn
+
+        if config.model.text_dependency_graph is not None:
+            txt_dependency_gcn = create_gcn(config.model.text_dependency_graph)
+
+        if config.model.object_semantic_graph is not None:
+            obj_semantic_gcn = create_gcn(config.model.object_semantic_graph)
+
         model = MultiGCN(
             num_answer_classes,
             num_object_classes,
-            txt_dependency_gcn=GCN((300, 512, 768, 1024)),
-            obj_semantic_gcn=GCN((num_object_classes, 1600, 1400, 1200, 1024)),
+            txt_dependency_gcn=txt_dependency_gcn,
+            obj_semantic_gcn=obj_semantic_gcn,
         )
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()

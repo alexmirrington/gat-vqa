@@ -1,6 +1,7 @@
 """Classes storing model configuration information."""
 from dataclasses import dataclass
 from enum import Enum
+from typing import Tuple
 
 
 class ModelName(Enum):
@@ -9,6 +10,18 @@ class ModelName(Enum):
     FASTER_RCNN = "faster_rcnn"
     E2E_MULTI_GCN = "e2e_multi_gcn"
     MULTI_GCN = "multi_gcn"
+
+
+class GCNName(Enum):
+    """Enum specifying possible GCN model names."""
+
+    GCN = "gcn"
+
+
+class GCNPoolingName(Enum):
+    """Enum specifying possible GCN model names."""
+
+    GLOBAL_MEAN = "global_mean"
 
 
 class Backbone(Enum):
@@ -60,8 +73,20 @@ class E2EMultiGCNModelConfig(ModelConfig):
 
 
 @dataclass(frozen=True)
+class GCNModelConfig:
+    """Class for storing GCN model configuration information."""
+
+    gcn: GCNName
+    pooling: GCNPoolingName
+    layer_sizes: Tuple[int]
+
+
+@dataclass(frozen=True)
 class MultiGCNModelConfig(ModelConfig):
     """Class for storing model configuration information."""
+
+    text_dependency_graph: GCNModelConfig
+    object_semantic_graph: GCNModelConfig
 
     def __post_init__(self) -> None:
         """Perform post-init checks on fields."""

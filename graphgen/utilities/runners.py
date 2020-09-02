@@ -516,11 +516,12 @@ class MultiChannelGCNRunner(Runner):
         )
 
         if self._start_epoch == 0:
-            self.save(self._start_epoch, "0.pt")
+            self.save(self._start_epoch, "current.pt")
 
         self.model.train()
         self.model.to(self.device)
 
+        best_val_loss = math.inf
         for epoch in range(self._start_epoch, self.config.training.epochs):
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
@@ -571,8 +572,12 @@ class MultiChannelGCNRunner(Runner):
                         metrics.reset()
 
             # Save and log at end of epoch
-            self.save(epoch + 1, f"{epoch+1}.pt")
+            self.save(epoch + 1, "current.pt")
+
             results.update({f"val/{key}": val for key, val in self.evaluate().items()})
+            if results["val/loss"] <= best_val_loss:
+                best_val_loss = results["val/loss"]
+                self.save(epoch + 1, "best.pt")
             log_metrics_stdout(results)
             wandb.log(results)
             metrics.reset()

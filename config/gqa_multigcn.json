@@ -35,7 +35,17 @@
     }]
   },
   "model": {
-    "name": "multi_gcn"
+    "name": "multi_gcn",
+    "text_dependency_graph": {
+      "gcn": "gcn",
+      "pooling": "global_mean",
+      "layer_sizes": [300, 512, 768, 1024]
+    },
+    "object_semantic_graph": {
+      "gcn": "gcn",
+      "pooling": "global_mean",
+      "layer_sizes": [1703, 1024]
+    }
   },
   "training": {
     "epochs": 25,
