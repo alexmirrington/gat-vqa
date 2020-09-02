@@ -1,7 +1,7 @@
 """Classes storing model configuration information."""
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple
+from typing import List, Optional
 
 
 class ModelName(Enum):
@@ -78,15 +78,15 @@ class GCNModelConfig:
 
     gcn: GCNName
     pooling: GCNPoolingName
-    layer_sizes: Tuple[int]
+    layer_sizes: List[int]
 
 
 @dataclass(frozen=True)
 class MultiGCNModelConfig(ModelConfig):
     """Class for storing model configuration information."""
 
-    text_dependency_graph: GCNModelConfig
-    object_semantic_graph: GCNModelConfig
+    text_dependency_graph: Optional[GCNModelConfig]
+    object_semantic_graph: Optional[GCNModelConfig]
 
     def __post_init__(self) -> None:
         """Perform post-init checks on fields."""

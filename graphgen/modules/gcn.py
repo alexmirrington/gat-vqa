@@ -1,5 +1,5 @@
 """Basic GCN implementation."""
-from typing import Callable, Tuple
+from typing import Callable, Sequence
 
 import torch
 import torch.nn.functional as F
@@ -12,7 +12,7 @@ class GCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
 
     def __init__(
         self,
-        shape: Tuple[int, ...],
+        shape: Sequence[int],
         pool_func: Callable[..., torch.Tensor],
     ) -> None:
         """Create a GCN with layer sizes according to `shape`."""
