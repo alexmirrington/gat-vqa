@@ -361,14 +361,17 @@ class QuestionTransformer:
 
     def __call__(self, data: Question) -> TrainableQuestion:
         """Transform data into a trainable format and look up word embeddings."""
-        adjacency = torch.tensor(data["dependencies"])  # pylint: disable=not-callable
-        node_features = self.vectors.get_vecs_by_tokens(
+        dependencies = torch.tensor(  # pylint: disable=not-callable
+            data["dependencies"]
+        )
+        embeddings = self.vectors.get_vecs_by_tokens(
             data["tokens"], lower_case_backup=True
         )
         return {
             "questionId": data["questionId"],
             "imageId": data["imageId"],
-            "dependencies": Data(edge_index=adjacency, x=node_features),
+            "embeddings": embeddings,
+            "dependencies": Data(edge_index=dependencies, x=embeddings),
             "answer": data["answer"],
         }
 

@@ -86,8 +86,9 @@ class GCNModelConfig:
 class MultiGCNModelConfig(ModelConfig):
     """Class for storing model configuration information."""
 
-    text_dependency_graph: Optional[GCNModelConfig]
-    object_semantic_graph: Optional[GCNModelConfig]
+    text_syntactic_graph: Optional[GCNModelConfig]
+    text_semantic_graph: Optional[GCNModelConfig]
+    object_positional_graph: Optional[GCNModelConfig]
 
     def __post_init__(self) -> None:
         """Perform post-init checks on fields."""

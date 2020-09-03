@@ -22,6 +22,7 @@ class TrainableQuestion(TypedDict):
 
     questionId: str
     imageId: str
+    embeddings: torch.Tensor
     dependencies: Data
     answer: Optional[int]
 

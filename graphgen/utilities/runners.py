@@ -9,11 +9,15 @@ import numpy as np
 import torch
 import wandb
 from termcolor import colored
+from torch.nn.utils.rnn import pack_sequence
 from torch.utils.data import DataLoader
 
 from ..config import Config
 from ..datasets.collators import VariableSizeTensorCollator
-from ..datasets.utilities import ChunkedRandomSampler
+from ..datasets.utilities.chunked_random_sampler import (
+    ChunkedRandomSampler,
+    GQAObjectsChunkedRandomSampler,
+)
 from ..metrics import Metric, MetricCollection
 from ..utilities.factories import DatasetCollection, PreprocessorCollection
 from .logging import log_metrics_stdout
@@ -202,7 +206,6 @@ class FasterRCNNRunner(Runner):
             collate_fn=VariableSizeTensorCollator(),
         )
         self.model.eval()
-
         eval_limit = (
             self.config.training.eval_subset
             if self.config.training.eval_subset is not None
@@ -508,7 +511,7 @@ class MultiChannelGCNRunner(Runner):
             self.datasets.train,
             batch_size=self.config.training.dataloader.batch_size,
             num_workers=self.config.training.dataloader.workers,
-            sampler=ChunkedRandomSampler(self.datasets.train.questions),
+            sampler=GQAObjectsChunkedRandomSampler(self.datasets.train),
             collate_fn=VariableSizeTensorCollator(),
         )
         metrics = MetricCollection(
@@ -526,20 +529,25 @@ class MultiChannelGCNRunner(Runner):
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
                 dependencies = sample["question"]["dependencies"].to(self.device)
+                word_embeddings = pack_sequence(
+                    sample["question"]["embeddings"], enforce_sorted=False
+                ).to(self.device)
                 targets = sample["question"]["answer"].to(self.device)
-                boxes = [box.to(self.device) for box in sample["scene_graph"]["boxes"]]
-                labels = [
-                    lbl.to(self.device) for lbl in sample["scene_graph"]["labels"]
-                ]
+                rcnn_objects = sample["objects"].to(self.device)
+                rcnn_boxes = sample["boxes"].to(self.device)
 
                 # Labels can be indices or a object class probability distribution.
 
                 # Learn
                 self.optimiser.zero_grad()
                 preds = self.model(
-                    dependencies=dependencies, boxes=boxes, labels=labels
+                    dependencies=dependencies,
+                    word_embeddings=word_embeddings,
+                    objects=rcnn_objects,
+                    boxes=rcnn_boxes,
                 )
                 loss = self.criterion(preds, targets)  # type: ignore
+
                 loss.backward()
                 self.optimiser.step()
 
@@ -605,6 +613,9 @@ class MultiChannelGCNRunner(Runner):
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
                 dependencies = sample["question"]["dependencies"].to(self.device)
+                word_embeddings = pack_sequence(
+                    sample["question"]["embeddings"], enforce_sorted=False
+                ).to(self.device)
                 targets = sample["question"]["answer"].to(self.device)
                 boxes = [box.to(self.device) for box in sample["scene_graph"]["boxes"]]
                 labels = [
@@ -614,7 +625,10 @@ class MultiChannelGCNRunner(Runner):
                 # Labels can be indices or a object class probability distribution.
 
                 preds = self.model(
-                    dependencies=dependencies, boxes=boxes, labels=labels
+                    dependencies=dependencies,
+                    word_embeddings=word_embeddings,
+                    boxes=boxes,
+                    labels=labels,
                 )
                 loss = self.criterion(preds, targets)  # type: ignore
 

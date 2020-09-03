@@ -7,8 +7,6 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn import Linear, Parameter
 
-# sg-t-depgcn-i-semgcn-biattn-linear-fusion-2
-
 
 class BidirectionalAttention(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method  # noqa: B950
     """Implementation of a pairwise general attention layer, whereby general \

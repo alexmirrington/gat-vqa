@@ -10,14 +10,14 @@ import torchvision
 class RelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
     """Implementation of a relation proposal network."""
 
-    def __init__(self, num_classes: int):
+    def __init__(self, feature_dim: int):
         """Construct a `RelPN` instance."""
         super().__init__()
-        self.similarity = RelSimilarity(num_classes)
+        self.similarity = RelSimilarity(feature_dim)
 
     def _relatedness(
         self,
-        class_logits: List[torch.Tensor],
+        feats: List[torch.Tensor],
         proposals: List[torch.Tensor],
         take: int = 64,
     ) -> torch.Tensor:
@@ -43,7 +43,7 @@ class RelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
         """
         all_pairs = []
         all_scores = []
-        for img_logits, img_proposals in zip(class_logits, proposals):
+        for img_logits, img_proposals in zip(feats, proposals):
             # Get relatedness scores between class logits. Entry i, j refers to
             # relatedness between subject i and object j
             relatedness = self.similarity(img_logits)
@@ -139,19 +139,18 @@ class RelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
 
     def forward(
         self,
-        class_logits: List[torch.Tensor],
+        feats: List[torch.Tensor],  # TODO change types to support tensor too
         proposals: List[torch.Tensor],
     ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
         """Return a set of relation pairs and scores for each image.
 
         Params:
         -------
-        `class_logits`: List of tensors of shape `(num_proposals, num_classes)`,
-        the softmax outputs of the box head classifier for all boxes for all images.
+        `feats`: List of tensors of shape `(num_proposals, feature_dim)`.
         `proposals`: List of tensors each of shape `(num_boxes, 4)`,
         the bounding box proposals in the original image space for each image.
         """
-        relation_pairs, relation_scores = self._relatedness(class_logits, proposals)
+        relation_pairs, relation_scores = self._relatedness(feats, proposals)
         # nms_relation_pairs, nms_relation_scores = self.filter_overlaps(
         #     proposals, relation_pairs, relation_scores
         # )

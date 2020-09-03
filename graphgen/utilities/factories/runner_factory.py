@@ -160,9 +160,6 @@ class RunnerFactory:
             set(preprocessors.scene_graphs.object_to_index.values())
         )
 
-        txt_dependency_gcn = None
-        obj_semantic_gcn = None
-
         def create_gcn(config: GCNModelConfig) -> torch.nn.Module:
             # Determine pooling function
             if config.pooling == GCNPoolingName.GLOBAL_MEAN:
@@ -176,17 +173,20 @@ class RunnerFactory:
                 raise NotImplementedError()
             return gcn
 
-        if config.model.text_dependency_graph is not None:
-            txt_dependency_gcn = create_gcn(config.model.text_dependency_graph)
+        assert config.model.text_syntactic_graph is not None
+        assert config.model.text_semantic_graph is not None
+        assert config.model.object_positional_graph is not None
 
-        if config.model.object_semantic_graph is not None:
-            obj_semantic_gcn = create_gcn(config.model.object_semantic_graph)
+        txt_syntactic_gcn = create_gcn(config.model.text_syntactic_graph)
+        txt_semantic_gcn = create_gcn(config.model.text_semantic_graph)
+        obj_positional_gcn = create_gcn(config.model.object_positional_graph)
 
         model = MultiGCN(
             num_answer_classes,
             num_object_classes,
-            txt_dependency_gcn=txt_dependency_gcn,
-            obj_semantic_gcn=obj_semantic_gcn,
+            txt_syntactic_gcn=txt_syntactic_gcn,
+            txt_semantic_gcn=txt_semantic_gcn,
+            obj_positional_gcn=obj_positional_gcn,
         )
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()
