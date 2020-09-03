@@ -167,7 +167,7 @@ class RunnerFactory:
             else:
                 raise NotImplementedError()
             # Create GCN
-            if config.gcn == GCNName.GCN:
+            if config.gcn == GCNName.GCN or config.gcn == GCNName.GAT:
                 gcn = GCN(config.layer_sizes, pool_func)
             else:
                 raise NotImplementedError()

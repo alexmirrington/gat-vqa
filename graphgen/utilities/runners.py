@@ -617,18 +617,17 @@ class MultiChannelGCNRunner(Runner):
                     sample["question"]["embeddings"], enforce_sorted=False
                 ).to(self.device)
                 targets = sample["question"]["answer"].to(self.device)
-                boxes = [box.to(self.device) for box in sample["scene_graph"]["boxes"]]
-                labels = [
-                    lbl.to(self.device) for lbl in sample["scene_graph"]["labels"]
-                ]
+                rcnn_objects = sample["objects"].to(self.device)
+                rcnn_boxes = sample["boxes"].to(self.device)
 
                 # Labels can be indices or a object class probability distribution.
 
+                # Learn
                 preds = self.model(
                     dependencies=dependencies,
                     word_embeddings=word_embeddings,
-                    boxes=boxes,
-                    labels=labels,
+                    objects=rcnn_objects,
+                    boxes=rcnn_boxes,
                 )
                 loss = self.criterion(preds, targets)  # type: ignore
 
