@@ -1,6 +1,6 @@
 """Implementation of a pairwise general attention layer."""
 import math
-from typing import Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -126,7 +126,9 @@ class BidirectionalAttention(torch.nn.Module):  # type: ignore  # pylint: disabl
         # print(f"{x_k_update.size()=}")
 
         if self.bidirectional:
-            alpha_qs = F.softmax(torch.transpose(alphas, 1, 2), dim=2)
+            alpha_qs = F.softmax(
+                torch.transpose(alphas, 1, 2), dim=2
+            )  # Try tanh/additive attention for stability?
             alpha_q_feats = torch.bmm(alpha_qs, x_k_proj)  # TODO add more weights?
             # print(f"{alpha_q_feats.size()=}")
 
@@ -140,3 +142,72 @@ class BidirectionalAttention(torch.nn.Module):  # type: ignore  # pylint: disabl
         if self.return_attention_weights:
             return x_k + x_k_update, x_q + x_q_update, alpha_ks, alpha_qs
         return x_k + x_k_update, x_q + x_q_update
+
+
+class PairwiseAlignment(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method  # noqa: B950
+    """A `PairwiseAlignment` fusion module."""
+
+    def __init__(
+        self,
+        feat_dims: Sequence[int],
+        proj_dim: int,
+        heads: int,
+        aggregate: Optional[str] = "concat",
+    ):
+        """Create a `PairwiseAlignment` module."""
+        super().__init__()
+        self.feat_dims = feat_dims
+        self.proj_dim = proj_dim
+        self.heads = heads
+        self.aggregate = aggregate
+
+        self.linear_projections = torch.nn.ModuleList(
+            [
+                torch.nn.Linear(feat_dim, heads * self.proj_dim, bias=True)
+                for feat_dim in self.feat_dims
+            ]
+        )
+
+    def forward(self, feats: Sequence[torch.Tensor]) -> List[torch.Tensor]:
+        """Propagate data through the module."""
+        projected_feats = [
+            torch.transpose(proj(feat).view(-1, self.heads, self.proj_dim), 0, 1)
+            for proj, feat in zip(self.linear_projections, feats)
+        ]
+        print(f"{[pfeat.size() for pfeat in projected_feats]=}")
+        aligned = []
+        for key_feats in projected_feats:
+            for query_feats in projected_feats:
+                # key_feats (self.heads, num_key_nodes, self.proj_dim)
+                # query_feats (self.heads, num_query_nodes, self.proj_dim)
+
+                # Compute dotprod attention
+                # TODO reduce redundant attention calcs and compute bidirectional
+                # attention here
+                alignment = (
+                    torch.bmm(query_feats, torch.transpose(key_feats, 1, 2))
+                    / self.proj_dim
+                )
+                # alignment (self.heads, num_query_nodes, num_key_nodes)
+                alignment = torch.softmax(
+                    alignment, dim=2
+                )  # Softmax across attention keys
+                # Obtain the parts of the value (key) that are relevant to the query,
+                # i.e. we have tensor of shape
+                # (self.heads, num_query_nodes, self.proj_dim),
+                # the weighted sum of each projected key feature for each query node.
+                aligned_values = torch.bmm(alignment, key_feats)
+                if self.aggregate is None:
+                    aligned.append(aligned_values)
+                elif self.aggregate == "concat":
+                    aligned.append(
+                        torch.flatten(
+                            torch.transpose(aligned_values, 0, 1), start_dim=1
+                        )
+                    )
+                    print(f"{aligned[-1].size()}")
+                elif self.aggregate == "mean":
+                    aligned.append(torch.mean(aligned_values, dim=0))
+                else:
+                    raise NotImplementedError()
+        return aligned

@@ -175,18 +175,21 @@ class RunnerFactory:
 
         assert config.model.text_syntactic_graph is not None
         assert config.model.text_semantic_graph is not None
+        assert config.model.object_feature_graph is not None
         assert config.model.object_positional_graph is not None
 
         txt_syntactic_gcn = create_gcn(config.model.text_syntactic_graph)
         txt_semantic_gcn = create_gcn(config.model.text_semantic_graph)
-        obj_positional_gcn = create_gcn(config.model.object_positional_graph)
+        obj_feat_gcn = create_gcn(config.model.object_feature_graph)
+        obj_pos_gcn = create_gcn(config.model.object_positional_graph)
 
         model = MultiGCN(
             num_answer_classes,
             num_object_classes,
             txt_syntactic_gcn=txt_syntactic_gcn,
             txt_semantic_gcn=txt_semantic_gcn,
-            obj_positional_gcn=obj_positional_gcn,
+            obj_feat_gcn=obj_feat_gcn,
+            obj_pos_gcn=obj_pos_gcn,
         )
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()

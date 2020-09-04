@@ -32,8 +32,10 @@ class SceneGraph(TypedDict):
 
     imageId: str
     boxes: List[Tuple[int, int, int, int]]
-    labels: List[int]
-    # TODO work out relations format. We probs need to preprocess relation ids
+    labels: List[int]  # object classes
+    attributes: List[str]
+    coos: Tuple[List[int], List[int]]
+    relations: List[int]
 
 
 class TrainableSceneGraph(TypedDict):
@@ -42,3 +44,5 @@ class TrainableSceneGraph(TypedDict):
     imageId: str
     boxes: torch.FloatTensor  # FloatTensor[N, 4] (x1, y1, x2, y2) format
     labels: torch.IntTensor  # Int64Tensor[N] class labels for boxes
+    attributes: torch.Tensor
+    relations: Data

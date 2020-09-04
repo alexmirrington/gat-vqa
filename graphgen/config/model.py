@@ -88,6 +88,7 @@ class MultiGCNModelConfig(ModelConfig):
 
     text_syntactic_graph: Optional[GCNModelConfig]
     text_semantic_graph: Optional[GCNModelConfig]
+    object_feature_graph: Optional[GCNModelConfig]
     object_positional_graph: Optional[GCNModelConfig]
 
     def __post_init__(self) -> None:

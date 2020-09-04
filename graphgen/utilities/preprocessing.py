@@ -141,9 +141,16 @@ class QuestionPreprocessor:
 class SceneGraphPreprocessor:
     """Abstract base class for all scene graph preprocessors."""
 
-    def __init__(self, object_to_index: Optional[Dict[str, int]] = None) -> None:
+    def __init__(
+        self,
+        object_to_index: Optional[Dict[str, int]] = None,
+        attr_to_index: Optional[Dict[str, int]] = None,
+        rel_to_index: Optional[Dict[str, int]] = None,
+    ) -> None:
         """Create a `SceneGraphPreprocessor` instance."""
         self._object_to_index = object_to_index if object_to_index is not None else {}
+        self._attr_to_index = attr_to_index if attr_to_index is not None else {}
+        self._rel_to_index = rel_to_index if rel_to_index is not None else {}
 
     @property
     def object_to_index(self) -> Dict[str, int]:
@@ -155,6 +162,28 @@ class SceneGraphPreprocessor:
     def object_to_index(self, value: Dict[str, int]) -> None:
         """Set the int to str mapping of indices to objects."""
         self._object_to_index = value
+
+    @property
+    def attr_to_index(self) -> Dict[str, int]:
+        """Get the `int` to `str` mapping of indices to attribute classes, based \
+        on the data that has been processed so far."""
+        return self._attr_to_index.copy()
+
+    @attr_to_index.setter
+    def attr_to_index(self, value: Dict[str, int]) -> None:
+        """Set the int to str mapping of indices to attributes."""
+        self._attr_to_index = value
+
+    @property
+    def rel_to_index(self) -> Dict[str, int]:
+        """Get the `int` to `str` mapping of indices to relation classes, based \
+        on the data that has been processed so far."""
+        return self._rel_to_index.copy()
+
+    @rel_to_index.setter
+    def rel_to_index(self, value: Dict[str, int]) -> None:
+        """Set the int to str mapping of indices to relations."""
+        self._rel_to_index = value
 
     def __call__(self, data: Sequence[Any]) -> List[SceneGraph]:
         """Preprocess a scene graph sample."""
@@ -265,38 +294,29 @@ class GQAQuestionPreprocessor(QuestionPreprocessor):
 class GQASceneGraphPreprocessor(SceneGraphPreprocessor):
     """Class for preprocessing GQA scene graphs."""
 
-    def __init__(
-        self,
-        object_to_index: Optional[Dict[str, int]] = None,
-        use_coco_classes: bool = False,
-    ) -> None:
-        """Create a `GQASceneGraphPreprocessor` instance."""
-        super().__init__(object_to_index)
-
-        self._coco_vectors: Optional[torch.Tensor] = None
-
-        self._glove = GloVe(name="6B", dim=300)
-
-        if use_coco_classes:
-            self._coco_vectors = torch.stack(
-                [self._embed_word(word) for word in COCO_INSTANCE_CATEGORY_NAMES]
-            )
-            self._similarity = torch.nn.CosineSimilarity(dim=1)
-
-    def _embed_word(self, word: str) -> torch.Tensor:
-        return torch.sum(
-            self._glove.get_vecs_by_tokens(word.split(), lower_case_backup=True), dim=0
-        )
-
     def _process_objects(
         self, objects: List[Dict[str, GQASceneGraphObject]]
-    ) -> Tuple[List[List[Tuple[int, int, int, int]]], List[List[int]]]:
+    ) -> Tuple[
+        List[List[Tuple[int, int, int, int]]],
+        List[List[int]],
+        List[List[List[str]]],
+        List[Tuple[List[int], List[int]]],
+        List[List[int]],
+    ]:
         boxes: List[List[Tuple[int, int, int, int]]] = []
         labels: List[List[int]] = []
+        attrs: List[List[List[str]]] = []
+        coos: List[Tuple[List[int], List[int]]] = []
+        relations: List[List[int]] = []
+
         for obj_dict in objects:
             labels.append([])
             boxes.append([])
-            for obj_data in obj_dict.values():
+            attrs.append([])
+            coos.append(([], []))
+            relations.append([])
+            obj_key_to_idx = {key: idx for idx, key in enumerate(obj_dict.keys())}
+            for obj_key, obj_data in obj_dict.items():
                 name = obj_data["name"]
                 box = (
                     obj_data["x"],
@@ -304,34 +324,24 @@ class GQASceneGraphPreprocessor(SceneGraphPreprocessor):
                     obj_data["x"] + obj_data["w"],
                     obj_data["y"] + obj_data["h"],
                 )
-                if obj_data["w"] > 0 and obj_data["h"] > 0:
-                    if name is not None and name not in self._object_to_index:
-                        if (
-                            self._coco_vectors is not None
-                            and self._similarity is not None
-                        ):
-                            # Map word to COCO class via cosine similarity
-                            name_embedding = (
-                                self._embed_word(name)
-                                .unsqueeze(0)
-                                .repeat(self._coco_vectors.size(0), 1)
-                                .unsqueeze(-1)
-                            )
-                            similarities = self._similarity(
-                                self._coco_vectors.unsqueeze(-1), name_embedding
-                            )
-                            idx = int(torch.argmax(similarities, dim=0))
-                            self._object_to_index[name] = idx
-                        else:
-                            # Unknown vocab, add to dict. It is OK to add val
-                            # object names to the dict, as we still have no training
-                            # signal for those in the training set, hence there is no
-                            # reason to freeze the object vocab.
-                            self._object_to_index[name] = len(self._object_to_index)
-                    labels[-1].append(self._object_to_index[name])
-                    boxes[-1].append(box)
+                if name not in self._object_to_index:
+                    # Unknown vocab, add to dict. It is OK to add val
+                    # object names to the dict, as we still have no training
+                    # signal for those in the training set, hence there is no
+                    # reason to freeze the object vocab.
+                    self._object_to_index[name] = len(self._object_to_index)
+                labels[-1].append(self._object_to_index[name])
+                boxes[-1].append(box)
+                attrs[-1].append(obj_data["attributes"])
+                # Populate relation indices
+                for relation in obj_data["relations"]:
+                    if relation["name"] not in self._rel_to_index:
+                        self._rel_to_index[relation["name"]] = len(self._rel_to_index)
+                    coos[-1][0].append(obj_key_to_idx[obj_key])
+                    coos[-1][1].append(obj_key_to_idx[relation["object"]])
+                    relations[-1].append(self._rel_to_index[relation["name"]])
 
-        return boxes, labels
+        return boxes, labels, attrs, coos, relations
 
     def __call__(self, data: Sequence[GQASceneGraph]) -> List[SceneGraph]:
         """Preprocess a scene graph sample."""
@@ -343,10 +353,21 @@ class GQASceneGraphPreprocessor(SceneGraphPreprocessor):
             total=len(data) // step + 1,
             desc="preprocessing: ",
         ):
-            boxes, labels = self._process_objects([d["objects"] for d in data])
+            boxes, labels, attrs, coos, rels = self._process_objects(
+                [d["objects"] for d in data]
+            )
             result += [
-                {"imageId": scene["imageId"], "boxes": boxes_, "labels": labels_}
-                for scene, boxes_, labels_ in zip(data, boxes, labels)
+                {
+                    "imageId": scene["imageId"],
+                    "boxes": boxes_,
+                    "labels": labels_,
+                    "attributes": attrs_,
+                    "coos": coos_,
+                    "relations": rels_,
+                }
+                for scene, boxes_, labels_, attrs_, coos_, rels_ in zip(
+                    data, boxes, labels, attrs, coos, rels
+                )
             ]
             start += step
         return result
@@ -381,9 +402,19 @@ class SceneGraphTransformer:
 
     def __init__(self) -> None:
         """Initialise a `SceneGraphTransformer` instance."""
+        self.vectors = GloVe(name="6B", dim=300)
 
     def __call__(self, data: SceneGraph) -> TrainableSceneGraph:
         """Transform data into a trainable format."""
+        coos = torch.tensor(  # pylint: disable=not-callable
+            data["coos"], dtype=torch.long
+        )
+        relations = torch.tensor(  # pylint: disable=not-callable
+            data["relations"]
+        ).unsqueeze(-1)
+        attributes = self.vectors.get_vecs_by_tokens(
+            data["attributes"], lower_case_backup=True
+        )
         return {
             "imageId": data["imageId"],
             "boxes": torch.tensor(  # pylint: disable=not-callable
@@ -392,4 +423,20 @@ class SceneGraphTransformer:
             "labels": torch.tensor(  # pylint: disable=not-callable
                 data["labels"], dtype=torch.int64
             ),
+            "attributes": attributes,
+            "relations": Data(edge_index=coos, x=relations),
         }
+
+
+class ObjectTransformer:
+    """Class for applying transformations to rcnn object features."""
+
+    def __init__(self) -> None:
+        """Initialise a `ObjectsTransformer` instance."""
+
+    def __call__(
+        self, objects: torch.Tensor, boxes: torch.Tensor, meta: Dict[str, Any]
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Transform data into a trainable format."""
+        num_objects = meta["objectsNum"]
+        return (objects[:num_objects], boxes[:num_objects])

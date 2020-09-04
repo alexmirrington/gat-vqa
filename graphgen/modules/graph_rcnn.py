@@ -6,7 +6,7 @@ from torch_geometric.data import Batch, Data
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
 
 from .faster_rcnn import FasterRCNNTarget
-from .relpn import RelPN
+from .relpn import SpatialRelPN
 
 
 class GraphRCNN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
@@ -20,7 +20,7 @@ class GraphRCNN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-me
         self.faster_rcnn = fasterrcnn_resnet50_fpn(  # TODO allow customisation
             pretrained=pretrained, num_classes=num_classes
         )
-        self.relpn = RelPN(num_classes)
+        self.relpn = SpatialRelPN(num_classes)
 
         # Register forward hooks
         self.__bbox_head_outputs: List[Tuple[torch.Tensor, torch.Tensor]] = []

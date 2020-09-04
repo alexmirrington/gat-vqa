@@ -533,8 +533,10 @@ class MultiChannelGCNRunner(Runner):
                     sample["question"]["embeddings"], enforce_sorted=False
                 ).to(self.device)
                 targets = sample["question"]["answer"].to(self.device)
-                rcnn_objects = sample["objects"].to(self.device)
-                rcnn_boxes = sample["boxes"].to(self.device)
+                rcnn_objects = [
+                    objects.to(self.device) for objects in sample["objects"]
+                ]
+                rcnn_boxes = [boxes.to(self.device) for boxes in sample["boxes"]]
 
                 # Labels can be indices or a object class probability distribution.
 
@@ -617,8 +619,10 @@ class MultiChannelGCNRunner(Runner):
                     sample["question"]["embeddings"], enforce_sorted=False
                 ).to(self.device)
                 targets = sample["question"]["answer"].to(self.device)
-                rcnn_objects = sample["objects"].to(self.device)
-                rcnn_boxes = sample["boxes"].to(self.device)
+                rcnn_objects = [
+                    objects.to(self.device) for objects in sample["objects"]
+                ]
+                rcnn_boxes = [boxes.to(self.device) for boxes in sample["boxes"]]
 
                 # Labels can be indices or a object class probability distribution.
 

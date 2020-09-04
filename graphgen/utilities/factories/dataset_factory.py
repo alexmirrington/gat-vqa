@@ -26,7 +26,11 @@ from ...datasets.gqa import (
     GQASceneGraphs,
     GQASpatial,
 )
-from ..preprocessing import QuestionTransformer, SceneGraphTransformer
+from ..preprocessing import (
+    ObjectTransformer,
+    QuestionTransformer,
+    SceneGraphTransformer,
+)
 from .preprocessing_factory import PreprocessorCollection
 
 
@@ -147,7 +151,7 @@ class DatasetFactory:
                 elif feature.name == GQAFeatures.SPATIAL.value:
                     spatial = GQASpatial(filemap)
                 elif feature.name == GQAFeatures.OBJECTS.value:
-                    objects = GQAObjects(filemap)
+                    objects = GQAObjects(filemap, transform=ObjectTransformer())
                 else:
                     raise NotImplementedError()
 
