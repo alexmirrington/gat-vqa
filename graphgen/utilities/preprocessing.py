@@ -294,20 +294,20 @@ class GQAQuestionPreprocessor(QuestionPreprocessor):
 class GQASceneGraphPreprocessor(SceneGraphPreprocessor):
     """Class for preprocessing GQA scene graphs."""
 
-    def _process_objects(
+    def _process_objects(  # pylint: disable=no-self-use
         self, objects: List[Dict[str, GQASceneGraphObject]]
     ) -> Tuple[
         List[List[Tuple[int, int, int, int]]],
-        List[List[int]],
+        List[List[str]],
         List[List[List[str]]],
         List[Tuple[List[int], List[int]]],
-        List[List[int]],
+        List[List[str]],
     ]:
         boxes: List[List[Tuple[int, int, int, int]]] = []
-        labels: List[List[int]] = []
+        labels: List[List[str]] = []
         attrs: List[List[List[str]]] = []
         coos: List[Tuple[List[int], List[int]]] = []
-        relations: List[List[int]] = []
+        relations: List[List[str]] = []
 
         for obj_dict in objects:
             labels.append([])
@@ -324,22 +324,14 @@ class GQASceneGraphPreprocessor(SceneGraphPreprocessor):
                     obj_data["x"] + obj_data["w"],
                     obj_data["y"] + obj_data["h"],
                 )
-                if name not in self._object_to_index:
-                    # Unknown vocab, add to dict. It is OK to add val
-                    # object names to the dict, as we still have no training
-                    # signal for those in the training set, hence there is no
-                    # reason to freeze the object vocab.
-                    self._object_to_index[name] = len(self._object_to_index)
-                labels[-1].append(self._object_to_index[name])
+                labels[-1].append(name)
                 boxes[-1].append(box)
                 attrs[-1].append(obj_data["attributes"])
                 # Populate relation indices
                 for relation in obj_data["relations"]:
-                    if relation["name"] not in self._rel_to_index:
-                        self._rel_to_index[relation["name"]] = len(self._rel_to_index)
                     coos[-1][0].append(obj_key_to_idx[obj_key])
                     coos[-1][1].append(obj_key_to_idx[relation["object"]])
-                    relations[-1].append(self._rel_to_index[relation["name"]])
+                    relations[-1].append(relation["name"])
 
         return boxes, labels, attrs, coos, relations
 
@@ -409,22 +401,25 @@ class SceneGraphTransformer:
         coos = torch.tensor(  # pylint: disable=not-callable
             data["coos"], dtype=torch.long
         )
-        relations = torch.tensor(  # pylint: disable=not-callable
-            data["relations"]
-        ).unsqueeze(-1)
-        attributes = self.vectors.get_vecs_by_tokens(
-            data["attributes"], lower_case_backup=True
+        relations = (
+            self.vectors.get_vecs_by_tokens(data["relations"], lower_case_backup=True)
+            if len(data["relations"]) > 0
+            else torch.tensor([])  # pylint: disable=not-callable
         )
+        attributes = [
+            self.vectors.get_vecs_by_tokens(obj_attrs, lower_case_backup=True)
+            if len(obj_attrs) > 0
+            else torch.tensor([])  # pylint: disable=not-callable
+            for obj_attrs in data["attributes"]
+        ]
+        labels = self.vectors.get_vecs_by_tokens(data["labels"], lower_case_backup=True)
         return {
             "imageId": data["imageId"],
             "boxes": torch.tensor(  # pylint: disable=not-callable
                 data["boxes"], dtype=torch.float
             ),
-            "labels": torch.tensor(  # pylint: disable=not-callable
-                data["labels"], dtype=torch.int64
-            ),
             "attributes": attributes,
-            "relations": Data(edge_index=coos, x=relations),
+            "objects": Data(edge_index=coos, x=labels, edge_attr=relations),
         }
 
 

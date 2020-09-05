@@ -9,15 +9,11 @@ import numpy as np
 import torch
 import wandb
 from termcolor import colored
-from torch.nn.utils.rnn import pack_sequence
 from torch.utils.data import DataLoader
 
 from ..config import Config
 from ..datasets.collators import VariableSizeTensorCollator
-from ..datasets.utilities.chunked_random_sampler import (
-    ChunkedRandomSampler,
-    GQAObjectsChunkedRandomSampler,
-)
+from ..datasets.utilities.chunked_random_sampler import ChunkedRandomSampler
 from ..metrics import Metric, MetricCollection
 from ..utilities.factories import DatasetCollection, PreprocessorCollection
 from .logging import log_metrics_stdout
@@ -511,7 +507,7 @@ class MultiChannelGCNRunner(Runner):
             self.datasets.train,
             batch_size=self.config.training.dataloader.batch_size,
             num_workers=self.config.training.dataloader.workers,
-            sampler=GQAObjectsChunkedRandomSampler(self.datasets.train),
+            sampler=ChunkedRandomSampler(self.datasets.train.questions),
             collate_fn=VariableSizeTensorCollator(),
         )
         metrics = MetricCollection(
@@ -529,25 +525,17 @@ class MultiChannelGCNRunner(Runner):
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
                 dependencies = sample["question"]["dependencies"].to(self.device)
-                word_embeddings = pack_sequence(
-                    sample["question"]["embeddings"], enforce_sorted=False
-                ).to(self.device)
+                # word_embeddings = pack_sequence(
+                #     sample["question"]["embeddings"], enforce_sorted=False
+                # ).to(self.device)
+                objects = sample["scene_graph"]["objects"].to(self.device)
                 targets = sample["question"]["answer"].to(self.device)
-                rcnn_objects = [
-                    objects.to(self.device) for objects in sample["objects"]
-                ]
-                rcnn_boxes = [boxes.to(self.device) for boxes in sample["boxes"]]
 
                 # Labels can be indices or a object class probability distribution.
 
                 # Learn
                 self.optimiser.zero_grad()
-                preds = self.model(
-                    dependencies=dependencies,
-                    word_embeddings=word_embeddings,
-                    objects=rcnn_objects,
-                    boxes=rcnn_boxes,
-                )
+                preds = self.model(dependencies=dependencies, objects=objects)
                 loss = self.criterion(preds, targets)  # type: ignore
 
                 loss.backward()
@@ -615,24 +603,16 @@ class MultiChannelGCNRunner(Runner):
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
                 dependencies = sample["question"]["dependencies"].to(self.device)
-                word_embeddings = pack_sequence(
-                    sample["question"]["embeddings"], enforce_sorted=False
-                ).to(self.device)
+                # word_embeddings = pack_sequence(
+                #     sample["question"]["embeddings"], enforce_sorted=False
+                # ).to(self.device)
+                objects = sample["scene_graph"]["objects"].to(self.device)
                 targets = sample["question"]["answer"].to(self.device)
-                rcnn_objects = [
-                    objects.to(self.device) for objects in sample["objects"]
-                ]
-                rcnn_boxes = [boxes.to(self.device) for boxes in sample["boxes"]]
 
                 # Labels can be indices or a object class probability distribution.
 
                 # Learn
-                preds = self.model(
-                    dependencies=dependencies,
-                    word_embeddings=word_embeddings,
-                    objects=rcnn_objects,
-                    boxes=rcnn_boxes,
-                )
+                preds = self.model(dependencies=dependencies, objects=objects)
                 loss = self.criterion(preds, targets)  # type: ignore
 
                 # Calculate and log metrics, using answer indices as we only want

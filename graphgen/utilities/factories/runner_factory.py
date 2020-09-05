@@ -17,7 +17,7 @@ from ...config.model import (
     MultiGCNModelConfig,
 )
 from ...config.training import OptimiserName
-from ...modules import GCN, E2EMultiGCN, FasterRCNN, GraphRCNN, MultiGCN
+from ...modules import GAT, GCN, E2EMultiGCN, FasterRCNN, GraphRCNN, MultiGCN
 from ...utilities.runners import (
     EndToEndMultiChannelGCNRunner,
     FasterRCNNRunner,
@@ -156,9 +156,6 @@ class RunnerFactory:
             )
 
         num_answer_classes = len(preprocessors.questions.index_to_answer)
-        num_object_classes = len(
-            set(preprocessors.scene_graphs.object_to_index.values())
-        )
 
         def create_gcn(config: GCNModelConfig) -> torch.nn.Module:
             # Determine pooling function
@@ -167,29 +164,24 @@ class RunnerFactory:
             else:
                 raise NotImplementedError()
             # Create GCN
-            if config.gcn == GCNName.GCN or config.gcn == GCNName.GAT:
+            if config.gcn == GCNName.GCN:
                 gcn = GCN(config.layer_sizes, pool_func)
+            elif config.gcn == GCNName.GAT:
+                gcn = GAT(config.layer_sizes, 1, pool_func)  # TODO variable heads
             else:
                 raise NotImplementedError()
             return gcn
 
         assert config.model.text_syntactic_graph is not None
-        assert config.model.text_semantic_graph is not None
-        assert config.model.object_feature_graph is not None
-        assert config.model.object_positional_graph is not None
+        assert config.model.scene_graph is not None
 
-        txt_syntactic_gcn = create_gcn(config.model.text_syntactic_graph)
-        txt_semantic_gcn = create_gcn(config.model.text_semantic_graph)
-        obj_feat_gcn = create_gcn(config.model.object_feature_graph)
-        obj_pos_gcn = create_gcn(config.model.object_positional_graph)
+        text_syntactic_gcn = create_gcn(config.model.text_syntactic_graph)
+        scene_gcn = create_gcn(config.model.scene_graph)
 
         model = MultiGCN(
-            num_answer_classes,
-            num_object_classes,
-            txt_syntactic_gcn=txt_syntactic_gcn,
-            txt_semantic_gcn=txt_semantic_gcn,
-            obj_feat_gcn=obj_feat_gcn,
-            obj_pos_gcn=obj_pos_gcn,
+            num_answer_classes=num_answer_classes,
+            text_syntactic_gcn=text_syntactic_gcn,
+            scene_gcn=scene_gcn,
         )
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()
