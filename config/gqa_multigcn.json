@@ -49,15 +49,15 @@
   },
   "training": {
     "epochs": 25,
-    "log_step": 256,
+    "log_step": 64,
     "eval_subset": null,
     "dataloader": {
-      "batch_size": 64,
+      "batch_size": 256,
       "workers": 1
     },
     "optimiser": {
       "name": "adam",
-      "learning_rate": 5e-5,
+      "learning_rate": 1e-4,
       "momentum": null,
       "weight_decay": 5e-4
     },

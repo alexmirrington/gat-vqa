@@ -6,10 +6,9 @@ import torch.nn.functional as F
 from torch_geometric.data import Data
 
 from .gat import GAT
-
-# from .bidirectional_attention import BidirectionalAttention
 from .gcn import GCN
 
+# from .bidirectional_attention import BidirectionalAttention
 # from block import fusions
 
 
