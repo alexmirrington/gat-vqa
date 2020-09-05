@@ -16,7 +16,9 @@ class GQAObjects(ChunkedHDF5Dataset):
         self,
         filemap: GQAFilemap,
         transform: Optional[
-            Callable[[Tensor, Tensor, Dict[str, Any]], Tuple[Tensor, Tensor]]
+            Callable[
+                [Tensor, Tensor, Dict[str, Any]], Tuple[Tensor, Tensor, Dict[str, Any]]
+            ]
         ] = None,
     ) -> None:
         """Initialise a `GQAObjects` instance.
@@ -62,7 +64,7 @@ class GQAObjects(ChunkedHDF5Dataset):
         """Get the dataset's filemap."""
         return self._filemap
 
-    def __getitem__(self, index: int) -> Tuple[Tensor, Tensor]:
+    def __getitem__(self, index: int) -> Tuple[Tensor, Tensor, Dict[str, Any]]:
         """Get an item from the dataset at a given index."""
         data = super().__getitem__(index)
         meta = self._meta[index]
@@ -75,4 +77,5 @@ class GQAObjects(ChunkedHDF5Dataset):
         return (
             torch.tensor(data["features"]),  # pylint: disable=not-callable
             torch.tensor(data["bboxes"]),  # pylint: disable=not-callable
+            meta,
         )

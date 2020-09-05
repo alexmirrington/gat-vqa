@@ -537,19 +537,40 @@ class MultiChannelGCNRunner(Runner):
                     objects.to(self.device) for objects in sample["objects"]
                 ]
                 rcnn_boxes = [boxes.to(self.device) for boxes in sample["boxes"]]
-
+                sg_boxes = [
+                    boxes.to(self.device) for boxes in sample["scene_graph"]["boxes"]
+                ]
+                sg_labels = [
+                    labels.to(self.device) for labels in sample["scene_graph"]["labels"]
+                ]
+                sg_relations = [
+                    rels.to(self.device) for rels in sample["scene_graph"]["relations"]
+                ]
+                sg_coos = [
+                    coos.to(self.device) for coos in sample["scene_graph"]["coos"]
+                ]
+                widths = sample["meta"]["width"]
+                heights = sample["meta"]["height"]
                 # Labels can be indices or a object class probability distribution.
 
                 # Learn
                 self.optimiser.zero_grad()
-                preds = self.model(
+                preds, losses = self.model(
                     dependencies=dependencies,
                     word_embeddings=word_embeddings,
-                    objects=rcnn_objects,
-                    boxes=rcnn_boxes,
+                    rcnn_objects=rcnn_objects,
+                    rcnn_boxes=rcnn_boxes,
+                    gt_boxes=sg_boxes,
+                    gt_labels=sg_labels,
+                    gt_relations=sg_relations,
+                    gt_coos=sg_coos,
+                    widths=widths,
+                    heights=heights,
                 )
-                loss = self.criterion(preds, targets)  # type: ignore
-
+                pred_loss = self.criterion(preds, targets)  # type: ignore
+                loss = pred_loss
+                for partial_loss in losses.values():
+                    loss += partial_loss
                 loss.backward()
                 self.optimiser.step()
 
@@ -568,6 +589,8 @@ class MultiChannelGCNRunner(Runner):
                     results = {
                         "epoch": epoch + (batch + 1) / len(dataloader),
                         "train/loss": loss.item(),
+                        "train/relpn-loss": losses["relpn"].item(),
+                        "train/relcls-loss": losses["relcls"].item(),
                     }
                     results.update(
                         {f"train/{key}": val for key, val in metrics.evaluate().items()}
@@ -623,6 +646,18 @@ class MultiChannelGCNRunner(Runner):
                     objects.to(self.device) for objects in sample["objects"]
                 ]
                 rcnn_boxes = [boxes.to(self.device) for boxes in sample["boxes"]]
+                sg_boxes = [
+                    boxes.to(self.device) for boxes in sample["scene_graph"]["boxes"]
+                ]
+                sg_labels = [
+                    labels.to(self.device) for labels in sample["scene_graph"]["labels"]
+                ]
+                sg_relations = [
+                    rels.to(self.device) for rels in sample["scene_graph"]["relations"]
+                ]
+                sg_coos = sample["scene_graph"]["coos"].to(self.device)
+                widths = sample["meta"]["width"]
+                heights = sample["meta"]["height"]
 
                 # Labels can be indices or a object class probability distribution.
 
@@ -630,8 +665,14 @@ class MultiChannelGCNRunner(Runner):
                 preds = self.model(
                     dependencies=dependencies,
                     word_embeddings=word_embeddings,
-                    objects=rcnn_objects,
-                    boxes=rcnn_boxes,
+                    rcnn_objects=rcnn_objects,
+                    rcnn_boxes=rcnn_boxes,
+                    gt_boxes=sg_boxes,
+                    gt_labels=sg_labels,
+                    gt_relations=sg_relations,
+                    gt_coos=sg_coos,
+                    widths=widths,
+                    heights=heights,
                 )
                 loss = self.criterion(preds, targets)  # type: ignore
 

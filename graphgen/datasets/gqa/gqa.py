@@ -146,9 +146,10 @@ class GQA(torch.utils.data.Dataset):  # type: ignore
                 if image_key is not None
                 else index
             )
-            objects, boxes = self._objects[image_id]
+            objects, boxes, meta = self._objects[image_id]
             result["objects"] = objects
             result["boxes"] = boxes
+            result["meta"] = meta
 
         if len(result) == 0:
             raise IndexError("No keys exist for this dataset.")

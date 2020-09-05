@@ -1,6 +1,6 @@
 """Implementation of a relation proposal network."""
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -18,7 +18,6 @@ class SpatialRelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract
     def _relatedness(
         self,
         feats: List[torch.Tensor],
-        proposals: List[torch.Tensor],
         take: Optional[int] = None,
     ) -> torch.Tensor:
         """Compute a relatedness score for every pair of boxes based on their \
@@ -26,10 +25,8 @@ class SpatialRelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract
 
         Params:
         -------
-        `class_logits`: pre-softmax outputs of the box head classifier for all
+        `feats`: pre-softmax outputs of the box head classifier for all
         boxes for all images.
-        `proposals`: List of tensors of shape `(num_boxes, 4)`, the bounding \
-        box proposals in the original image space, for each image.
 
         Returns:
         --------
@@ -43,10 +40,10 @@ class SpatialRelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract
         """
         all_pairs = []
         all_scores = []
-        for img_logits, img_proposals in zip(feats, proposals):
+        for img_feats in feats:
             # Get relatedness scores between class logits. Entry i, j refers to
             # relatedness between subject i and object j
-            relatedness = self.similarity(img_logits)
+            relatedness = self.similarity(img_feats)
 
             # Create a matrix of i, j indices that we can look up later
             meshgrid = torch.transpose(
@@ -169,7 +166,7 @@ class SpatialRelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract
         proposals: List[torch.Tensor],
         pre_nms_limit: Optional[int] = 256,
         iou_threshold: float = 0.7,
-        post_nms_limit: Optional[int] = 128,
+        post_nms_limit: Optional[Union[int, List[int]]] = 128,
     ) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
         """Return a set of relation pairs and scores for each image.
 
@@ -179,9 +176,7 @@ class SpatialRelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract
         `proposals`: List of tensors each of shape `(num_boxes, 4)`,
         the bounding box proposals in the original image space for each image.
         """
-        relation_pairs, relation_scores = self._relatedness(
-            feats, proposals, take=pre_nms_limit
-        )
+        relation_pairs, relation_scores = self._relatedness(feats, take=pre_nms_limit)
         # Get intersections between box pairs, representing the spatial interaction
         # of two objects
         intersections = [
@@ -199,12 +194,14 @@ class SpatialRelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract
         ]  # TODO make more efficient, maybe with torch.gather
 
         # Perform NMS on object intsersections
+        if isinstance(post_nms_limit, int):
+            post_nms_limit = [post_nms_limit for _ in range(len(feats))]
         keep = [
             torchvision.ops.boxes.nms(
                 img_pre_nms_intersections, img_relation_scores, iou_threshold
-            )[:post_nms_limit]
-            for img_pre_nms_intersections, img_relation_scores in zip(
-                pre_nms_intersections, relation_scores
+            )[:img_post_nms_limit]
+            for img_pre_nms_intersections, img_relation_scores, img_post_nms_limit in zip(
+                pre_nms_intersections, relation_scores, post_nms_limit
             )
         ]  # TODO migrate to batched_nms instead of nms for each image
         post_nms_intersections = [
@@ -241,14 +238,14 @@ class RelPNSimilarity(torch.nn.Module):  # type: ignore  # pylint: disable=abstr
         # https://github.com/alexmirrington/graph-rcnn.pytorch/blob/master/
         # lib/scene_parser/rcnn/modeling/relation_heads/relpn/relpn.py
         self.subject_projection = torch.nn.Sequential(  # phi in the paper
-            torch.nn.Linear(in_features, 256),  # 64 in the paper
+            torch.nn.Linear(in_features, 64),
             torch.nn.ReLU(True),
-            torch.nn.Linear(256, 64),
+            torch.nn.Linear(64, 64),
         )
         self.object_projection = torch.nn.Sequential(  # psi in the paper
-            torch.nn.Linear(in_features, 256),  # 64 in the paper
+            torch.nn.Linear(in_features, 64),
             torch.nn.ReLU(True),
-            torch.nn.Linear(256, 64),
+            torch.nn.Linear(64, 64),
         )
 
     def forward(self, data: torch.Tensor) -> torch.Tensor:
