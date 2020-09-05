@@ -21,6 +21,7 @@ class GAT(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
         for idx in range(1, len(shape)):
             self.conv_layers.append(GATConv(shape[idx - 1], shape[idx], heads=heads))
         self.pool = pool_func
+        self.shape = shape
 
     def forward(self, data: Data) -> torch.Tensor:
         """Perform a forward GCN pass."""
