@@ -412,7 +412,11 @@ class SceneGraphTransformer:
             else torch.tensor([])  # pylint: disable=not-callable
             for obj_attrs in data["attributes"]
         ]
-        labels = self.vectors.get_vecs_by_tokens(data["labels"], lower_case_backup=True)
+        labels = (
+            self.vectors.get_vecs_by_tokens(data["labels"], lower_case_backup=True)
+            if len(data["labels"]) > 0
+            else torch.tensor([])  # pylint: disable=not-callable
+        )
         return {
             "imageId": data["imageId"],
             "boxes": torch.tensor(  # pylint: disable=not-callable
