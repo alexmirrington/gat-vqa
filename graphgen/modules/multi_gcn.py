@@ -33,7 +33,7 @@ class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-met
         self.text_gcn = text_syntactic_gcn
         self.scene_gcn = scene_gcn
 
-        self.max_qn_length = 28  # max question length across entire dataset
+        self.max_qn_length = 29  # max question length across entire dataset
         self.truncate_qn_length = self.max_qn_length
 
         # LINEAR FUSION
