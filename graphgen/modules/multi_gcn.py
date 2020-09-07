@@ -60,18 +60,20 @@ class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-met
             dependencies.x, batch=dependencies.batch
         )
         question_lengths = question_lengths.type(torch.IntTensor).sum(dim=-1)
-        print(f"{question_lengths=}")
+        # print(f"{question_lengths=}")
         # Self attention over words to determine which are important
         word_alignment = torch.bmm(
             question_words, torch.transpose(question_words, 1, 2)
-        )  # (batch_size, max_question_length, max_question_length)
-        word_alignment = torch.softmax(word_alignment, dim=-1) / math.sqrt(
+        ) / math.sqrt(
             question_words.size(-1)
+        )  # (batch_size, max_question_length, max_question_length)
+        word_alignment = torch.softmax(
+            word_alignment, dim=-1
         )  # (batch_size, max_question_length, max_question_length)
         word_self_attention = torch.bmm(
             word_alignment, question_words
         )  # (batch_size, max_question_length, num_word_feats)
-        print(f"{word_self_attention.size()=}")
+        # print(f"{word_self_attention.size()=}")
 
         # (batch_size, max_object_count, num_object_feats)
         # Attention over scene objects to determine which are important to
@@ -80,10 +82,11 @@ class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-met
             objects.x, batch=objects.batch
         )
         sg_object_counts = sg_object_counts.type(torch.IntTensor).sum(dim=-1)
-        print(f"{sg_object_counts=}")
-
+        # print(f"{sg_object_counts=}")
         sg_alignment = torch.bmm(
             word_self_attention, torch.transpose(sg_object_feats, 1, 2)
+        ) / math.sqrt(
+            sg_object_feats.size(-1)
         )  # (batch_size, max_question_length, max_object_count)
         sg_alignment = torch.softmax(
             sg_alignment, dim=-1
@@ -91,7 +94,7 @@ class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-met
         word_sg_attention = torch.bmm(
             sg_alignment, sg_object_feats
         )  # (batch_size, max_question_length, num_object_feats)
-        print(f"{word_sg_attention.size()=}")
+        # print(f"{word_sg_attention.size()=}")
 
         # Pack the attention sequences according to number of words
         packed_self_attns = pack_padded_sequence(
