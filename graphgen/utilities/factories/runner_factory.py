@@ -10,14 +10,11 @@ from ...config.model import (
     Backbone,
     E2EMultiGCNModelConfig,
     FasterRCNNModelConfig,
-    GCNModelConfig,
-    GCNName,
-    GCNPoolingName,
     ModelName,
     MultiGCNModelConfig,
 )
 from ...config.training import OptimiserName
-from ...modules import GAT, GCN, E2EMultiGCN, FasterRCNN, GraphRCNN, MultiGCN
+from ...modules import GCN, E2EMultiGCN, FasterRCNN, GraphRCNN, MultiGCN
 from ...utilities.runners import (
     EndToEndMultiChannelGCNRunner,
     FasterRCNNRunner,
@@ -157,31 +154,16 @@ class RunnerFactory:
 
         num_answer_classes = len(preprocessors.questions.index_to_answer)
 
-        def create_gcn(config: GCNModelConfig) -> torch.nn.Module:
-            # Determine pooling function
-            if config.pooling == GCNPoolingName.GLOBAL_MEAN:
-                pool_func = global_mean_pool
-            else:
-                raise NotImplementedError()
-            # Create GCN
-            if config.gcn == GCNName.GCN:
-                gcn = GCN(config.layer_sizes, pool_func)
-            elif config.gcn == GCNName.GAT:
-                gcn = GAT(config.layer_sizes, 1, pool_func)  # TODO variable heads
-            else:
-                raise NotImplementedError()
-            return gcn
-
         assert config.model.text_syntactic_graph is not None
         assert config.model.scene_graph is not None
 
-        text_syntactic_gcn = create_gcn(config.model.text_syntactic_graph)
-        scene_gcn = create_gcn(config.model.scene_graph)
-
+        # Create GCN
         model = MultiGCN(
             num_answer_classes=num_answer_classes,
-            text_syntactic_gcn=text_syntactic_gcn,
-            scene_gcn=scene_gcn,
+            text_gcn_shape=config.model.text_syntactic_graph.layer_sizes,
+            text_gcn_conv=config.model.text_syntactic_graph.gcn,
+            scene_gcn_shape=config.model.scene_graph.layer_sizes,
+            scene_gcn_conv=config.model.scene_graph.gcn,
         )
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()

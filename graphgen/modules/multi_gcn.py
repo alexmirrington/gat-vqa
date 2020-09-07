@@ -1,17 +1,15 @@
 """Multi-gcn model."""
 import math
-from typing import Any, Union
+from typing import Any, Sequence
 
 import torch
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torch_geometric.data import Data
+from torch_geometric.nn.conv import GATConv, GCNConv
 from torch_geometric.utils import to_dense_batch
 
-from .gat import GAT
-from .gcn import GCN
-
-# from .bidirectional_attention import BidirectionalAttention
+from ..config.model import GCNName
 
 
 class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
@@ -22,25 +20,47 @@ class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-met
     def __init__(
         self,
         num_answer_classes: int,
-        text_syntactic_gcn: Union[GCN, GAT],
-        scene_gcn: Union[GCN, GAT],
+        text_gcn_shape: Sequence[int],
+        text_gcn_conv: GCNName,
+        scene_gcn_shape: Sequence[int],
+        scene_gcn_conv: GCNName,
     ) -> None:
         """Create a multi-gcn model with bidirectional attention."""
         super().__init__()
         self.num_answer_classes = num_answer_classes
 
-        # Create GCNs TODO use these instead of individual GATConv layers
-        self.text_gcn = text_syntactic_gcn
-        self.scene_gcn = scene_gcn
+        self.text_gcn_layers = torch.nn.ModuleList([])
+        for idx in range(1, len(text_gcn_shape)):
+            if text_gcn_conv == GCNName.GCN:
+                self.text_gcn_layers.append(
+                    GCNConv(text_gcn_shape[idx - 1], text_gcn_shape[idx])
+                )
+            elif text_gcn_conv == GCNName.GAT:
+                self.text_gcn_layers.append(
+                    GATConv(text_gcn_shape[idx - 1], text_gcn_shape[idx], heads=1)
+                )
+            else:
+                raise NotImplementedError()
+
+        self.scene_gcn_layers = torch.nn.ModuleList([])
+        for idx in range(1, len(scene_gcn_shape)):
+            if scene_gcn_conv == GCNName.GCN:
+                self.scene_gcn_layers.append(
+                    GCNConv(scene_gcn_shape[idx - 1], scene_gcn_shape[idx])
+                )
+            elif scene_gcn_conv == GCNName.GAT:
+                self.scene_gcn_layers.append(
+                    GATConv(scene_gcn_shape[idx - 1], scene_gcn_shape[idx], heads=1)
+                )
+            else:
+                raise NotImplementedError()
 
         self.max_qn_length = 29  # max question length across entire dataset
         self.truncate_qn_length = self.max_qn_length
 
         # LINEAR FUSION
         # Create 2-layer MLP fusion net that takes in conatenated feats from gcns.
-        in_dim = self.truncate_qn_length * (
-            self.text_gcn.shape[-1] + self.scene_gcn.shape[-1]
-        )
+        in_dim = self.truncate_qn_length * (text_gcn_shape[-1] + scene_gcn_shape[-1])
         self.fusion = torch.nn.Sequential(
             torch.nn.Linear(in_dim, num_answer_classes),
             torch.nn.Linear(num_answer_classes, num_answer_classes),
@@ -50,53 +70,82 @@ class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-met
         """Propagate data through the model."""
         # pylint: disable=too-many-locals
 
-        _ = self.text_gcn(dependencies)
-        _ = self.scene_gcn(objects)
+        for idx in range(min(len(self.text_gcn_layers), len(self.scene_gcn_layers))):
+            # Get text and scene feats for current layer
+            text_gcn_layer = self.text_gcn_layers[idx]
+            scene_gcn_layer = self.scene_gcn_layers[idx]
+
+            dependencies.x = text_gcn_layer(dependencies.x, dependencies.edge_index)
+            # TODO experiment without ReLU, or even gated tanh/relu
+            # if idx != len(self.text_gcn_layers) - 1:
+            #     dependencies.x = F.relu(dependencies.x)
+
+            objects.x = scene_gcn_layer(objects.x, objects.edge_index)
+            # TODO experiment without ReLU, or even gated tanh/relu
+            # if idx != len(self.scene_gcn_layers) - 1:
+            #     objects.x = F.relu(objects.x)
+
+            # Apply dense bidirectional attention to node features
+            # TODO  multihead_attn = torch.nn.MultiheadAttention(300, self.heads)
+
+        # Apply any leftover conv layers for text gcn
+        for leftover_idx in range(idx, len(self.text_gcn_layers)):
+            text_gcn_layer = self.text_gcn_layers[leftover_idx]
+            dependencies.x = text_gcn_layer(dependencies.x, dependencies.edge_index)
+            # TODO experiment without ReLU, or even gated tanh/relu
+            # if leftover_idx != len(self.text_gcn_layers) - 1:
+            #     dependencies.x = F.relu(dependencies.x)
+
+        # Apply any leftover conv layers for scene gcn
+        for leftover_idx in range(idx, len(self.scene_gcn_layers)):
+            scene_gcn_layer = self.scene_gcn_layers[leftover_idx]
+            objects.x = scene_gcn_layer(objects.x, objects.edge_index)
+            # TODO experiment without ReLU, or even gated tanh/relu
+            # if leftover_idx != len(self.scene_gcn_layers) - 1:
+            #     objects.x = F.relu(objects.x)
 
         # Attention alignment like in "aligned dual channel gcns for vqa"
-
-        # (batch_size, max_question_length, num_word_feats)
+        # question_words: (batch_size, max_question_length, num_word_feats)
         question_words, question_lengths = to_dense_batch(
             dependencies.x, batch=dependencies.batch
         )
         question_lengths = question_lengths.type(torch.IntTensor).sum(dim=-1)
-        # print(f"{question_lengths=}")
+
         # Self attention over words to determine which are important
         word_alignment = torch.bmm(
             question_words, torch.transpose(question_words, 1, 2)
         ) / math.sqrt(
             question_words.size(-1)
-        )  # (batch_size, max_question_length, max_question_length)
+        )  # word_alignment: (batch_size, max_question_length, max_question_length)
         word_alignment = torch.softmax(
             word_alignment, dim=-1
-        )  # (batch_size, max_question_length, max_question_length)
+        )  # word_alignment: (batch_size, max_question_length, max_question_length)
         word_self_attention = torch.bmm(
             word_alignment, question_words
-        )  # (batch_size, max_question_length, num_word_feats)
-        # print(f"{word_self_attention.size()=}")
+        )  # word_self_attention: (batch_size, max_question_length, num_word_feats)
 
-        # (batch_size, max_object_count, num_object_feats)
-        # Attention over scene objects to determine which are important to
-        # attended question
+        # Attention over scene objects to determine which object features are
+        # important to the self-attended question
+        # sg_object_feats: (batch_size, max_object_count, num_object_feats)
         sg_object_feats, sg_object_counts = to_dense_batch(
             objects.x, batch=objects.batch
         )
         sg_object_counts = sg_object_counts.type(torch.IntTensor).sum(dim=-1)
-        # print(f"{sg_object_counts=}")
         sg_alignment = torch.bmm(
             word_self_attention, torch.transpose(sg_object_feats, 1, 2)
         ) / math.sqrt(
             sg_object_feats.size(-1)
-        )  # (batch_size, max_question_length, max_object_count)
+        )  # sg_alignment: (batch_size, max_question_length, max_object_count)
         sg_alignment = torch.softmax(
             sg_alignment, dim=-1
-        )  # (batch_size, max_question_length, max_object_count)
+        )  # sg_alignment: (batch_size, max_question_length, max_object_count)
         word_sg_attention = torch.bmm(
             sg_alignment, sg_object_feats
-        )  # (batch_size, max_question_length, num_object_feats)
-        # print(f"{word_sg_attention.size()=}")
+        )  # word_sg_attention: (batch_size, max_question_length, num_object_feats)
 
-        # Pack the attention sequences according to number of words
+        # Pack and unpack the attention sequences according to number of words
+        # to ensure consistent question length across all batches for fusion
+        # layer compatibility.
         packed_self_attns = pack_padded_sequence(
             word_self_attention,
             question_lengths,
