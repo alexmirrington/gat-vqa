@@ -115,8 +115,8 @@ class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-met
         fused_feats = self.fusion(
             torch.cat(
                 [
-                    padded_self_attns.flatten(start=1),
-                    padded_word_sg_attns.flatten(start=1),
+                    padded_self_attns.flatten(start_dim=1),
+                    padded_word_sg_attns.flatten(start_dim=1),
                 ],
                 dim=1,
             )
