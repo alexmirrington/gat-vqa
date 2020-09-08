@@ -59,26 +59,28 @@ class MACMultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-
         """Propagate data through the model."""
         # pylint: disable=too-many-locals
 
+        text_feats = dependencies.x
+        sg_feats = objects.x
         for idx in range(min(len(self.text_gcn_layers), len(self.scene_gcn_layers))):
             # Get text and scene feats for current layer
             text_gcn_layer = self.text_gcn_layers[idx]
             scene_gcn_layer = self.scene_gcn_layers[idx]
 
-            dependencies.x = text_gcn_layer(dependencies.x, dependencies.edge_index)
-            objects.x = scene_gcn_layer(objects.x, objects.edge_index)
+            text_feats = text_gcn_layer(text_feats, dependencies.edge_index)
+            sg_feats = scene_gcn_layer(sg_feats, objects.edge_index)
 
             # Apply dense bidirectional attention to node features
             # TODO  multihead_attn = torch.nn.MultiheadAttention(300, self.heads)
 
         # Apply any leftover conv layers for text gcn
-        for leftover_idx in range(idx, len(self.text_gcn_layers)):
+        for leftover_idx in range(idx + 1, len(self.text_gcn_layers)):
             text_gcn_layer = self.text_gcn_layers[leftover_idx]
-            dependencies.x = text_gcn_layer(dependencies.x, dependencies.edge_index)
+            text_feats = text_gcn_layer(text_feats, dependencies.edge_index)
 
         # Apply any leftover conv layers for scene gcn
-        for leftover_idx in range(idx, len(self.scene_gcn_layers)):
+        for leftover_idx in range(idx + 1, len(self.scene_gcn_layers)):
             scene_gcn_layer = self.scene_gcn_layers[leftover_idx]
-            objects.x = scene_gcn_layer(objects.x, objects.edge_index)
+            sg_feats = scene_gcn_layer(sg_feats, objects.edge_index)
 
         # MAC network expects a tuple of tensors, (contextual_words, question, img).
         # `contextual_words` has size (batch_size, max_word_length, hidden_dim),
@@ -87,11 +89,11 @@ class MACMultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-
         # concatenated outputs of the forward and backward question BiLSTM passes.
         # `img` has size (batch_size, hidden_dim, img_feat_dim).
 
-        contextual_words = to_dense_batch(dependencies.x, batch=dependencies.batch)
+        contextual_words, _ = to_dense_batch(text_feats, batch=dependencies.batch)
         # TODO consider self-attention pooling over contextual words instead
         # of global mean pooling.
-        question, _ = global_mean_pool(dependencies.x, batch=dependencies.batch)
-        scene_graph_feats, _ = to_dense_batch(objects.x, batch=objects.batch)
+        question = global_mean_pool(text_feats, batch=dependencies.batch)
+        scene_graph_feats, _ = to_dense_batch(sg_feats, batch=objects.batch)
 
         # Pad scene graph feats to the correct dimension, or limit if too big
         if scene_graph_feats.size(1) >= self.max_objects:
@@ -106,11 +108,11 @@ class MACMultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-
                             self.max_objects - scene_graph_feats.size(1),
                             scene_graph_feats.size(2),
                         )
-                    ),
+                    ).to(scene_graph_feats.device),
                 ),
                 dim=1,
             )
 
-        out = self.mac_network(contextual_words, question, scene_graph_feats)
+        out = self.mac_network((contextual_words, question, scene_graph_feats))
 
         return out

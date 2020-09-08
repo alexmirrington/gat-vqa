@@ -148,10 +148,10 @@ class MACNetwork(nn.Module):  # type: ignore  # pylint: disable=abstract-method 
         self.memory_gate = memory_gate
         self.memory_gate_bias = memory_gate_bias
 
-        if cell is not None and cell.dim != self.hidden_dim:
+        if cell is not None and cell.hidden_dim != self.hidden_dim:
             raise ValueError(
                 f"MACNetwork parameter {self.hidden_dim=} and \
-                cell parameter {cell.dim} must be equal."
+                cell parameter {cell.hidden_dim} must be equal."
             )
 
         if classifier is not None and classifier.input_dim != self.hidden_dim:

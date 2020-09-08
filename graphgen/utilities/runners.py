@@ -652,7 +652,7 @@ class MACMultiChannelGCNRunner(Runner):
             config, device, model, optimiser, criterion, datasets, preprocessors, resume
         )
 
-        self.exp_moving_model = deepcopy(self.model).to(device)
+        self.exp_moving_model = deepcopy(self.model)
         MACMultiChannelGCNRunner.accumulate(self.exp_moving_model, self.model, decay=0)
 
         self.scheduler = None
@@ -733,6 +733,7 @@ class MACMultiChannelGCNRunner(Runner):
 
         self.model.train()
         self.model.to(self.device)
+        self.exp_moving_model.to(self.device)
 
         best_val_loss = math.inf
         for epoch in range(self._start_epoch, self.config.training.epochs):
@@ -815,6 +816,7 @@ class MACMultiChannelGCNRunner(Runner):
         metrics = MetricCollection(
             self.config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
         )
+
         self.exp_moving_model.eval()
 
         eval_limit = (
