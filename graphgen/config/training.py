@@ -37,6 +37,8 @@ class OptimiserConfig:
     momentum: Optional[float]
     learning_rate: float
     weight_decay: float
+    grad_clip: float
+    schedule: bool
 
     def __post_init__(self) -> None:
         """Validate fields after dataclass construction."""

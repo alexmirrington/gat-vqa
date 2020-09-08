@@ -35,7 +35,11 @@
     }]
   },
   "model": {
-    "name": "multi_gcn",
+    "name": "mac_multi_gcn",
+    "mac": {
+      "length": 6,
+      "hidden_dim": 512
+    },
     "text_syntactic_graph": {
       "gcn": "gat",
       "pooling": "global_mean",
@@ -44,15 +48,16 @@
     "scene_graph": {
       "gcn": "gat",
       "pooling": "global_mean",
-      "layer_sizes": [300, 300, 300]
+      "layer_sizes": [300, 300, 300],
+      "max_objects": 100
     }
   },
   "training": {
-    "epochs": 25,
-    "log_step": 64,
+    "epochs": 20,
+    "log_step": 256,
     "eval_subset": null,
     "dataloader": {
-      "batch_size": 256,
+      "batch_size": 64,
       "workers": 1
     },
     "optimiser": {
@@ -60,7 +65,8 @@
       "learning_rate": 1e-4,
       "momentum": null,
       "weight_decay": 5e-4,
-      "grad_clip": 0
+      "grad_clip": 8,
+      "schedule": true
     },
     "data": {
       "features": [

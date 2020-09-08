@@ -10,6 +10,7 @@ class ModelName(Enum):
     FASTER_RCNN = "faster_rcnn"
     E2E_MULTI_GCN = "e2e_multi_gcn"
     MULTI_GCN = "multi_gcn"
+    MAC_MULTI_GCN = "mac_multi_gcn"
 
 
 class GCNName(Enum):
@@ -83,6 +84,21 @@ class GCNModelConfig:
 
 
 @dataclass(frozen=True)
+class SceneGraphGCNModelConfig(GCNModelConfig):
+    """Class for storing scene graph GCN model configuration information."""
+
+    max_objects: int
+
+
+@dataclass(frozen=True)
+class MACModelConfig:
+    """Class for storing MAC network model configuration information."""
+
+    length: int
+    hidden_dim: int
+
+
+@dataclass(frozen=True)
 class MultiGCNModelConfig(ModelConfig):
     """Class for storing model configuration information."""
 
@@ -94,4 +110,20 @@ class MultiGCNModelConfig(ModelConfig):
         if self.name != ModelName.MULTI_GCN:
             raise ValueError(
                 f"Field {self.name=} must be equal to {ModelName.MULTI_GCN}"
+            )
+
+
+@dataclass(frozen=True)
+class MACMultiGCNModelConfig(ModelConfig):
+    """Class for storing model configuration information."""
+
+    mac: MACModelConfig
+    text_syntactic_graph: GCNModelConfig
+    scene_graph: SceneGraphGCNModelConfig
+
+    def __post_init__(self) -> None:
+        """Perform post-init checks on fields."""
+        if self.name != ModelName.MAC_MULTI_GCN:
+            raise ValueError(
+                f"Field {self.name=} must be equal to {ModelName.MAC_MULTI_GCN}"
             )

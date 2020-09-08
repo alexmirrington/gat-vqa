@@ -1,6 +1,7 @@
 """Various train/val/test loops for running different types of models."""
 import math
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -88,13 +89,11 @@ class Runner(ABC):
         if self.resume is None:
             raise ValueError("Cannot load model without resume information.")
         root = Path(wandb.run.dir) / "checkpoints"
-        print(root)
         if not root.exists():
             root.mkdir(parents=True)
         restored = wandb.restore(
             self.resume.checkpoint, run_path=self.resume.run, root=root
         )
-        print(restored.name)
         checkpoint = torch.load(restored.name)
         self.model.load_state_dict(checkpoint["model_state_dict"])
         self.optimiser.load_state_dict(checkpoint["optimizer_state_dict"])
@@ -627,6 +626,232 @@ class MultiChannelGCNRunner(Runner):
                     break
 
         self.model.train()
+        results = {"loss": loss.item()}
+        results.update(metrics.evaluate())
+        return results
+
+
+class MACMultiChannelGCNRunner(Runner):
+    """Runner class for training a MultiChannelGCN model."""
+
+    def __init__(  # pylint: disable=too-many-arguments
+        self,
+        config: Config,
+        device: torch.device,
+        model: torch.nn.Module,
+        optimiser: torch.optim.Optimizer,
+        criterion: Optional[Callable[..., torch.Tensor]],
+        datasets: DatasetCollection,
+        preprocessors: PreprocessorCollection,
+        resume: Optional[ResumeInfo],
+    ) -> None:
+        """Create a MultiChannelGCNRunner instance."""
+        if criterion is None:
+            raise ValueError("This model requires a criterion.")
+        super().__init__(
+            config, device, model, optimiser, criterion, datasets, preprocessors, resume
+        )
+
+        self.exp_moving_model = deepcopy(self.model).to(device)
+        MACMultiChannelGCNRunner.accumulate(self.exp_moving_model, self.model, decay=0)
+
+        self.scheduler = None
+        if self.config.training.optimiser.schedule:
+            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                self.optimiser,
+                "min",
+                factor=0.5,
+                patience=0,
+            )
+
+    @staticmethod
+    def accumulate(
+        target_model: torch.nn.Module,
+        source_model: torch.nn.Module,
+        decay: float = 0.999,
+    ) -> None:
+        """Accumulate gradients."""
+        t_params = dict(target_model.named_parameters())
+        s_params = dict(source_model.named_parameters())
+
+        for k in t_params.keys():
+            t_params[k].data.mul_(decay).add_(1 - decay, s_params[k].data)
+
+    def save(self, epoch: int, name: str) -> None:
+        """Save a model's state dict to file."""
+        super().save(epoch, name)
+        # Save ema val weights
+        root = Path(wandb.run.dir) / "checkpoints"
+        torch.save(
+            {
+                "epoch": epoch,
+                "model_state_dict": self.exp_moving_model.state_dict(),
+            },
+            str(root / ("val_" + name)),
+        )
+        wandb.save(str(root / "*"))
+
+    def load(self) -> int:
+        """Load a model's state dict from file."""
+        epoch = super().load()
+        # Load val weights
+        print(colored("loading val checkpoint:", attrs=["bold"]))
+        if self.resume is None:
+            raise ValueError("Cannot load model without resume information.")
+        root = Path(wandb.run.dir) / "checkpoints"
+        restored = wandb.restore(
+            "val_" + self.resume.checkpoint, run_path=self.resume.run, root=root
+        )
+        checkpoint = torch.load(restored.name)
+        self.exp_moving_model.load_state_dict(checkpoint["model_state_dict"])
+
+        print(f"loaded val checkpoint from {restored.name}")
+        return epoch
+
+    def train(self) -> None:
+        """Train a model according to a criterion and optimiser on a dataset."""
+        # Log gradients each epoch
+        wandb.watch(
+            self.model,
+            log_freq=math.ceil(
+                self.config.training.epochs / self.config.training.dataloader.batch_size
+            ),
+        )
+        dataloader = DataLoader(
+            self.datasets.train,
+            batch_size=self.config.training.dataloader.batch_size,
+            num_workers=self.config.training.dataloader.workers,
+            sampler=ChunkedRandomSampler(self.datasets.train.questions),
+            collate_fn=VariableSizeTensorCollator(),
+        )
+        metrics = MetricCollection(
+            self.config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
+        )
+
+        if self._start_epoch == 0:
+            self.save(self._start_epoch, "current.pt")
+
+        self.model.train()
+        self.model.to(self.device)
+
+        best_val_loss = math.inf
+        for epoch in range(self._start_epoch, self.config.training.epochs):
+            for batch, sample in enumerate(dataloader):
+                # Move data to GPU
+                dependencies = sample["question"]["dependencies"].to(self.device)
+                # word_embeddings = pack_sequence(
+                #     sample["question"]["embeddings"], enforce_sorted=False
+                # ).to(self.device)
+                objects = sample["scene_graph"]["objects"].to(self.device)
+                targets = sample["question"]["answer"].to(self.device)
+
+                # Labels can be indices or a object class probability distribution.
+                if self.config.training.optimiser.grad_clip:
+                    torch.nn.utils.clip_grad_norm_(
+                        self.model.parameters(),
+                        max_norm=self.config.training.optimiser.grad_clip,
+                    )
+                # Learn
+                self.optimiser.zero_grad()
+                preds = self.model(dependencies=dependencies, objects=objects)
+                loss = self.criterion(preds, targets)  # type: ignore
+                loss.backward()
+                self.optimiser.step()
+
+                # Update exponential moving model weights
+                self.accumulate(self.exp_moving_model, self.model)
+
+                # Calculate and log metrics, using answer indices as we only want
+                # basics for train set.
+                metrics.append(
+                    sample["question"]["questionId"],
+                    np.argmax(preds.detach().cpu().numpy(), axis=1),
+                    targets.detach().cpu().numpy(),
+                )
+                if (
+                    batch % self.config.training.log_step
+                    == self.config.training.log_step - 1
+                    or batch == len(dataloader) - 1
+                ):
+                    results = {
+                        "epoch": epoch + (batch + 1) / len(dataloader),
+                        "train/loss": loss.item(),
+                    }
+                    results.update(
+                        {f"train/{key}": val for key, val in metrics.evaluate().items()}
+                    )
+                    log_metrics_stdout(
+                        results,
+                        newline=False,
+                    )
+                    # Delay logging until after val metrics come in if end of epoch
+                    if batch != len(dataloader) - 1:
+                        wandb.log(results)
+                        metrics.reset()
+
+            # Save and log at end of epoch
+            self.save(epoch + 1, "current.pt")
+
+            results.update({f"val/{key}": val for key, val in self.evaluate().items()})
+            if results["val/loss"] <= best_val_loss:
+                best_val_loss = results["val/loss"]
+                self.save(epoch + 1, "best.pt")
+            log_metrics_stdout(results)
+            wandb.log(results)
+            metrics.reset()
+
+            # Update lr based on val loss (official MAC code uses train loss)
+            if self.scheduler is not None:
+                self.scheduler.step(results["val/loss"])
+
+    def evaluate(self) -> Dict[str, Any]:
+        """Evaluate a model according to a criterion on a given dataset."""
+        dataloader = DataLoader(
+            self.datasets.val,
+            batch_size=self.config.training.dataloader.batch_size,
+            num_workers=self.config.training.dataloader.workers,
+            collate_fn=VariableSizeTensorCollator(),
+        )
+        metrics = MetricCollection(
+            self.config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
+        )
+        self.exp_moving_model.eval()
+
+        eval_limit = (
+            self.config.training.eval_subset
+            if self.config.training.eval_subset is not None
+            else len(dataloader)
+        )
+
+        with torch.no_grad():
+            for batch, sample in enumerate(dataloader):
+                # Move data to GPU
+                dependencies = sample["question"]["dependencies"].to(self.device)
+                # word_embeddings = pack_sequence(
+                #     sample["question"]["embeddings"], enforce_sorted=False
+                # ).to(self.device)
+                objects = sample["scene_graph"]["objects"].to(self.device)
+                targets = sample["question"]["answer"].to(self.device)
+
+                # Labels can be indices or a object class probability distribution.
+
+                # Learn
+                preds = self.exp_moving_model(
+                    dependencies=dependencies, objects=objects
+                )
+                loss = self.criterion(preds, targets)  # type: ignore
+
+                # Calculate and log metrics, using answer indices as we only want
+                # basics for train set.
+                metrics.append(
+                    sample["question"]["questionId"],
+                    np.argmax(preds.detach().cpu().numpy(), axis=1),
+                    targets.detach().cpu().numpy(),
+                )
+                print(f"eval: {batch + 1}/{eval_limit}", end="\r")
+                if batch + 1 == eval_limit:
+                    break
+
         results = {"loss": loss.item()}
         results.update(metrics.evaluate())
         return results

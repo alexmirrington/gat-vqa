@@ -10,15 +10,22 @@ from ...config.model import (
     Backbone,
     E2EMultiGCNModelConfig,
     FasterRCNNModelConfig,
+    MACMultiGCNModelConfig,
     ModelName,
     MultiGCNModelConfig,
 )
 from ...config.training import OptimiserName
-from ...modules import GCN, E2EMultiGCN, FasterRCNN, GraphRCNN, MultiGCN
+from ...modules import GCN, E2EMultiGCN, FasterRCNN, GraphRCNN, MACMultiGCN, MultiGCN
+from ...modules.mac import MACCell, MACNetwork
+from ...modules.mac.control import ControlUnit
+from ...modules.mac.output import OutputUnit
+from ...modules.mac.read import ReadUnit
+from ...modules.mac.write import WriteUnit
 from ..preprocessing import DatasetCollection, PreprocessorCollection
 from ..runners import (
     EndToEndMultiChannelGCNRunner,
     FasterRCNNRunner,
+    MACMultiChannelGCNRunner,
     MultiChannelGCNRunner,
     ResumeInfo,
     Runner,
@@ -34,6 +41,7 @@ class RunnerFactory:
             ModelName.FASTER_RCNN: RunnerFactory.create_faster_rcnn,
             ModelName.E2E_MULTI_GCN: RunnerFactory.create_e2emultigcn,
             ModelName.MULTI_GCN: RunnerFactory.create_multigcn,
+            ModelName.MAC_MULTI_GCN: RunnerFactory.create_mac_multigcn,
         }
 
     @staticmethod
@@ -167,6 +175,58 @@ class RunnerFactory:
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()
         runner = MultiChannelGCNRunner(
+            config, device, model, optimiser, criterion, datasets, preprocessors, resume
+        )
+
+        return runner
+
+    @staticmethod
+    def create_mac_multigcn(
+        config: Config,
+        device: torch.device,
+        preprocessors: PreprocessorCollection,
+        datasets: DatasetCollection,
+        resume: Optional[ResumeInfo],
+    ) -> Runner:
+        """Create an End-to-end multi-channel GCN runner from a config."""
+        if not isinstance(config.model, MACMultiGCNModelConfig):
+            raise TypeError(
+                f"Expected model config of type {MACMultiGCNModelConfig.__name__} \
+                but got {config.model.__class__.__name__}"
+            )
+
+        num_answer_classes = len(preprocessors.questions.index_to_answer)
+
+        assert config.model.text_syntactic_graph is not None
+        assert config.model.scene_graph is not None
+
+        model = MACMultiGCN(
+            mac_network=MACNetwork(
+                length=config.model.mac.length,
+                hidden_dim=config.model.mac.hidden_dim,
+                classifier=OutputUnit(config.model.mac.hidden_dim, num_answer_classes),
+                cell=MACCell(
+                    config.model.mac.hidden_dim,
+                    control=ControlUnit(
+                        hidden_dim=config.model.mac.hidden_dim,
+                        length=config.model.mac.length,
+                    ),
+                    read=ReadUnit(
+                        hidden_dim=config.model.mac.hidden_dim,
+                        kb_dim=config.model.scene_graph.max_objects,
+                    ),
+                    write=WriteUnit(hidden_dim=config.model.mac.hidden_dim),
+                ),
+            ),
+            text_gcn_shape=config.model.text_syntactic_graph.layer_sizes,
+            text_gcn_conv=config.model.text_syntactic_graph.gcn,
+            scene_gcn_shape=config.model.scene_graph.layer_sizes,
+            scene_gcn_conv=config.model.scene_graph.gcn,
+            max_objects=config.model.scene_graph.max_objects,
+        )
+        optimiser = RunnerFactory._build_optimiser(config, model)
+        criterion = torch.nn.NLLLoss()
+        runner = MACMultiChannelGCNRunner(
             config, device, model, optimiser, criterion, datasets, preprocessors, resume
         )
 
