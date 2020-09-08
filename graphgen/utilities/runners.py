@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 import wandb
 from termcolor import colored
 from torch.utils.data import DataLoader
@@ -754,7 +755,9 @@ class MACMultiChannelGCNRunner(Runner):
                     )
                 # Learn
                 self.optimiser.zero_grad()
-                preds = self.model(dependencies=dependencies, objects=objects)
+                preds = F.log_softmax(
+                    self.model(dependencies=dependencies, objects=objects)
+                )
                 loss = self.criterion(preds, targets)  # type: ignore
                 loss.backward()
                 self.optimiser.step()
@@ -838,8 +841,8 @@ class MACMultiChannelGCNRunner(Runner):
                 # Labels can be indices or a object class probability distribution.
 
                 # Learn
-                preds = self.exp_moving_model(
-                    dependencies=dependencies, objects=objects
+                preds = F.log_softmax(
+                    self.exp_moving_model(dependencies=dependencies, objects=objects)
                 )
                 loss = self.criterion(preds, targets)  # type: ignore
 
