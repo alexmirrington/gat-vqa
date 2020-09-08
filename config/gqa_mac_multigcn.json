@@ -42,12 +42,12 @@
     },
     "text_syntactic_graph": {
       "gcn": "gat",
-      "pooling": "global_mean",
+      "pooling": null,
       "layer_sizes": [300, 300, 300]
     },
     "scene_graph": {
       "gcn": "gat",
-      "pooling": "global_mean",
+      "pooling": null,
       "layer_sizes": [300, 300, 300],
       "max_objects": 100
     }

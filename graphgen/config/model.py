@@ -79,7 +79,7 @@ class GCNModelConfig:
     """Class for storing GCN model configuration information."""
 
     gcn: GCNName
-    pooling: GCNPoolingName
+    pooling: Optional[GCNPoolingName]
     layer_sizes: List[int]
 
 
