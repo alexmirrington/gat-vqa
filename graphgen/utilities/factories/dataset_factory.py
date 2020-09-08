@@ -1,12 +1,10 @@
 """Tools for creating trainable datasets given configuration objects."""
 import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
 
 import jsons
 import wandb
-from torch.utils.data import Dataset
 
 from ...config import Config
 from ...config.clevr import CLEVRDatasetConfig
@@ -27,19 +25,12 @@ from ...datasets.gqa import (
     GQASpatial,
 )
 from ..preprocessing import (
+    DatasetCollection,
     ObjectTransformer,
+    PreprocessorCollection,
     QuestionTransformer,
     SceneGraphTransformer,
 )
-from .preprocessing_factory import PreprocessorCollection
-
-
-@dataclass(frozen=True)
-class DatasetCollection:
-    """Wrapper class for storing a train, val and test dataset tuple."""
-
-    train: Dataset
-    val: Dataset
 
 
 class DatasetFactory:

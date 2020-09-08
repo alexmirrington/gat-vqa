@@ -15,15 +15,14 @@ from ...config.model import (
 )
 from ...config.training import OptimiserName
 from ...modules import GCN, E2EMultiGCN, FasterRCNN, GraphRCNN, MultiGCN
-from ...utilities.runners import (
+from ..preprocessing import DatasetCollection, PreprocessorCollection
+from ..runners import (
     EndToEndMultiChannelGCNRunner,
     FasterRCNNRunner,
     MultiChannelGCNRunner,
     ResumeInfo,
     Runner,
 )
-from .dataset_factory import DatasetCollection
-from .preprocessing_factory import PreprocessorCollection
 
 
 class RunnerFactory:

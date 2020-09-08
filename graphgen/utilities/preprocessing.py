@@ -1,4 +1,5 @@
 """Module containing utilities for preprocessing data."""
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import stanza
@@ -15,100 +16,6 @@ from ..schemas.common import (
 )
 from ..schemas.gqa import GQAQuestion, GQASceneGraph, GQASceneGraphObject
 from .generators import slice_sequence
-
-COCO_INSTANCE_CATEGORY_NAMES = [
-    "__background__",
-    "person",
-    "bicycle",
-    "car",
-    "motorcycle",
-    "airplane",
-    "bus",
-    "train",
-    "truck",
-    "boat",
-    "traffic light",
-    "fire hydrant",
-    "N/A",
-    "stop sign",
-    "parking meter",
-    "bench",
-    "bird",
-    "cat",
-    "dog",
-    "horse",
-    "sheep",
-    "cow",
-    "elephant",
-    "bear",
-    "zebra",
-    "giraffe",
-    "N/A",
-    "backpack",
-    "umbrella",
-    "N/A",
-    "N/A",
-    "handbag",
-    "tie",
-    "suitcase",
-    "frisbee",
-    "skis",
-    "snowboard",
-    "sports ball",
-    "kite",
-    "baseball bat",
-    "baseball glove",
-    "skateboard",
-    "surfboard",
-    "tennis racket",
-    "bottle",
-    "N/A",
-    "wine glass",
-    "cup",
-    "fork",
-    "knife",
-    "spoon",
-    "bowl",
-    "banana",
-    "apple",
-    "sandwich",
-    "orange",
-    "broccoli",
-    "carrot",
-    "hot dog",
-    "pizza",
-    "donut",
-    "cake",
-    "chair",
-    "couch",
-    "potted plant",
-    "bed",
-    "N/A",
-    "dining table",
-    "N/A",
-    "N/A",
-    "toilet",
-    "N/A",
-    "tv",
-    "laptop",
-    "mouse",
-    "remote",
-    "keyboard",
-    "cell phone",
-    "microwave",
-    "oven",
-    "toaster",
-    "sink",
-    "refrigerator",
-    "N/A",
-    "book",
-    "clock",
-    "vase",
-    "scissors",
-    "teddy bear",
-    "hair drier",
-    "toothbrush",
-]
 
 
 class QuestionPreprocessor:
@@ -439,3 +346,19 @@ class ObjectTransformer:
         """Transform data into a trainable format."""
         num_objects = meta["objectsNum"]
         return (objects[:num_objects], boxes[:num_objects])
+
+
+@dataclass(frozen=True)
+class PreprocessorCollection:
+    """Wrapper class for storing a preprocessor feature mappings."""
+
+    questions: QuestionPreprocessor
+    scene_graphs: SceneGraphPreprocessor
+
+
+@dataclass(frozen=True)
+class DatasetCollection:
+    """Wrapper class for storing a train and val dataset tuple."""
+
+    train: torch.utils.data.Dataset
+    val: torch.utils.data.Dataset

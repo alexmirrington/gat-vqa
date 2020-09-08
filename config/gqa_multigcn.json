@@ -37,12 +37,12 @@
   "model": {
     "name": "multi_gcn",
     "text_syntactic_graph": {
-      "gcn": "gcn",
+      "gcn": "gat",
       "pooling": "global_mean",
       "layer_sizes": [300, 300, 300]
     },
     "scene_graph": {
-      "gcn": "gcn",
+      "gcn": "gat",
       "pooling": "global_mean",
       "layer_sizes": [300, 300, 300]
     }

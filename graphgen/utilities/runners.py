@@ -15,7 +15,7 @@ from ..config import Config
 from ..datasets.collators import VariableSizeTensorCollator
 from ..datasets.utilities.chunked_random_sampler import ChunkedRandomSampler
 from ..metrics import Metric, MetricCollection
-from ..utilities.factories import DatasetCollection, PreprocessorCollection
+from ..utilities.preprocessing import DatasetCollection, PreprocessorCollection
 from .logging import log_metrics_stdout
 
 

@@ -1,6 +1,5 @@
 """Tools for preprocessing datasets given a pipeline in the form of a config object."""
 import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -21,17 +20,8 @@ from ...datasets.utilities import KeyedDataset
 from ..preprocessing import (
     GQAQuestionPreprocessor,
     GQASceneGraphPreprocessor,
-    QuestionPreprocessor,
-    SceneGraphPreprocessor,
+    PreprocessorCollection,
 )
-
-
-@dataclass(frozen=True)
-class PreprocessorCollection:
-    """Wrapper class for storing a preprocessor feature mappings."""
-
-    questions: QuestionPreprocessor
-    scene_graphs: SceneGraphPreprocessor
 
 
 class PreprocessingFactory:
