@@ -76,33 +76,20 @@ class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-met
             scene_gcn_layer = self.scene_gcn_layers[idx]
 
             dependencies.x = text_gcn_layer(dependencies.x, dependencies.edge_index)
-            # TODO experiment without ReLU, or even gated tanh/relu
-            # if idx != len(self.text_gcn_layers) - 1:
-            #     dependencies.x = F.relu(dependencies.x)
-
             objects.x = scene_gcn_layer(objects.x, objects.edge_index)
-            # TODO experiment without ReLU, or even gated tanh/relu
-            # if idx != len(self.scene_gcn_layers) - 1:
-            #     objects.x = F.relu(objects.x)
 
             # Apply dense bidirectional attention to node features
             # TODO  multihead_attn = torch.nn.MultiheadAttention(300, self.heads)
 
         # Apply any leftover conv layers for text gcn
-        for leftover_idx in range(idx, len(self.text_gcn_layers)):
+        for leftover_idx in range(idx + 1, len(self.text_gcn_layers)):
             text_gcn_layer = self.text_gcn_layers[leftover_idx]
             dependencies.x = text_gcn_layer(dependencies.x, dependencies.edge_index)
-            # TODO experiment without ReLU, or even gated tanh/relu
-            # if leftover_idx != len(self.text_gcn_layers) - 1:
-            #     dependencies.x = F.relu(dependencies.x)
 
         # Apply any leftover conv layers for scene gcn
-        for leftover_idx in range(idx, len(self.scene_gcn_layers)):
+        for leftover_idx in range(idx + 1, len(self.scene_gcn_layers)):
             scene_gcn_layer = self.scene_gcn_layers[leftover_idx]
             objects.x = scene_gcn_layer(objects.x, objects.edge_index)
-            # TODO experiment without ReLU, or even gated tanh/relu
-            # if leftover_idx != len(self.scene_gcn_layers) - 1:
-            #     objects.x = F.relu(objects.x)
 
         # Attention alignment like in "aligned dual channel gcns for vqa"
         # question_words: (batch_size, max_question_length, num_word_feats)
