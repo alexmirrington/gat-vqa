@@ -137,7 +137,17 @@ class DatasetFactory:
                         scene_graphs = GQASceneGraphs(
                             filemap,
                             GQASplit(subset.split),
-                            transform=SceneGraphTransformer(),
+                            transform=SceneGraphTransformer(
+                                object_count=len(
+                                    preprocessors.scene_graphs.object_to_index
+                                ),
+                                relation_count=len(
+                                    preprocessors.scene_graphs.rel_to_index
+                                ),
+                                attribute_count=len(
+                                    preprocessors.scene_graphs.attr_to_index
+                                ),
+                            ),
                         )
                 elif feature.name == GQAFeatures.SPATIAL.value:
                     spatial = GQASpatial(filemap)

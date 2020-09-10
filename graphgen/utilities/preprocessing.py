@@ -311,38 +311,91 @@ class QuestionTransformer:
 class SceneGraphTransformer:
     """Class for applying transformations to scene graphs."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self, object_count: int, relation_count: int, attribute_count: int
+    ) -> None:
         """Initialise a `SceneGraphTransformer` instance."""
         self.vectors = GloVe(name="6B", dim=300)
+        self.object_count = object_count
+        self.relation_count = relation_count
+        self.attribute_count = attribute_count
+
+    def build_node_graph(
+        self,
+        object_coos: Tuple[List[int], List[int]],
+        objects: List[str],
+        relations: List[str],
+        attributes: List[List[str]],
+        add_skip_edges: bool = False,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Build a graph containing objects, relation and attribute nodes."""
+        # pylint: disable=too-many-locals
+        # Add obj->relation, relation->obj and attr->object edges
+        sources = object_coos[0] if add_skip_edges else []
+        targets = object_coos[1] if add_skip_edges else []
+        feats = []
+        feats.append(
+            self.vectors.get_vecs_by_tokens(objects, lower_case_backup=True)
+            if len(objects) > 0
+            else torch.tensor([])  # pylint: disable=not-callable
+        )
+        offset_idx = len(objects)
+        # Add source->relation and relation->target edges
+        for idx in range(len(relations)):
+            source_node = object_coos[0][idx]
+            target_node = object_coos[1][idx]
+            # Treat every relation as unique, i.e. two "on" relations will
+            # correspond to two nodes in the final graph. The relation node
+            # has index `len(objects) + idx` in the graph.
+            sources += [source_node, offset_idx + idx]
+            targets += [offset_idx + idx, target_node]
+        offset_idx += len(relations)
+        # Add relations to node features
+        feats.append(
+            self.vectors.get_vecs_by_tokens(relations, lower_case_backup=True)
+            if len(relations) > 0
+            else torch.tensor([])  # pylint: disable=not-callable
+        )
+        # Add attr->object edges
+        attr_to_idx: Dict[str, int] = {}
+        for obj_idx, obj_attrs in enumerate(attributes):
+            for attr in obj_attrs:
+                # We don't treat attributes as unique, since all edges are
+                # outgoing from attributes, i.e. two "blue" relations will
+                # correspond to one node in the final graph, with outgoing
+                # edges to all blue objects.
+                if attr not in attr_to_idx:
+                    attr_to_idx[attr] = len(attr_to_idx)
+                sources.append(offset_idx + attr_to_idx[attr])
+                targets.append(obj_idx)
+
+        # Add attributes to node features
+        # (requires python 3.7+, to assert order of inserted keys in attr_to_idx)
+        feats.append(
+            self.vectors.get_vecs_by_tokens(
+                list(attr_to_idx.keys()), lower_case_backup=True
+            )
+            if len(attr_to_idx) > 0
+            else torch.tensor([])  # pylint: disable=not-callable
+        )
+        return (
+            torch.tensor(  # pylint:disable=not-callable
+                (sources, targets), dtype=torch.long
+            ),
+            torch.cat(feats, dim=0),
+        )
 
     def __call__(self, data: SceneGraph) -> TrainableSceneGraph:
         """Transform data into a trainable format."""
-        coos = torch.tensor(  # pylint: disable=not-callable
-            data["coos"], dtype=torch.long
-        )
-        relations = (
-            self.vectors.get_vecs_by_tokens(data["relations"], lower_case_backup=True)
-            if len(data["relations"]) > 0
-            else torch.tensor([])  # pylint: disable=not-callable
-        )
-        attributes = [
-            self.vectors.get_vecs_by_tokens(obj_attrs, lower_case_backup=True)
-            if len(obj_attrs) > 0
-            else torch.tensor([])  # pylint: disable=not-callable
-            for obj_attrs in data["attributes"]
-        ]
-        labels = (
-            self.vectors.get_vecs_by_tokens(data["labels"], lower_case_backup=True)
-            if len(data["labels"]) > 0
-            else torch.tensor([])  # pylint: disable=not-callable
+        coos, feats = self.build_node_graph(
+            data["coos"], data["labels"], data["relations"], data["attributes"]
         )
         return {
             "imageId": data["imageId"],
             "boxes": torch.tensor(  # pylint: disable=not-callable
                 data["boxes"], dtype=torch.float
             ),
-            "attributes": attributes,
-            "objects": Data(edge_index=coos, x=labels, edge_attr=relations),
+            "objects": Data(edge_index=coos, x=feats),
         }
 
 
