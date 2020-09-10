@@ -1,4 +1,6 @@
 """Implementation of a MAC recurrent cell write unit."""
+from typing import Sequence
+
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -14,7 +16,7 @@ class WriteUnit(nn.Module):  # type: ignore  # pylint: disable=abstract-method  
         super().__init__()
         self.hidden_dim = hidden_dim
         self.self_attention = self_attention
-
+        # TODO move from hidden_dim to memory_dim, kb_dim and control_dim
         if self.self_attention:
             self.control = xavier_uniform_linear(self.hidden_dim, self.hidden_dim)
             self.attn = xavier_uniform_linear(self.hidden_dim, 1)
@@ -23,9 +25,17 @@ class WriteUnit(nn.Module):  # type: ignore  # pylint: disable=abstract-method  
             self.concat = xavier_uniform_linear(self.hidden_dim * 2, self.hidden_dim)
 
     def forward(
-        self, memories: torch.Tensor, retrieved: torch.Tensor, controls: torch.Tensor
+        self,
+        memories: Sequence[torch.Tensor],
+        retrieved: torch.Tensor,
+        controls: Sequence[torch.Tensor],
     ) -> torch.Tensor:
         """Propagate data through the model."""
+        # print(f"{self.__class__.__name__}")
+        # print(f"{[m.size() for m in memories]=}")
+        # print(f"{retrieved.size()=}")
+        # print(f"{[c.size() for c in controls]=}")
+
         # optionally project info if config.writeInfoProj:
 
         # optional info nonlinearity if writeInfoAct != 'NON'

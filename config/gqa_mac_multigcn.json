@@ -43,13 +43,13 @@
     "text_syntactic_graph": {
       "gcn": "gat",
       "pooling": null,
-      "layer_sizes": [300, 300, 512]
+      "layer_sizes": [300, 300, 300]
     },
     "scene_graph": {
       "gcn": "gat",
       "pooling": null,
-      "layer_sizes": [300, 300, 512],
-      "max_objects": 512
+      "layer_sizes": [300, 300, 300],
+      "max_objects": 100
     }
   },
   "training": {

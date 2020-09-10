@@ -33,9 +33,12 @@ class SceneGraph(TypedDict):
     imageId: str
     boxes: List[Tuple[int, int, int, int]]
     labels: List[str]
-    attributes: List[str]
-    coos: Tuple[List[int], List[int]]
+    attributes: List[List[str]]
     relations: List[str]
+    coos: Tuple[List[int], List[int]]
+    indexed_labels: List[int]
+    indexed_attributes: List[List[int]]
+    indexed_relations: List[int]
 
 
 class TrainableSceneGraph(TypedDict):

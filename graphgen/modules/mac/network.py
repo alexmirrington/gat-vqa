@@ -34,20 +34,20 @@ class MACCell(nn.Module):  # type: ignore  # pylint: disable=abstract-method  # 
         self.memory_variational_dropout = memory_variational_dropout
         self.memory_dropout = memory_variational_dropout_amount
 
-        if control is not None and control.hidden_dim != self.hidden_dim:
+        if control is not None and control.control_dim != self.hidden_dim:
             raise ValueError(
                 f"MACCell parameter {self.hidden_dim=} and \
-                control unit parameter {control.hidden_dim} must be equal."
+                control unit parameter {control.control_dim} must be equal."
             )
 
         self.control = (
-            ControlUnit(hidden_dim=self.hidden_dim) if control is None else control
+            ControlUnit(control_dim=self.hidden_dim) if control is None else control
         )
 
-        if read is not None and read.hidden_dim != self.hidden_dim:
+        if read is not None and read.memory_dim != self.hidden_dim:
             raise ValueError(
                 f"MACCell parameter {self.hidden_dim=} and \
-                read unit parameter {read.hidden_dim} must be equal."
+                read unit parameter {read.memory_dim} must be equal."
             )
 
         if (
@@ -61,7 +61,7 @@ class MACCell(nn.Module):  # type: ignore  # pylint: disable=abstract-method  # 
 
         self.read = (
             ReadUnit(
-                hidden_dim=self.hidden_dim,
+                memory_dim=self.hidden_dim,
                 variational_dropout=self.memory_variational_dropout,
             )
             if read is None

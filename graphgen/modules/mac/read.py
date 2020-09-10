@@ -1,4 +1,6 @@
 """Implementation of a MAC recurrent cell read unit."""
+from typing import Sequence
+
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -12,42 +14,49 @@ class ReadUnit(nn.Module):  # type: ignore  # pylint: disable=abstract-method  #
     # pylint: disable=too-many-instance-attributes
     def __init__(
         self,
-        hidden_dim: int = 512,
-        kb_dim: int = 512,
+        memory_dim: int = 512,  # TODO consider different kb_dim
         variational_dropout: bool = True,
         dropout: float = 0.15,
     ):
         """Initialise the read unit."""
         super().__init__()
-        self.hidden_dim = hidden_dim
-        self.kb_dim = kb_dim
+        self.memory_dim = memory_dim
         self.variational_dropout = variational_dropout
         self.dropout = dropout
 
         self.read_dropout = nn.Dropout(self.dropout)
-        self.mem_proj = xavier_uniform_linear(self.hidden_dim, self.hidden_dim)
-        self.kb_proj = xavier_uniform_linear(self.kb_dim, self.hidden_dim)
-        self.concat = xavier_uniform_linear(self.hidden_dim * 2, self.hidden_dim)
-        self.concat2 = xavier_uniform_linear(self.hidden_dim, self.hidden_dim)
-        self.attn = xavier_uniform_linear(self.hidden_dim, 1)
+        self.mem_proj = xavier_uniform_linear(self.memory_dim, self.memory_dim)
+        self.kb_proj = xavier_uniform_linear(self.memory_dim, self.memory_dim)
+        self.concat = xavier_uniform_linear(self.memory_dim * 2, self.memory_dim)
+        self.concat2 = xavier_uniform_linear(self.memory_dim, self.memory_dim)
+        self.attn = xavier_uniform_linear(self.memory_dim, 1)
 
     def forward(
         self,
-        memory: torch.Tensor,
+        memories: Sequence[torch.Tensor],
         know: torch.Tensor,
-        control: torch.Tensor,
+        controls: Sequence[torch.Tensor],
         masks: torch.Tensor,
     ) -> torch.Tensor:
         """Propagate data through the model."""
+        # print(f"{self.__class__.__name__}")
+        # print(f"{[m.size() for m in memories]=}")
+        # print(f"{know.size()=}")
+        # print(f"{[c.size() for c in controls]=}")
+        # print(f"{masks.size()=}")
+
         # Step 1: knowledge base / memory interactions
+        last_mem = memories[-1]
         if self.training:
             if self.variational_dropout:
-                last_mem = memory[-1] * masks
+                last_mem = memories[-1] * masks
             else:
-                last_mem = self.read_dropout(memory[-1])
+                last_mem = self.read_dropout(memories[-1])
         know = self.read_dropout(know.permute(0, 2, 1))
         proj_mem = self.mem_proj(last_mem).unsqueeze(1)
-        proj_know = self.kb_proj(know)
+        proj_know = self.kb_proj(
+            know
+        )  # proj_know is (batch_size, num_objects, memory_dim)
         concat = torch.cat(
             [
                 proj_mem * proj_know,
@@ -63,7 +72,7 @@ class ReadUnit(nn.Module):  # type: ignore  # pylint: disable=abstract-method  #
         )  # if readMemProj ++ second projection and nonlinearity if readMemAct
 
         # Step 2: compute interactions with control (if config.readCtrl)
-        attn = F.elu(concat * control[-1].unsqueeze(1))
+        attn = F.elu(concat * controls[-1].unsqueeze(1))
 
         # if readCtrlConcatInter torch.cat([interactions, concat])
 

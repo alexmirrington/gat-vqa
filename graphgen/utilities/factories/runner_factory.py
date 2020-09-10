@@ -208,12 +208,11 @@ class RunnerFactory:
                 cell=MACCell(
                     config.model.mac.hidden_dim,
                     control=ControlUnit(
-                        hidden_dim=config.model.mac.hidden_dim,
-                        length=config.model.mac.length,
+                        control_dim=config.model.mac.hidden_dim,
+                        length=config.model.mac.length,  # TODO set question input dim
                     ),
                     read=ReadUnit(
-                        hidden_dim=config.model.mac.hidden_dim,
-                        kb_dim=config.model.scene_graph.max_objects,
+                        memory_dim=config.model.mac.hidden_dim,
                     ),
                     write=WriteUnit(hidden_dim=config.model.mac.hidden_dim),
                 ),

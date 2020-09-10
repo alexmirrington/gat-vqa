@@ -232,14 +232,20 @@ class GQASceneGraphPreprocessor(SceneGraphPreprocessor):
                     obj_data["y"] + obj_data["h"],
                 )
                 labels[-1].append(name)
+                if name not in self._object_to_index:
+                    self._object_to_index[name] = len(self._object_to_index)
                 boxes[-1].append(box)
                 attrs[-1].append(obj_data["attributes"])
+                for attr in obj_data["attributes"]:
+                    if attr not in self._attr_to_index:
+                        self._attr_to_index[attr] = len(self._attr_to_index)
                 # Populate relation indices
                 for relation in obj_data["relations"]:
                     coos[-1][0].append(obj_key_to_idx[obj_key])
                     coos[-1][1].append(obj_key_to_idx[relation["object"]])
                     relations[-1].append(relation["name"])
-
+                    if relation["name"] not in self._rel_to_index:
+                        self._rel_to_index[relation["name"]] = len(self._rel_to_index)
         return boxes, labels, attrs, coos, relations
 
     def __call__(self, data: Sequence[GQASceneGraph]) -> List[SceneGraph]:
@@ -261,8 +267,14 @@ class GQASceneGraphPreprocessor(SceneGraphPreprocessor):
                     "boxes": boxes_,
                     "labels": labels_,
                     "attributes": attrs_,
-                    "coos": coos_,
                     "relations": rels_,
+                    "coos": coos_,
+                    "indexed_labels": [self._object_to_index[lbl] for lbl in labels_],
+                    "indexed_attributes": [
+                        [self._attr_to_index[attr] for attr in obj_attrs]
+                        for obj_attrs in attrs_
+                    ],
+                    "indexed_relations": [self._rel_to_index[rel] for rel in rels_],
                 }
                 for scene, boxes_, labels_, attrs_, coos_, rels_ in zip(
                     data, boxes, labels, attrs, coos, rels
