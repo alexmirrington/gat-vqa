@@ -40,24 +40,23 @@
       "length": 6,
       "hidden_dim": 512
     },
-    "text_syntactic_graph": {
-      "gcn": "gat",
-      "pooling": null,
-      "layer_sizes": [300, 300, 300]
+    "question": {
+      "input_dim": 300,
+      "hidden_dim": 512,
+      "bidirectional": true
     },
     "scene_graph": {
       "gcn": "gat",
       "pooling": null,
-      "layer_sizes": [300, 300, 300],
-      "max_objects": 100
+      "layer_sizes": [300, 300, 300]
     }
   },
   "training": {
     "epochs": 20,
-    "log_step": 256,
+    "log_step": 512,
     "eval_subset": null,
     "dataloader": {
-      "batch_size": 64,
+      "batch_size": 32,
       "workers": 1
     },
     "optimiser": {
@@ -65,8 +64,8 @@
       "learning_rate": 1e-4,
       "momentum": null,
       "weight_decay": 5e-4,
-      "grad_clip": 8,
-      "schedule": true
+      "grad_clip": null,
+      "schedule": false
     },
     "data": {
       "features": [

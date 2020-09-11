@@ -311,14 +311,9 @@ class QuestionTransformer:
 class SceneGraphTransformer:
     """Class for applying transformations to scene graphs."""
 
-    def __init__(
-        self, object_count: int, relation_count: int, attribute_count: int
-    ) -> None:
+    def __init__(self) -> None:
         """Initialise a `SceneGraphTransformer` instance."""
         self.vectors = GloVe(name="6B", dim=300)
-        self.object_count = object_count
-        self.relation_count = relation_count
-        self.attribute_count = attribute_count
 
     def build_node_graph(
         self,

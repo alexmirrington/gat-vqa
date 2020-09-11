@@ -1,5 +1,5 @@
 """Basic GCN implementation."""
-from typing import Callable, Sequence
+from typing import Callable, Optional, Sequence, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -13,7 +13,7 @@ class GCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
     def __init__(
         self,
         shape: Sequence[int],
-        pool_func: Callable[..., torch.Tensor],
+        pool_func: Optional[Callable[..., torch.Tensor]],
     ) -> None:
         """Create a GCN with layer sizes according to `shape`."""
         super().__init__()
@@ -23,7 +23,7 @@ class GCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
             self.conv_layers.append(GCNConv(shape[idx - 1], shape[idx]))
         self.pool = pool_func
 
-    def forward(self, data: Data) -> torch.Tensor:
+    def forward(self, data: Data) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Perform a forward GCN pass."""
         feats, edge_index = data.x, data.edge_index
 
@@ -33,6 +33,7 @@ class GCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
             # feats = F.dropout(feats, training=self.training)
         feats = self.conv_layers[-1](feats, edge_index)
 
-        # Simple mean pooling over nodes
-        pooled_feats = self.pool(feats, data.batch)
-        return pooled_feats
+        if self.pool is not None:
+            pooled_feats = self.pool(feats, data.batch)
+            return feats, pooled_feats
+        return feats, None

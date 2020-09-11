@@ -1,7 +1,7 @@
 """Classes storing model configuration information."""
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Union
 
 
 class ModelName(Enum):
@@ -84,13 +84,6 @@ class GCNModelConfig:
 
 
 @dataclass(frozen=True)
-class SceneGraphGCNModelConfig(GCNModelConfig):
-    """Class for storing scene graph GCN model configuration information."""
-
-    max_objects: int
-
-
-@dataclass(frozen=True)
 class MACModelConfig:
     """Class for storing MAC network model configuration information."""
 
@@ -114,12 +107,21 @@ class MultiGCNModelConfig(ModelConfig):
 
 
 @dataclass(frozen=True)
+class LSTMModelConfig:
+    """Class for storing LSTM model configuration information."""
+
+    input_dim: int
+    hidden_dim: int
+    bidirectional: bool
+
+
+@dataclass(frozen=True)
 class MACMultiGCNModelConfig(ModelConfig):
     """Class for storing model configuration information."""
 
     mac: MACModelConfig
-    text_syntactic_graph: GCNModelConfig
-    scene_graph: SceneGraphGCNModelConfig
+    question: Union[LSTMModelConfig, GCNModelConfig]
+    scene_graph: Optional[GCNModelConfig]
 
     def __post_init__(self) -> None:
         """Perform post-init checks on fields."""

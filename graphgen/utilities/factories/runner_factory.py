@@ -10,12 +10,24 @@ from ...config.model import (
     Backbone,
     E2EMultiGCNModelConfig,
     FasterRCNNModelConfig,
+    GCNModelConfig,
+    GCNName,
+    GCNPoolingName,
+    LSTMModelConfig,
     MACMultiGCNModelConfig,
     ModelName,
     MultiGCNModelConfig,
 )
 from ...config.training import OptimiserName
-from ...modules import GCN, E2EMultiGCN, FasterRCNN, GraphRCNN, MACMultiGCN, MultiGCN
+from ...modules import (
+    GAT,
+    GCN,
+    E2EMultiGCN,
+    FasterRCNN,
+    GraphRCNN,
+    MACMultiGCN,
+    MultiGCN,
+)
 from ...modules.mac import MACCell, MACNetwork
 from ...modules.mac.control import ControlUnit
 from ...modules.mac.output import OutputUnit
@@ -197,8 +209,38 @@ class RunnerFactory:
 
         num_answer_classes = len(preprocessors.questions.index_to_answer)
 
-        assert config.model.text_syntactic_graph is not None
-        assert config.model.scene_graph is not None
+        assert config.model.question is not None
+
+        def build_gcn(config: GCNModelConfig) -> torch.nn.Module:
+            if config.pooling is None:
+                pool_func = None
+            elif config.pooling == GCNPoolingName.GLOBAL_MEAN:
+                pool_func = global_mean_pool
+            else:
+                raise NotImplementedError()
+            if config.gcn == GCNName.GCN:
+                return GCN(shape=config.layer_sizes, pool_func=pool_func)
+            if config.gcn == GCNName.GAT:
+                return GAT(shape=config.layer_sizes, heads=1, pool_func=pool_func)
+            raise NotImplementedError()
+
+        # Create question module
+        if isinstance(config.model.question, LSTMModelConfig):
+            question_module = torch.nn.LSTM(
+                config.model.question.input_dim,
+                config.model.question.hidden_dim // 2
+                if config.model.question.bidirectional
+                else config.model.question.hidden_dim,
+                batch_first=True,
+                bidirectional=config.model.question.bidirectional,
+            )
+        elif isinstance(config.model.question, GCNModelConfig):
+            question_module = build_gcn(config.model.question)
+
+        # Create scene gcn
+        scene_gcn = None
+        if config.model.scene_graph is not None:
+            scene_gcn = build_gcn(config.model.scene_graph)
 
         model = MACMultiGCN(
             mac_network=MACNetwork(
@@ -217,11 +259,8 @@ class RunnerFactory:
                     write=WriteUnit(hidden_dim=config.model.mac.hidden_dim),
                 ),
             ),
-            text_gcn_shape=config.model.text_syntactic_graph.layer_sizes,
-            text_gcn_conv=config.model.text_syntactic_graph.gcn,
-            scene_gcn_shape=config.model.scene_graph.layer_sizes,
-            scene_gcn_conv=config.model.scene_graph.gcn,
-            max_objects=config.model.scene_graph.max_objects,
+            question_module=question_module,
+            scene_gcn=scene_gcn,
         )
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()
