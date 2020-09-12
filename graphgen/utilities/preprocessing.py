@@ -338,10 +338,11 @@ class SceneGraphTransformer:
                 if len(feats) > 0
                 else torch.tensor([])  # pylint: disable=not-callable
             )
+        dim = self.num_objects + self.num_relations + self.num_attributes
         return (
             torch.nn.functional.one_hot(
                 feats,
-                num_classes=self.num_objects + self.num_relations + self.num_attributes,
+                num_classes=dim,
             ).type(torch.FloatTensor)
             if len(feats) > 0
             else torch.tensor([])  # pylint: disable=not-callable
@@ -422,6 +423,59 @@ class SceneGraphTransformer:
             torch.cat(feats, dim=0),
         )
 
+    def build_concat_kb(
+        self,
+        object_coos: Tuple[List[int], List[int]],
+        objects: List[str],
+        relations: List[str],
+        attributes: List[List[str]],
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Build a knowledgebase of concatenated glove vectors."""
+        sources = object_coos[0]
+        targets = object_coos[1]
+        feats = self.embed_feats(objects)
+        # Mean pool relations
+        if len(objects) > 0:
+            rels: List[List[str]] = [[] for _ in objects]  # relations for each object
+            for idx, rel in enumerate(relations):
+                source_obj_idx = sources[idx]
+                target_obj_idx = targets[idx]
+                rels[source_obj_idx].append(rel)  # TODO determine whether to add source
+                rels[target_obj_idx].append(rel)
+            rel_feats = torch.stack(
+                [
+                    torch.mean(self.embed_feats(obj_rels), axis=0)
+                    if len(obj_rels) > 0
+                    else torch.zeros(self.vectors.dim)
+                    for obj_rels in rels
+                ],
+                dim=0,
+            )
+            assert rel_feats.size() == feats.size()
+            attr_feats = torch.stack(
+                [
+                    torch.mean(self.embed_feats(obj_attrs), axis=0)
+                    if len(obj_attrs) > 0
+                    else torch.zeros(self.vectors.dim)
+                    for obj_attrs in attributes
+                ],
+                dim=0,
+            )
+            assert attr_feats.size() == feats.size()
+
+            return (
+                torch.tensor(  # pylint:disable=not-callable
+                    (sources, targets), dtype=torch.long
+                ),
+                torch.cat((feats, rel_feats, attr_feats), dim=1),
+            )
+        return (
+            torch.tensor(  # pylint:disable=not-callable
+                (sources, targets), dtype=torch.long
+            ),
+            feats,
+        )
+
     def __call__(self, data: SceneGraph) -> TrainableSceneGraph:
         """Transform data into a trainable format."""
         objects: Union[List[str], List[int]] = (
@@ -436,9 +490,11 @@ class SceneGraphTransformer:
             else data["indexed_attributes"]
         )
 
-        coos, feats = self.build_node_graph(
-            data["coos"], objects, relations, attributes
-        )
+        # coos, feats = self.build_node_graph(
+        #     data["coos"], objects, relations, attributes
+        # )
+        coos, feats = self.build_concat_kb(data["coos"], objects, relations, attributes)  # type: ignore  # noqa: B950
+
         return {
             "imageId": data["imageId"],
             "boxes": torch.tensor(  # pylint: disable=not-callable

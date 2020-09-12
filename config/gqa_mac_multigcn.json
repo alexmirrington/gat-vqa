@@ -46,25 +46,24 @@
       "bidirectional": true
     },
     "scene_graph": {
-      "gcn": "gcn",
-      "pooling": null,
-      "layer_sizes": [2630, 2630, 2630],
-      "embedding": "one_hot"
+      "input_dim": 900,
+      "hidden_dim": 512,
+      "bidirectional": true
     }
   },
   "training": {
     "epochs": 20,
-    "log_step": 1024,
+    "log_step": 256,
     "eval_subset": null,
     "dataloader": {
-      "batch_size": 16,
+      "batch_size": 64,
       "workers": 1
     },
     "optimiser": {
       "name": "adam",
-      "learning_rate": 1e-4,
+      "learning_rate": 3e-4,
       "momentum": null,
-      "weight_decay": 5e-4,
+      "weight_decay": 0,
       "grad_clip": null,
       "schedule": false
     },

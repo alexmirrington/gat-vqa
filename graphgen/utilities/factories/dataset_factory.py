@@ -16,7 +16,7 @@ from ...config.gqa import (
     GQASplit,
     GQAVersion,
 )
-from ...config.model import MACMultiGCNModelConfig
+from ...config.model import GCNModelConfig, MACMultiGCNModelConfig
 from ...datasets.gqa import (
     GQA,
     GQAImages,
@@ -141,7 +141,7 @@ class DatasetFactory:
                             transform=SceneGraphTransformer(
                                 embedding=config.model.scene_graph.embedding
                                 if isinstance(config.model, MACMultiGCNModelConfig)
-                                and config.model.scene_graph is not None
+                                and isinstance(config.model.scene_graph, GCNModelConfig)
                                 else None,  # TODO parameterise in config
                                 num_objects=len(
                                     preprocessors.scene_graphs.object_to_index

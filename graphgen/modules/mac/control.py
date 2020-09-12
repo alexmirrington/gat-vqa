@@ -48,24 +48,30 @@ class ControlUnit(nn.Module):  # type: ignore  # pylint: disable=abstract-method
         controls: Sequence[torch.Tensor],
     ) -> torch.Tensor:
         """Propagate data through the model."""
-        # print(f"{self.__class__.__name__}")
-        # print(f"{context.size()=}")
-        # print(f"{question.size()=}")
-        # print(f"{[c.size() for c in controls]=}")
-
         cur_step = len(controls) - 1
-        control = controls[-1]
+        # control = controls[-1]  # Needed if using control_question
 
-        question = torch.tanh(  # ELU?
+        # prepare question input to control
+        question = F.elu(  # torch.tanh
             self.shared_control_proj(question)  # Included in MACCell.__call__
         )  # TODO: avoid repeating call
+
+        # question = torch.tanh(  # ELU?
+        #     self.shared_control_proj(question)  # Included in MACCell.__call__
+        # )  # TODO: avoid repeating call
+
         position_aware = self.position_aware[cur_step](question)
         # Unshared due to --controlInputUnshared being set by default in
         # original code base.
 
-        control_question = torch.cat([control, position_aware], 1)
-        control_question = self.control_question(control_question)
-        control_question = control_question.unsqueeze(1)
+        # Compute "continuous" control state given previous control and question.
+        # control inputs: question and previous control. Runs if given CLEVR args1.txt,
+        # but not included for GQA
+        # control_question = torch.cat([control, position_aware], 1)
+        # control_question = self.control_question(control_question)
+        # control_question = control_question.unsqueeze(1)
+
+        control_question = position_aware.unsqueeze(1)
 
         context_prod = control_question * context
 

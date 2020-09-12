@@ -129,7 +129,7 @@ class MACMultiGCNModelConfig(ModelConfig):
 
     mac: MACModelConfig
     question: Union[LSTMModelConfig, GCNModelConfig]
-    scene_graph: Optional[GCNModelConfig]
+    scene_graph: Optional[Union[LSTMModelConfig, GCNModelConfig]]
 
     def __post_init__(self) -> None:
         """Perform post-init checks on fields."""

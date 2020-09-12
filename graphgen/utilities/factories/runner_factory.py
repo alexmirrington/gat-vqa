@@ -238,9 +238,18 @@ class RunnerFactory:
             question_module = build_gcn(config.model.question)
 
         # Create scene gcn
-        scene_gcn = None
-        if config.model.scene_graph is not None:
-            scene_gcn = build_gcn(config.model.scene_graph)
+        scene_graph_module = None
+        if isinstance(config.model.scene_graph, LSTMModelConfig):
+            scene_graph_module = torch.nn.LSTM(
+                config.model.scene_graph.input_dim,
+                config.model.scene_graph.hidden_dim // 2
+                if config.model.scene_graph.bidirectional
+                else config.model.scene_graph.hidden_dim,
+                batch_first=True,
+                bidirectional=config.model.scene_graph.bidirectional,
+            )
+        elif isinstance(config.model.scene_graph, GCNModelConfig):
+            scene_graph_module = build_gcn(config.model.scene_graph)
 
         model = MACMultiGCN(
             mac_network=MACNetwork(
@@ -260,7 +269,7 @@ class RunnerFactory:
                 ),
             ),
             question_module=question_module,
-            scene_gcn=scene_gcn,
+            scene_graph_module=scene_graph_module,
         )
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()

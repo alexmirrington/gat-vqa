@@ -5,6 +5,8 @@ import torch
 from torch_geometric.data import Batch
 from torch_geometric.utils import to_dense_batch
 
+from . import GAT, GCN
+
 
 class MACMultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
     """MAC network that uses multiple GCN inputs for its question and \
@@ -15,16 +17,19 @@ class MACMultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-
         self,
         mac_network: torch.nn.Module,
         question_module: torch.nn.Module,
-        scene_gcn: Optional[torch.nn.Module],
+        scene_graph_module: Optional[torch.nn.Module],
     ) -> None:
         """Create a multi-gcn model with bidirectional attention."""
         super().__init__()
         self.mac_network = mac_network
         self.question_module = question_module
-        self.scene_gcn = scene_gcn
+        self.scene_graph_module = scene_graph_module
+
         self.sg_proj = (
-            torch.nn.Linear(self.scene_gcn.shape[-1], self.mac_network.hidden_dim)
-            if self.scene_gcn is not None
+            torch.nn.Linear(
+                self.scene_graph_module.shape[-1], self.mac_network.hidden_dim
+            )
+            if isinstance(self.scene_graph_module, (GCN, GAT))
             else None
         )
 
@@ -72,30 +77,38 @@ class MACMultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-
             )
 
         # Get scene graph feats
-        sg_feats = objects.x
-        if self.scene_gcn is not None:
-            sg_feats, _ = self.scene_gcn(objects)
-        scene_graph_feats, _ = to_dense_batch(sg_feats, batch=objects.batch)
+        if isinstance(self.scene_graph_module, torch.nn.LSTM):
+            # Get dense text features for MAC contextual words
+            dense_object_feats, num_objects = to_dense_batch(
+                objects.x, batch=objects.batch
+            )
+            num_objects = torch.sum(num_objects, dim=1)
+            batch_size = dense_object_feats.size(0)
+            # Assume we have at least one object for samples with zero objects
+            num_objects = torch.maximum(num_objects, 1)
+            packed_object_feats = torch.nn.utils.rnn.pack_padded_sequence(
+                dense_object_feats,
+                num_objects,
+                batch_first=True,
+                enforce_sorted=False,
+            )
+            lstm_out, _ = self.scene_graph_module(packed_object_feats)
+            lstm_out, _ = torch.nn.utils.rnn.pad_packed_sequence(
+                lstm_out, batch_first=True
+            )
+            scene_graph_feats = lstm_out  # (batch_size, max_objects, hidden_dim)
+            if self.sg_proj is not None:
+                scene_graph_feats = self.sg_proj(scene_graph_feats)
+        else:
+            sg_feats = objects.x
+            if self.scene_gcn is not None:
+                sg_feats, _ = self.scene_gcn(objects)
+            # (batch_size, max_objects, object_dim)
+            scene_graph_feats, _ = to_dense_batch(sg_feats, batch=objects.batch)
+            if self.sg_proj is not None:
+                scene_graph_feats = self.sg_proj(scene_graph_feats)
 
-        # Pad scene graph feats to the correct dimension, or limit if too big
-        # if scene_graph_feats.size(1) >= self.max_objects:
-        #     scene_graph_feats = scene_graph_feats[:, : self.max_objects, :]
-        # else:
-        #     scene_graph_feats = torch.cat(
-        #         (
-        #             scene_graph_feats,
-        #             torch.zeros(
-        #                 (
-        #                     scene_graph_feats.size(0),
-        #                     self.max_objects - scene_graph_feats.size(1),
-        #                     scene_graph_feats.size(2),
-        #                 )
-        #             ).to(scene_graph_feats.device),
-        #         ),
-        #         dim=1,
-        #     )
-
-        scene_graph_feats = torch.transpose(self.sg_proj(scene_graph_feats), 1, 2)
+        scene_graph_feats = torch.transpose(scene_graph_feats, 1, 2)
 
         # MAC network expects a tuple of tensors, (contextual_words, question, img).
         # `contextual_words` has size (batch_size, max_word_length, hidden_dim),
