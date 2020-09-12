@@ -85,7 +85,7 @@ class MACMultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-
             num_objects = torch.sum(num_objects, dim=1)
             batch_size = dense_object_feats.size(0)
             # Assume we have at least one object for samples with zero objects
-            num_objects = torch.maximum(num_objects, 1)
+            num_objects = torch.clamp(num_objects, min=1)
             packed_object_feats = torch.nn.utils.rnn.pack_padded_sequence(
                 dense_object_feats,
                 num_objects,
