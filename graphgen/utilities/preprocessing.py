@@ -1,6 +1,6 @@
 """Module containing utilities for preprocessing data."""
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import stanza
 import torch
@@ -8,6 +8,7 @@ from torch_geometric.data import Data
 from torchtext.vocab import GloVe
 from tqdm import tqdm
 
+from ..config.model import EmbeddingName
 from ..schemas.common import (
     Question,
     SceneGraph,
@@ -311,16 +312,47 @@ class QuestionTransformer:
 class SceneGraphTransformer:
     """Class for applying transformations to scene graphs."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        embedding: Optional[EmbeddingName],
+        num_objects: int,
+        num_relations: int,
+        num_attributes: int,
+    ) -> None:
         """Initialise a `SceneGraphTransformer` instance."""
-        self.vectors = GloVe(name="6B", dim=300)
+        self.embedding = embedding
+        self.num_objects = num_objects
+        self.num_relations = num_relations
+        self.num_attributes = num_attributes
+        self.vectors = (
+            GloVe(name="6B", dim=300)
+            if self.embedding is None or self.embedding == EmbeddingName.GLOVE
+            else None
+        )
+
+    def embed_feats(self, feats: Union[List[str], torch.Tensor]) -> torch.Tensor:
+        """Retrieve embeddings for a list of strings or Tensor."""
+        if self.vectors is not None:
+            return (
+                self.vectors.get_vecs_by_tokens(feats, lower_case_backup=True)
+                if len(feats) > 0
+                else torch.tensor([])  # pylint: disable=not-callable
+            )
+        return (
+            torch.nn.functional.one_hot(
+                feats,
+                num_classes=self.num_objects + self.num_relations + self.num_attributes,
+            ).type(torch.FloatTensor)
+            if len(feats) > 0
+            else torch.tensor([])  # pylint: disable=not-callable
+        )
 
     def build_node_graph(
         self,
         object_coos: Tuple[List[int], List[int]],
-        objects: List[str],
-        relations: List[str],
-        attributes: List[List[str]],
+        objects: Union[List[str], List[int]],
+        relations: Union[List[str], List[int]],
+        attributes: Union[List[List[str]], List[List[int]]],
         add_skip_edges: bool = False,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Build a graph containing objects, relation and attribute nodes."""
@@ -329,11 +361,13 @@ class SceneGraphTransformer:
         sources = object_coos[0] if add_skip_edges else []
         targets = object_coos[1] if add_skip_edges else []
         feats = []
-        feats.append(
-            self.vectors.get_vecs_by_tokens(objects, lower_case_backup=True)
-            if len(objects) > 0
-            else torch.tensor([])  # pylint: disable=not-callable
-        )
+        if isinstance(objects[0], int):
+            feats.append(
+                self.embed_feats(torch.tensor(objects))  # pylint: disable=not-callable
+            )
+        else:
+            feats.append(self.embed_feats(objects))
+
         offset_idx = len(objects)
         # Add source->relation and relation->target edges
         for idx in range(len(relations)):
@@ -346,15 +380,19 @@ class SceneGraphTransformer:
             targets += [offset_idx + idx, target_node]
         offset_idx += len(relations)
         # Add relations to node features
-        feats.append(
-            self.vectors.get_vecs_by_tokens(relations, lower_case_backup=True)
-            if len(relations) > 0
-            else torch.tensor([])  # pylint: disable=not-callable
-        )
+        if isinstance(relations[0], int):
+            feats.append(
+                self.embed_feats(
+                    torch.tensor(relations)  # pylint: disable=not-callable
+                    + self.num_objects
+                )
+            )
+        else:
+            feats.append(self.embed_feats(relations))
         # Add attr->object edges
-        attr_to_idx: Dict[str, int] = {}
+        attr_to_idx: Dict[Any, int] = {}
         for obj_idx, obj_attrs in enumerate(attributes):
-            for attr in obj_attrs:
+            for attr in obj_attrs:  # type: ignore
                 # We don't treat attributes as unique, since all edges are
                 # outgoing from attributes, i.e. two "blue" relations will
                 # correspond to one node in the final graph, with outgoing
@@ -363,16 +401,20 @@ class SceneGraphTransformer:
                     attr_to_idx[attr] = len(attr_to_idx)
                 sources.append(offset_idx + attr_to_idx[attr])
                 targets.append(obj_idx)
-
         # Add attributes to node features
         # (requires python 3.7+, to assert order of inserted keys in attr_to_idx)
-        feats.append(
-            self.vectors.get_vecs_by_tokens(
-                list(attr_to_idx.keys()), lower_case_backup=True
+        keys = list(attr_to_idx.keys())
+        if isinstance(keys[0], int):
+            feats.append(
+                self.embed_feats(
+                    torch.tensor(keys)  # pylint: disable=not-callable
+                    + self.num_objects
+                    + self.num_relations
+                )
             )
-            if len(attr_to_idx) > 0
-            else torch.tensor([])  # pylint: disable=not-callable
-        )
+        else:
+            feats.append(self.embed_feats(keys))
+
         return (
             torch.tensor(  # pylint:disable=not-callable
                 (sources, targets), dtype=torch.long
@@ -382,8 +424,24 @@ class SceneGraphTransformer:
 
     def __call__(self, data: SceneGraph) -> TrainableSceneGraph:
         """Transform data into a trainable format."""
+        objects: Union[List[str], List[int]] = (
+            data["labels"]
+            if self.embedding == EmbeddingName.GLOVE
+            else data["indexed_labels"]
+        )
+        relations: Union[List[str], List[int]] = (
+            data["relations"]
+            if self.embedding == EmbeddingName.GLOVE
+            else data["indexed_relations"]
+        )
+        attributes: Union[List[List[str]], List[List[int]]] = (
+            data["attributes"]
+            if self.embedding == EmbeddingName.GLOVE
+            else data["indexed_attributes"]
+        )
+
         coos, feats = self.build_node_graph(
-            data["coos"], data["labels"], data["relations"], data["attributes"]
+            data["coos"], objects, relations, attributes
         )
         return {
             "imageId": data["imageId"],

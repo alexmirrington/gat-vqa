@@ -26,6 +26,13 @@ class GCNPoolingName(Enum):
     GLOBAL_MEAN = "global_mean"
 
 
+class EmbeddingName(Enum):
+    """Enum specifying possible embedding names."""
+
+    GLOVE = "glove"
+    ONE_HOT = "one_hot"
+
+
 class Backbone(Enum):
     """Enum specifying possible backbones for the FasterRCNN object detector."""
 
@@ -81,6 +88,7 @@ class GCNModelConfig:
     gcn: GCNName
     pooling: Optional[GCNPoolingName]
     layer_sizes: List[int]
+    embedding: Optional[EmbeddingName]
 
 
 @dataclass(frozen=True)

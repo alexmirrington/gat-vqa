@@ -16,6 +16,7 @@ from ...config.gqa import (
     GQASplit,
     GQAVersion,
 )
+from ...config.model import MACMultiGCNModelConfig
 from ...datasets.gqa import (
     GQA,
     GQAImages,
@@ -137,7 +138,21 @@ class DatasetFactory:
                         scene_graphs = GQASceneGraphs(
                             filemap,
                             GQASplit(subset.split),
-                            transform=SceneGraphTransformer(),
+                            transform=SceneGraphTransformer(
+                                embedding=config.model.scene_graph.embedding
+                                if isinstance(config.model, MACMultiGCNModelConfig)
+                                and config.model.scene_graph is not None
+                                else None,  # TODO parameterise in config
+                                num_objects=len(
+                                    preprocessors.scene_graphs.object_to_index
+                                ),
+                                num_relations=len(
+                                    preprocessors.scene_graphs.rel_to_index
+                                ),
+                                num_attributes=len(
+                                    preprocessors.scene_graphs.attr_to_index
+                                ),
+                            ),
                         )
                 elif feature.name == GQAFeatures.SPATIAL.value:
                     spatial = GQASpatial(filemap)

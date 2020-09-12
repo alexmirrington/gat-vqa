@@ -46,17 +46,18 @@
       "bidirectional": true
     },
     "scene_graph": {
-      "gcn": "gat",
+      "gcn": "gcn",
       "pooling": null,
-      "layer_sizes": [300, 300, 300]
+      "layer_sizes": [2630, 2630, 2630],
+      "embedding": "one_hot"
     }
   },
   "training": {
     "epochs": 20,
-    "log_step": 512,
+    "log_step": 1024,
     "eval_subset": null,
     "dataloader": {
-      "batch_size": 32,
+      "batch_size": 16,
       "workers": 1
     },
     "optimiser": {
