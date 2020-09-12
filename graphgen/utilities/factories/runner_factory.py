@@ -8,26 +8,30 @@ from torch_geometric.nn import global_mean_pool
 from ...config import Config
 from ...config.model import (
     Backbone,
+    BottomUpModelConfig,
     E2EMultiGCNModelConfig,
     FasterRCNNModelConfig,
     GCNModelConfig,
     GCNName,
     GCNPoolingName,
     LSTMModelConfig,
-    MACMultiGCNModelConfig,
+    MACModelConfig,
     ModelName,
     MultiGCNModelConfig,
+    ReasoningMultiGCNModelConfig,
 )
 from ...config.training import OptimiserName
 from ...modules import (
     GAT,
     GCN,
+    BottomUpMultiGCN,
     E2EMultiGCN,
     FasterRCNN,
     GraphRCNN,
     MACMultiGCN,
     MultiGCN,
 )
+from ...modules.bottomup import BottomUp
 from ...modules.mac import MACCell, MACNetwork
 from ...modules.mac.control import ControlUnit
 from ...modules.mac.output import OutputUnit
@@ -53,7 +57,7 @@ class RunnerFactory:
             ModelName.FASTER_RCNN: RunnerFactory.create_faster_rcnn,
             ModelName.E2E_MULTI_GCN: RunnerFactory.create_e2emultigcn,
             ModelName.MULTI_GCN: RunnerFactory.create_multigcn,
-            ModelName.MAC_MULTI_GCN: RunnerFactory.create_mac_multigcn,
+            ModelName.REASONING_MULTI_GCN: RunnerFactory.create_reasoning_multigcn,
         }
 
     @staticmethod
@@ -193,17 +197,19 @@ class RunnerFactory:
         return runner
 
     @staticmethod
-    def create_mac_multigcn(
+    def create_reasoning_multigcn(
         config: Config,
         device: torch.device,
         preprocessors: PreprocessorCollection,
         datasets: DatasetCollection,
         resume: Optional[ResumeInfo],
     ) -> Runner:
-        """Create an End-to-end multi-channel GCN runner from a config."""
-        if not isinstance(config.model, MACMultiGCNModelConfig):
+        """Create a runner from a config."""
+        # pylint: disable=too-many-branches
+        if not isinstance(config.model, ReasoningMultiGCNModelConfig):
             raise TypeError(
-                f"Expected model config of type {MACMultiGCNModelConfig.__name__} \
+                f"Expected model config of type \
+                {ReasoningMultiGCNModelConfig.__name__} \
                 but got {config.model.__class__.__name__}"
             )
 
@@ -251,26 +257,52 @@ class RunnerFactory:
         elif isinstance(config.model.scene_graph, GCNModelConfig):
             scene_graph_module = build_gcn(config.model.scene_graph)
 
-        model = MACMultiGCN(
-            mac_network=MACNetwork(
-                length=config.model.mac.length,
-                hidden_dim=config.model.mac.hidden_dim,
-                classifier=OutputUnit(config.model.mac.hidden_dim, num_answer_classes),
-                cell=MACCell(
-                    config.model.mac.hidden_dim,
-                    control=ControlUnit(
-                        control_dim=config.model.mac.hidden_dim,
-                        length=config.model.mac.length,  # TODO set question input dim
+        if isinstance(config.model.reasoning, MACModelConfig):
+            model = MACMultiGCN(
+                mac_network=MACNetwork(
+                    length=config.model.reasoning.length,
+                    hidden_dim=config.model.reasoning.hidden_dim,
+                    classifier=OutputUnit(
+                        config.model.reasoning.hidden_dim, num_answer_classes
                     ),
-                    read=ReadUnit(
-                        memory_dim=config.model.mac.hidden_dim,
+                    cell=MACCell(
+                        config.model.reasoning.hidden_dim,
+                        control=ControlUnit(
+                            control_dim=config.model.reasoning.hidden_dim,
+                            length=config.model.reasoning.length,
+                        ),
+                        read=ReadUnit(
+                            memory_dim=config.model.reasoning.hidden_dim,
+                        ),
+                        write=WriteUnit(hidden_dim=config.model.reasoning.hidden_dim),
                     ),
-                    write=WriteUnit(hidden_dim=config.model.mac.hidden_dim),
                 ),
-            ),
-            question_module=question_module,
-            scene_graph_module=scene_graph_module,
-        )
+                question_module=question_module,
+                scene_graph_module=scene_graph_module,
+            )
+        elif isinstance(config.model.reasoning, BottomUpModelConfig):
+            if isinstance(config.model.question, LSTMModelConfig):
+                question_dim = config.model.question.hidden_dim
+            elif isinstance(config.model.question, GCNModelConfig):
+                question_dim = config.model.question.layer_sizes[-1]
+            else:
+                raise NotImplementedError()
+            if isinstance(config.model.scene_graph, LSTMModelConfig):
+                scene_graph_dim = config.model.scene_graph.hidden_dim
+            elif isinstance(config.model.scene_graph, GCNModelConfig):
+                scene_graph_dim = config.model.scene_graph.layer_sizes[-1]
+            else:
+                raise NotImplementedError()
+            model = BottomUpMultiGCN(
+                reasoning_module=BottomUp(
+                    question_dim=question_dim,
+                    knowledge_dim=scene_graph_dim,
+                    hidden_dim=config.model.reasoning.hidden_dim,
+                    output_dim=num_answer_classes,
+                ),
+                question_module=question_module,
+                scene_graph_module=scene_graph_module,
+            )
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()
         runner = MACMultiChannelGCNRunner(

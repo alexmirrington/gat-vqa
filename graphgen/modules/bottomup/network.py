@@ -78,18 +78,18 @@ class BottomUp(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-met
         `question`: question tensor of shape (batch_size, question_dim),
         typically the output of an LSTM or GRU.
         `knowledge`: knowledge-base tensor of shape
-        (batch_size, num_kb_feats, knowledge_dim)
+        (batch_size, knowledge_feat_count, knowledge_dim)
         """
-        expanded_question = question.unzqueeze(1).expand(
-            question.size(0), knowledge.size(1), question.size(2)
-        )  # (batch_size, num_kb_feats, question_dim)
+        expanded_question = question.unsqueeze(1).expand(
+            question.size(0), knowledge.size(1), question.size(1)
+        )  # (batch_size, knowledge_feat_count, question_dim)
         attn = self.question_knowledge_attn_gate(
             torch.cat((expanded_question, knowledge), dim=2)
-        )  # (batch_size, num_kb_feats, hidden_dim)
+        )  # (batch_size, knowledge_feat_count, hidden_dim)
         attn = torch.matmul(
             attn, self.question_knowledge_attn_weights
-        )  # (batch_size, num_kb_feats)
-        attn = F.softmax(attn, dim=1)  # (batch_size, num_kb_feats)
+        )  # (batch_size, knowledge_feat_count)
+        attn = F.softmax(attn, dim=1)  # (batch_size, knowledge_feat_count)
         attended_knowledge = torch.bmm(
             attn.unsqueeze(1), knowledge
         ).squeeze()  # (batch_size, knowledge_dim)

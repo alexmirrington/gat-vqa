@@ -7,8 +7,8 @@ from .gqa import GQADatasetConfig
 from .model import (
     E2EMultiGCNModelConfig,
     FasterRCNNModelConfig,
-    MACMultiGCNModelConfig,
     MultiGCNModelConfig,
+    ReasoningMultiGCNModelConfig,
 )
 from .preprocessing import PreprocessingConfig
 from .training import TrainingConfig
@@ -25,5 +25,5 @@ class Config:
         FasterRCNNModelConfig,
         E2EMultiGCNModelConfig,
         MultiGCNModelConfig,
-        MACMultiGCNModelConfig,
+        ReasoningMultiGCNModelConfig,
     ]

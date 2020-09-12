@@ -37,8 +37,7 @@
   "model": {
     "name": "reasoning_multi_gcn",
     "reasoning": {
-      "name": "mac",
-      "length": 6,
+      "name": "bottom_up",
       "hidden_dim": 512
     },
     "question": {

@@ -10,7 +10,7 @@ class ModelName(Enum):
     FASTER_RCNN = "faster_rcnn"
     E2E_MULTI_GCN = "e2e_multi_gcn"
     MULTI_GCN = "multi_gcn"
-    MAC_MULTI_GCN = "mac_multi_gcn"
+    REASONING_MULTI_GCN = "reasoning_multi_gcn"
 
 
 class GCNName(Enum):
@@ -31,6 +31,13 @@ class EmbeddingName(Enum):
 
     GLOVE = "glove"
     ONE_HOT = "one_hot"
+
+
+class ReasoningModelName(Enum):
+    """Enum specifying possible reasoning model names."""
+
+    MAC = "mac"
+    BOTTOM_UP = "bottom_up"
 
 
 class Backbone(Enum):
@@ -92,14 +99,6 @@ class GCNModelConfig:
 
 
 @dataclass(frozen=True)
-class MACModelConfig:
-    """Class for storing MAC network model configuration information."""
-
-    length: int
-    hidden_dim: int
-
-
-@dataclass(frozen=True)
 class MultiGCNModelConfig(ModelConfig):
     """Class for storing model configuration information."""
 
@@ -124,16 +123,38 @@ class LSTMModelConfig:
 
 
 @dataclass(frozen=True)
-class MACMultiGCNModelConfig(ModelConfig):
+class ReasoningModelConfig:
+    """Class for storing general reasoning model configuration information."""
+
+    name: ReasoningModelName
+
+
+@dataclass(frozen=True)
+class MACModelConfig(ReasoningModelConfig):
+    """Class for storing MAC network model configuration information."""
+
+    length: int
+    hidden_dim: int
+
+
+@dataclass(frozen=True)
+class BottomUpModelConfig(ReasoningModelConfig):
+    """Class for storing bottom-up model configuration information."""
+
+    hidden_dim: int
+
+
+@dataclass(frozen=True)
+class ReasoningMultiGCNModelConfig(ModelConfig):
     """Class for storing model configuration information."""
 
-    mac: MACModelConfig
+    reasoning: Union[MACModelConfig, BottomUpModelConfig]
     question: Union[LSTMModelConfig, GCNModelConfig]
     scene_graph: Optional[Union[LSTMModelConfig, GCNModelConfig]]
 
     def __post_init__(self) -> None:
         """Perform post-init checks on fields."""
-        if self.name != ModelName.MAC_MULTI_GCN:
+        if self.name != ModelName.REASONING_MULTI_GCN:
             raise ValueError(
-                f"Field {self.name=} must be equal to {ModelName.MAC_MULTI_GCN}"
+                f"Field {self.name=} must be equal to {ModelName.REASONING_MULTI_GCN}"
             )
