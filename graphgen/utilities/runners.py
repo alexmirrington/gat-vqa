@@ -652,14 +652,14 @@ class MACMultiChannelGCNRunner(Runner):
             config, device, model, optimiser, criterion, datasets, preprocessors, resume
         )
 
-        # self.scheduler = None
-        # if self.config.training.optimiser.schedule:
-        #     self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        #         self.optimiser,
-        #         "min",
-        #         factor=0.5,
-        #         patience=0,
-        #     )
+        self.scheduler = None
+        if self.config.training.optimiser.schedule:
+            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                self.optimiser,
+                "min",
+                factor=0.5,
+                patience=1,
+            )
 
     def train(self) -> None:
         """Train a model according to a criterion and optimiser on a dataset."""
@@ -707,7 +707,7 @@ class MACMultiChannelGCNRunner(Runner):
                 # Learn
                 self.optimiser.zero_grad()
                 preds = F.log_softmax(
-                    self.model(dependencies=dependencies, objects=objects)
+                    self.model(dependencies=dependencies, objects=objects), dim=1
                 )
                 loss = self.criterion(preds, targets)  # type: ignore
                 loss.backward()
@@ -753,8 +753,8 @@ class MACMultiChannelGCNRunner(Runner):
             metrics.reset()
 
             # Update lr based on val loss (official MAC code uses train loss)
-            # if self.scheduler is not None:
-            #     self.scheduler.step(results["val/loss"])
+            if self.scheduler is not None:
+                self.scheduler.step(results["val/loss"])
 
     def evaluate(self) -> Dict[str, Any]:
         """Evaluate a model according to a criterion on a given dataset."""
@@ -790,7 +790,7 @@ class MACMultiChannelGCNRunner(Runner):
 
                 # Learn
                 preds = F.log_softmax(
-                    self.model(dependencies=dependencies, objects=objects)
+                    self.model(dependencies=dependencies, objects=objects), dim=1
                 )
                 loss = self.criterion(preds, targets)  # type: ignore
 

@@ -29,8 +29,8 @@ class GatedTanh(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-me
 
         Refer to `torch.nn.Linear` for compatible input and output shapes.
         """
-        out = F.tanh(self.tanh_layer(data))
-        gate = F.sigmoid(self.gate_layer(data))
+        out = torch.tanh(self.tanh_layer(data))
+        gate = torch.sigmoid(self.gate_layer(data))
         return out * gate
 
 

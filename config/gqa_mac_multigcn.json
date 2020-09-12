@@ -62,11 +62,11 @@
     },
     "optimiser": {
       "name": "adam",
-      "learning_rate": 3e-4,
+      "learning_rate": 5e-4,
       "momentum": null,
       "weight_decay": 0,
       "grad_clip": null,
-      "schedule": false
+      "schedule": true
     },
     "data": {
       "features": [
