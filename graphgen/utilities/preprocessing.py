@@ -361,7 +361,7 @@ class SceneGraphTransformer:
         sources = object_coos[0] if add_skip_edges else []
         targets = object_coos[1] if add_skip_edges else []
         feats = []
-        if isinstance(objects[0], int):
+        if self.vectors is None:
             feats.append(
                 self.embed_feats(torch.tensor(objects))  # pylint: disable=not-callable
             )
@@ -380,7 +380,7 @@ class SceneGraphTransformer:
             targets += [offset_idx + idx, target_node]
         offset_idx += len(relations)
         # Add relations to node features
-        if isinstance(relations[0], int):
+        if self.vectors is None:
             feats.append(
                 self.embed_feats(
                     torch.tensor(relations)  # pylint: disable=not-callable
@@ -404,7 +404,7 @@ class SceneGraphTransformer:
         # Add attributes to node features
         # (requires python 3.7+, to assert order of inserted keys in attr_to_idx)
         keys = list(attr_to_idx.keys())
-        if isinstance(keys[0], int):
+        if self.vectors is None:
             feats.append(
                 self.embed_feats(
                     torch.tensor(keys)  # pylint: disable=not-callable
@@ -425,18 +425,14 @@ class SceneGraphTransformer:
     def __call__(self, data: SceneGraph) -> TrainableSceneGraph:
         """Transform data into a trainable format."""
         objects: Union[List[str], List[int]] = (
-            data["labels"]
-            if self.embedding == EmbeddingName.GLOVE
-            else data["indexed_labels"]
+            data["labels"] if self.vectors is not None else data["indexed_labels"]
         )
         relations: Union[List[str], List[int]] = (
-            data["relations"]
-            if self.embedding == EmbeddingName.GLOVE
-            else data["indexed_relations"]
+            data["relations"] if self.vectors is not None else data["indexed_relations"]
         )
         attributes: Union[List[List[str]], List[List[int]]] = (
             data["attributes"]
-            if self.embedding == EmbeddingName.GLOVE
+            if self.vectors is not None
             else data["indexed_attributes"]
         )
 
