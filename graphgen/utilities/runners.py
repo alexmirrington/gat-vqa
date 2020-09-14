@@ -202,7 +202,7 @@ class FasterRCNNRunner(Runner):
         start = int(self.config.training.data.val.subset[0] * len(self.datasets.val))
         end = int(self.config.training.data.val.subset[1] * len(self.datasets.val))
         dataloader = DataLoader(
-            self.datasets.val[start:end],
+            torch.utils.data.Subset(self.datasets.val, range(start, end)),
             batch_size=self.config.training.dataloader.batch_size,
             num_workers=self.config.training.dataloader.workers,
             collate_fn=VariableSizeTensorCollator(),
@@ -427,7 +427,7 @@ class EndToEndMultiChannelGCNRunner(Runner):
         start = int(self.config.training.data.val.subset[0] * len(self.datasets.val))
         end = int(self.config.training.data.val.subset[1] * len(self.datasets.val))
         dataloader = DataLoader(
-            self.datasets.val[start:end],
+            torch.utils.data.Subset(self.datasets.val, range(start, end)),
             batch_size=self.config.training.dataloader.batch_size,
             num_workers=self.config.training.dataloader.workers,
             collate_fn=VariableSizeTensorCollator(),
@@ -588,7 +588,7 @@ class MultiChannelGCNRunner(Runner):
         start = int(self.config.training.data.val.subset[0] * len(self.datasets.val))
         end = int(self.config.training.data.val.subset[1] * len(self.datasets.val))
         dataloader = DataLoader(
-            self.datasets.val[start:end],
+            torch.utils.data.Subset(self.datasets.val, range(start, end)),
             batch_size=self.config.training.dataloader.batch_size,
             num_workers=self.config.training.dataloader.workers,
             collate_fn=VariableSizeTensorCollator(),
@@ -690,6 +690,8 @@ class MACMultiChannelGCNRunner(Runner):
         self.model.train()
         self.model.to(self.device)
 
+        print(self.evaluate().items())
+
         best_val_loss = math.inf
         for epoch in range(self._start_epoch, self.config.training.epochs):
             for batch, sample in enumerate(dataloader):
@@ -764,7 +766,7 @@ class MACMultiChannelGCNRunner(Runner):
         start = int(self.config.training.data.val.subset[0] * len(self.datasets.val))
         end = int(self.config.training.data.val.subset[1] * len(self.datasets.val))
         dataloader = DataLoader(
-            self.datasets.val[start:end],
+            torch.utils.data.Subset(self.datasets.val, range(start, end)),
             batch_size=self.config.training.dataloader.batch_size,
             num_workers=self.config.training.dataloader.workers,
             collate_fn=VariableSizeTensorCollator(),

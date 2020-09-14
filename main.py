@@ -173,8 +173,11 @@ def merge_config(args: Iterable[str], config: Config) -> Config:
                 if idx == len(param_keys) - 1:
                     # Cast value to type of field value and set attribute
                     field_type = type(getattr(subconfig, key))
-                    value = field_type(value)
-                    setattr(subconfig, key, value)
+                    try:
+                        deserialised_value = jsons.loads(value, field_type)
+                    except jsons.exceptions.DecodeError:
+                        deserialised_value = field_type(value)
+                    setattr(subconfig, key, deserialised_value)
                 else:
                     # Get subconfig from key
                     subconfig = getattr(subconfig, key)
@@ -205,6 +208,5 @@ if __name__ == "__main__":
         job_type=parsed_args.job.value,
         config=jsons.dump(config_obj),
     )
-    print(jsons.dump(config_obj))
     # Run main with parsed config
     main(parsed_args, config_obj)

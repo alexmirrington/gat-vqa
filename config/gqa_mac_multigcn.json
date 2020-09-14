@@ -47,10 +47,10 @@
       "bidirectional": true
     },
     "scene_graph": {
-      "gcn": "gat",
-      "layer_sizes": [300, 300, 300],
-      "pooling": "global_mean",
-      "embedding": "glove"
+      "gcn": "gcn",
+      "layer_sizes": [2630, 2048, 1536, 1024, 512],
+      "pooling": null,
+      "embedding": "one_hot"
     }
   },
   "training": {
