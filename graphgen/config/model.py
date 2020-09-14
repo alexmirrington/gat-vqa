@@ -31,6 +31,7 @@ class EmbeddingName(Enum):
 
     GLOVE = "glove"
     ONE_HOT = "one_hot"
+    NORMAL = "normal"
 
 
 class ReasoningModelName(Enum):
@@ -92,10 +93,11 @@ class E2EMultiGCNModelConfig(ModelConfig):
 class GCNModelConfig:
     """Class for storing GCN model configuration information."""
 
+    embedding_dim: int
+    embedding: EmbeddingName
     gcn: GCNName
     pooling: Optional[GCNPoolingName]
     layer_sizes: List[int]
-    embedding: Optional[EmbeddingName]
 
 
 @dataclass
@@ -117,7 +119,8 @@ class MultiGCNModelConfig(ModelConfig):
 class LSTMModelConfig:
     """Class for storing LSTM model configuration information."""
 
-    input_dim: int
+    embedding_dim: int
+    embedding: EmbeddingName
     hidden_dim: int
     bidirectional: bool
 
@@ -150,7 +153,7 @@ class ReasoningMultiGCNModelConfig(ModelConfig):
 
     reasoning: Union[MACModelConfig, BottomUpModelConfig]
     question: Union[LSTMModelConfig, GCNModelConfig]
-    scene_graph: Optional[Union[LSTMModelConfig, GCNModelConfig]]
+    scene_graph: Union[LSTMModelConfig, GCNModelConfig]
 
     def __post_init__(self) -> None:
         """Perform post-init checks on fields."""

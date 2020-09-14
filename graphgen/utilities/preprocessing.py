@@ -325,28 +325,30 @@ class SceneGraphTransformer:
         self.num_relations = num_relations
         self.num_attributes = num_attributes
         self.vectors = (
-            GloVe(name="6B", dim=300)
-            if self.embedding is None or self.embedding == EmbeddingName.GLOVE
-            else None
+            GloVe(name="6B", dim=300) if self.embedding == EmbeddingName.GLOVE else None
         )
 
     def embed_feats(self, feats: Union[List[str], torch.Tensor]) -> torch.Tensor:
         """Retrieve embeddings for a list of strings or Tensor."""
-        if self.vectors is not None:
+        if self.embedding == EmbeddingName.GLOVE:
             return (
                 self.vectors.get_vecs_by_tokens(feats, lower_case_backup=True)
                 if len(feats) > 0
                 else torch.tensor([])  # pylint: disable=not-callable
             )
-        dim = self.num_objects + self.num_relations + self.num_attributes
-        return (
-            torch.nn.functional.one_hot(
-                feats,
-                num_classes=dim,
-            ).type(torch.FloatTensor)
-            if len(feats) > 0
-            else torch.tensor([])  # pylint: disable=not-callable
-        )
+        if self.embedding == EmbeddingName.ONE_HOT:
+            dim = self.num_objects + self.num_relations + self.num_attributes
+            return (
+                torch.nn.functional.one_hot(
+                    feats,
+                    num_classes=dim,
+                ).type(torch.FloatTensor)
+                if len(feats) > 0
+                else torch.tensor([])  # pylint: disable=not-callable
+            )
+        if self.embedding is None or self.embedding == EmbeddingName.NORMAL:
+            return feats  # Normally distributed embeddings are applied model-side
+        raise NotImplementedError()
 
     def build_node_graph(
         self,

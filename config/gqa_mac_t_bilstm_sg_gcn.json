@@ -42,15 +42,17 @@
       "hidden_dim": 512
     },
     "question": {
-      "input_dim": 300,
+      "embedding": "glove",
+      "embedding_dim": 300,
       "hidden_dim": 512,
       "bidirectional": true
     },
     "scene_graph": {
+      "embedding": "normal",
+      "embedding_dim": 512,
       "gcn": "gcn",
-      "layer_sizes": [2630, 2048, 1536, 1024, 512],
-      "pooling": null,
-      "embedding": "one_hot"
+      "layer_sizes": [512, 512, 512],
+      "pooling": null
     }
   },
   "training": {
@@ -62,7 +64,7 @@
     },
     "optimiser": {
       "name": "adam",
-      "learning_rate": 3e-4,
+      "learning_rate": 1e-4,
       "momentum": null,
       "weight_decay": 0,
       "grad_clip": 8,

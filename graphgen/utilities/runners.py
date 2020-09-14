@@ -690,8 +690,6 @@ class MACMultiChannelGCNRunner(Runner):
         self.model.train()
         self.model.to(self.device)
 
-        print(self.evaluate().items())
-
         best_val_loss = math.inf
         for epoch in range(self._start_epoch, self.config.training.epochs):
             for batch, sample in enumerate(dataloader):

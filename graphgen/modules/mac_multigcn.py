@@ -18,24 +18,32 @@ class MACMultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-
         mac_network: torch.nn.Module,
         question_module: torch.nn.Module,
         scene_graph_module: Optional[torch.nn.Module],
+        scene_graph_embeddings: Optional[torch.nn.Embedding],
     ) -> None:
         """Create a multi-gcn model with bidirectional attention."""
         super().__init__()
         self.mac_network = mac_network
         self.question_module = question_module
         self.scene_graph_module = scene_graph_module
+        self.scene_graph_embeddings = scene_graph_embeddings
 
         self.sg_proj = (
             torch.nn.Linear(
                 self.scene_graph_module.shape[-1], self.mac_network.hidden_dim
             )
             if isinstance(self.scene_graph_module, (GCN, GAT))
+            and self.scene_graph_module.shape[-1] != self.mac_network.hidden_dim
             else None
         )
 
     def forward(self, dependencies: Batch, objects: Batch) -> Any:
         """Propagate data through the model."""
         # pylint: disable=too-many-locals
+
+        # Apply scene graph embeddings if they exist.
+        if self.scene_graph_embeddings is not None:
+            assert len(objects.x.size()) == 1  # x should be tensor of indices
+            objects.x = self.scene_graph_embeddings(objects.x.long())
 
         if isinstance(self.question_module, torch.nn.LSTM):
             # Get dense text features for MAC contextual words

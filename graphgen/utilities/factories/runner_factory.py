@@ -10,6 +10,7 @@ from ...config.model import (
     Backbone,
     BottomUpModelConfig,
     E2EMultiGCNModelConfig,
+    EmbeddingName,
     FasterRCNNModelConfig,
     GCNModelConfig,
     GCNName,
@@ -233,7 +234,7 @@ class RunnerFactory:
         # Create question module
         if isinstance(config.model.question, LSTMModelConfig):
             question_module = torch.nn.LSTM(
-                config.model.question.input_dim,
+                config.model.question.embedding_dim,
                 config.model.question.hidden_dim // 2
                 if config.model.question.bidirectional
                 else config.model.question.hidden_dim,
@@ -247,7 +248,7 @@ class RunnerFactory:
         scene_graph_module = None
         if isinstance(config.model.scene_graph, LSTMModelConfig):
             scene_graph_module = torch.nn.LSTM(
-                config.model.scene_graph.input_dim,
+                config.model.scene_graph.embedding_dim,
                 config.model.scene_graph.hidden_dim // 2
                 if config.model.scene_graph.bidirectional
                 else config.model.scene_graph.hidden_dim,
@@ -279,6 +280,14 @@ class RunnerFactory:
                 ),
                 question_module=question_module,
                 scene_graph_module=scene_graph_module,
+                scene_graph_embeddings=torch.nn.Embedding(
+                    num_embeddings=len(preprocessors.scene_graphs.object_to_index)
+                    + len(preprocessors.scene_graphs.rel_to_index)
+                    + len(preprocessors.scene_graphs.attr_to_index),
+                    embedding_dim=config.model.scene_graph.embedding_dim,
+                )
+                if config.model.scene_graph.embedding == EmbeddingName.NORMAL
+                else None,
             )
         elif isinstance(config.model.reasoning, BottomUpModelConfig):
             if isinstance(config.model.question, LSTMModelConfig):
