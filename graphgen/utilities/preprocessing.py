@@ -490,10 +490,10 @@ class SceneGraphTransformer:
             else data["indexed_attributes"]
         )
 
-        # coos, feats = self.build_node_graph(
-        #     data["coos"], objects, relations, attributes
-        # )
-        coos, feats = self.build_concat_kb(data["coos"], objects, relations, attributes)  # type: ignore  # noqa: B950
+        coos, feats = self.build_node_graph(
+            data["coos"], objects, relations, attributes
+        )
+        # coos, feats = self.build_concat_kb(data["coos"], objects, relations, attributes)  # type: ignore  # noqa: B950
 
         return {
             "imageId": data["imageId"],
