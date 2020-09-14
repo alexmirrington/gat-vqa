@@ -117,6 +117,10 @@ class FasterRCNNRunner(Runner):
             ),
         )
 
+        # Ensure we are using the whole training set
+        assert abs(self.config.training.data.train.subset[0] - 0.0) < 1e-16
+        assert abs(self.config.training.data.train.subset[1] - 1.0) < 1e-16
+
         # Create dataloader
         dataloader = DataLoader(
             self.datasets.train,
@@ -194,18 +198,16 @@ class FasterRCNNRunner(Runner):
 
     def evaluate(self) -> Dict[str, Any]:
         """Evaluate a model according to a criterion on a given dataset."""
+        # pylint: disable=too-many-locals
+        start = int(self.config.training.data.val.subset[0] * len(self.datasets.val))
+        end = int(self.config.training.data.val.subset[1] * len(self.datasets.val))
         dataloader = DataLoader(
-            self.datasets.val,
+            self.datasets.val[start:end],
             batch_size=self.config.training.dataloader.batch_size,
             num_workers=self.config.training.dataloader.workers,
             collate_fn=VariableSizeTensorCollator(),
         )
         self.model.eval()
-        eval_limit = (
-            self.config.training.eval_subset
-            if self.config.training.eval_subset is not None
-            else len(dataloader)
-        )
 
         image_sample_limit = 32
         all_images: List[wandb.Image] = []
@@ -290,9 +292,7 @@ class FasterRCNNRunner(Runner):
                     )
                     all_images.append(log_img)
 
-                print(f"eval: {batch + 1}/{eval_limit}", end="\r")
-                if batch + 1 == eval_limit:
-                    break
+                print(f"eval: {batch + 1}/{len(dataloader)}", end="\r")
 
         self.model.train()
         return {"boxes": all_images}
@@ -329,6 +329,11 @@ class EndToEndMultiChannelGCNRunner(Runner):
                 self.config.training.epochs / self.config.training.dataloader.batch_size
             ),
         )
+
+        # Ensure we are using the whole training set
+        assert abs(self.config.training.data.train.subset[0] - 0.0) < 1e-16
+        assert abs(self.config.training.data.train.subset[1] - 1.0) < 1e-16
+
         dataloader = DataLoader(
             self.datasets.train,
             batch_size=self.config.training.dataloader.batch_size,
@@ -419,8 +424,10 @@ class EndToEndMultiChannelGCNRunner(Runner):
 
     def evaluate(self) -> Dict[str, Any]:
         """Evaluate a model according to a criterion on a given dataset."""
+        start = int(self.config.training.data.val.subset[0] * len(self.datasets.val))
+        end = int(self.config.training.data.val.subset[1] * len(self.datasets.val))
         dataloader = DataLoader(
-            self.datasets.val,
+            self.datasets.val[start:end],
             batch_size=self.config.training.dataloader.batch_size,
             num_workers=self.config.training.dataloader.workers,
             collate_fn=VariableSizeTensorCollator(),
@@ -429,12 +436,6 @@ class EndToEndMultiChannelGCNRunner(Runner):
             self.config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
         )
         self.model.eval()
-
-        eval_limit = (
-            self.config.training.eval_subset
-            if self.config.training.eval_subset is not None
-            else len(dataloader)
-        )
 
         with torch.no_grad():
             for batch, sample in enumerate(dataloader):
@@ -462,9 +463,7 @@ class EndToEndMultiChannelGCNRunner(Runner):
                     np.argmax(preds.detach().cpu().numpy(), axis=1),
                     targets.detach().cpu().numpy(),
                 )
-                print(f"eval: {batch + 1}/{eval_limit}", end="\r")
-                if batch + 1 == eval_limit:
-                    break
+                print(f"eval: {batch + 1}/{len(dataloader)}", end="\r")
 
         self.model.train()
         results = {"loss": loss.item()}
@@ -502,6 +501,11 @@ class MultiChannelGCNRunner(Runner):
                 self.config.training.epochs / self.config.training.dataloader.batch_size
             ),
         )
+
+        # Ensure we are using the whole training set
+        assert abs(self.config.training.data.train.subset[0] - 0.0) < 1e-16
+        assert abs(self.config.training.data.train.subset[1] - 1.0) < 1e-16
+
         dataloader = DataLoader(
             self.datasets.train,
             batch_size=self.config.training.dataloader.batch_size,
@@ -581,8 +585,10 @@ class MultiChannelGCNRunner(Runner):
 
     def evaluate(self) -> Dict[str, Any]:
         """Evaluate a model according to a criterion on a given dataset."""
+        start = int(self.config.training.data.val.subset[0] * len(self.datasets.val))
+        end = int(self.config.training.data.val.subset[1] * len(self.datasets.val))
         dataloader = DataLoader(
-            self.datasets.val,
+            self.datasets.val[start:end],
             batch_size=self.config.training.dataloader.batch_size,
             num_workers=self.config.training.dataloader.workers,
             collate_fn=VariableSizeTensorCollator(),
@@ -591,12 +597,6 @@ class MultiChannelGCNRunner(Runner):
             self.config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
         )
         self.model.eval()
-
-        eval_limit = (
-            self.config.training.eval_subset
-            if self.config.training.eval_subset is not None
-            else len(dataloader)
-        )
 
         with torch.no_grad():
             for batch, sample in enumerate(dataloader):
@@ -621,9 +621,7 @@ class MultiChannelGCNRunner(Runner):
                     np.argmax(preds.detach().cpu().numpy(), axis=1),
                     targets.detach().cpu().numpy(),
                 )
-                print(f"eval: {batch + 1}/{eval_limit}", end="\r")
-                if batch + 1 == eval_limit:
-                    break
+                print(f"eval: {batch + 1}/{len(dataloader)}", end="\r")
 
         self.model.train()
         results = {"loss": loss.item()}
@@ -670,6 +668,11 @@ class MACMultiChannelGCNRunner(Runner):
                 self.config.training.epochs / self.config.training.dataloader.batch_size
             ),
         )
+
+        # Ensure we are using the whole training set
+        assert abs(self.config.training.data.train.subset[0] - 0.0) < 1e-16
+        assert abs(self.config.training.data.train.subset[1] - 1.0) < 1e-16
+
         dataloader = DataLoader(
             self.datasets.train,
             batch_size=self.config.training.dataloader.batch_size,
@@ -758,8 +761,10 @@ class MACMultiChannelGCNRunner(Runner):
 
     def evaluate(self) -> Dict[str, Any]:
         """Evaluate a model according to a criterion on a given dataset."""
+        start = int(self.config.training.data.val.subset[0] * len(self.datasets.val))
+        end = int(self.config.training.data.val.subset[1] * len(self.datasets.val))
         dataloader = DataLoader(
-            self.datasets.val,
+            self.datasets.val[start:end],
             batch_size=self.config.training.dataloader.batch_size,
             num_workers=self.config.training.dataloader.workers,
             collate_fn=VariableSizeTensorCollator(),
@@ -769,12 +774,6 @@ class MACMultiChannelGCNRunner(Runner):
         )
 
         self.model.eval()
-
-        eval_limit = (
-            self.config.training.eval_subset
-            if self.config.training.eval_subset is not None
-            else len(dataloader)
-        )
 
         with torch.no_grad():
             for batch, sample in enumerate(dataloader):
@@ -801,9 +800,7 @@ class MACMultiChannelGCNRunner(Runner):
                     np.argmax(preds.detach().cpu().numpy(), axis=1),
                     targets.detach().cpu().numpy(),
                 )
-                print(f"eval: {batch + 1}/{eval_limit}", end="\r")
-                if batch + 1 == eval_limit:
-                    break
+                print(f"eval: {batch + 1}/{len(dataloader)}", end="\r")
 
         self.model.train()
         results = {"loss": loss.item()}

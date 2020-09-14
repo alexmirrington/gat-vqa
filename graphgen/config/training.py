@@ -1,7 +1,7 @@
 """Classes for storing training configuration information."""
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 
 class OptimiserName(Enum):
@@ -54,6 +54,7 @@ class DataSubsetConfig:
 
     split: str
     version: Optional[str] = None
+    subset: Tuple[float, float] = (0.0, 1.0)
 
 
 @dataclass(frozen=True)
@@ -80,7 +81,6 @@ class TrainingConfig:
 
     epochs: int
     log_step: int
-    eval_subset: Optional[int]
     dataloader: DataloaderConfig
     optimiser: OptimiserConfig
     data: TrainingDataConfig
@@ -92,6 +92,3 @@ class TrainingConfig:
 
         if self.log_step <= 0:
             raise ValueError(f"Field {self.log_step} must be strictly positive.")
-
-        if self.log_step <= 0:
-            raise ValueError(f"Field {self.eval_subset} must be strictly positive.")

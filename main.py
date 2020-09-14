@@ -134,6 +134,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sync", action="store_true", help="Sync results to wandb if specified."
     )
+    parser.add_argument(
+        "args",
+        help="Modify model config options using the command-line",
+        default=None,
+        nargs=argparse.REMAINDER,
+    )
     return parser.parse_args()
 
 
@@ -158,6 +164,33 @@ def load_config(filename: str) -> Tuple[Config, Any]:
 
     config: Config = jsons.load(config_json, Config)
     return config, config_json
+
+
+def merge_config(args: argparse.Namespace, config: Config) -> Config:
+    """Merge any leftover args of form param/nested_param=value into config object."""
+    for arg in args.args:
+        param, value = arg.split("=")
+        param_keys = param.split("/")
+        subconfig = config
+        for idx, key in enumerate(param_keys):
+            try:
+                if idx == len(param_keys) - 1:
+                    # Cast value to type of field value and set attribute
+                    field_type = type(getattr(subconfig, key))
+                    value = field_type(field_type)
+                    setattr(subconfig, key, value)
+                else:
+                    # Get subconfig from key
+                    subconfig = getattr(subconfig, key)
+            except AttributeError as ex:  # Ensure the attribute exists
+                raise ValueError(
+                    f"Invalid argument {arg}. Could not merge with config object."
+                ) from ex
+            except ValueError as ex:
+                raise ValueError(
+                    f"Invalid argument {arg}. Value could not be converted to "
+                ) from ex
+    return config
 
 
 if __name__ == "__main__":

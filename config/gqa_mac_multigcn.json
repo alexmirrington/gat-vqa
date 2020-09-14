@@ -55,10 +55,9 @@
   },
   "training": {
     "epochs": 20,
-    "log_step": 256,
-    "eval_subset": null,
+    "log_step": 1024,
     "dataloader": {
-      "batch_size": 64,
+      "batch_size": 16,
       "workers": 1
     },
     "optimiser": {
@@ -86,11 +85,13 @@
       },
       "val": {
         "split": "val",
-        "version": "balanced"
+        "version": "balanced",
+        "subset": [0.0, 0.5]
       },
       "test": {
-        "split": "testdev",
-        "version": "balanced"
+        "split": "val",
+        "version": "balanced",
+        "subset": [0.5, 1.0]
       }
     }
   }
