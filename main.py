@@ -5,7 +5,7 @@ import json
 import os
 from enum import Enum
 from pathlib import Path, PurePath
-from typing import Any, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 import jsons
 import stanza
@@ -101,7 +101,7 @@ def run(config: Config, device: torch.device, resume: Optional[ResumeInfo]) -> N
     runner.train()
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args() -> Tuple[argparse.Namespace, List[str]]:
     """Parse `sys.argv` and return an `argparse.Namespace` object.
 
     Params:
@@ -134,16 +134,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sync", action="store_true", help="Sync results to wandb if specified."
     )
-    parser.add_argument(
-        "args",
-        help="Modify model config options using the command-line",
-        default=None,
-        nargs=argparse.REMAINDER,
-    )
-    return parser.parse_args()
+    return parser.parse_known_intermixed_args()
 
 
-def load_config(filename: str) -> Tuple[Config, Any]:
+def load_config(filename: str) -> Config:
     """Load a JSON configuration from `filename` into a `Config` object.
 
     Params:
@@ -163,12 +157,14 @@ def load_config(filename: str) -> Tuple[Config, Any]:
     jsons.set_serializer(path_serializer, PurePath)
 
     config: Config = jsons.load(config_json, Config)
-    return config, config_json
+    return config
 
 
-def merge_config(args: argparse.Namespace, config: Config) -> Config:
+def merge_config(args: Iterable[str], config: Config) -> Config:
     """Merge any leftover args of form param/nested_param=value into config object."""
-    for arg in args.args:
+    # Apply override args
+    for arg in args:
+        arg = arg.lstrip("-")
         param, value = arg.split("=")
         param_keys = param.split("/")
         subconfig = config
@@ -177,7 +173,7 @@ def merge_config(args: argparse.Namespace, config: Config) -> Config:
                 if idx == len(param_keys) - 1:
                     # Cast value to type of field value and set attribute
                     field_type = type(getattr(subconfig, key))
-                    value = field_type(field_type)
+                    value = field_type(value)
                     setattr(subconfig, key, value)
                 else:
                     # Get subconfig from key
@@ -186,17 +182,19 @@ def merge_config(args: argparse.Namespace, config: Config) -> Config:
                 raise ValueError(
                     f"Invalid argument {arg}. Could not merge with config object."
                 ) from ex
-            except ValueError as ex:
+            except (ValueError, TypeError) as ex:
                 raise ValueError(
-                    f"Invalid argument {arg}. Value could not be converted to "
+                    f"Invalid argument {arg}. Value could not be converted to \
+                    type {field_type}"
                 ) from ex
     return config
 
 
 if __name__ == "__main__":
     # Parse config
-    parsed_args = parse_args()
-    config_obj, config_dict = load_config(parsed_args.config)
+    parsed_args, remaining_args = parse_args()
+    config_obj = load_config(parsed_args.config)
+    config_obj = merge_config(remaining_args, config_obj)
     # Set up wandb
     os.environ["WANDB_MODE"] = "run" if parsed_args.sync else "dryrun"
     if not Path(".wandb").exists():
@@ -205,7 +203,8 @@ if __name__ == "__main__":
         project="graphgen",
         dir=".wandb",
         job_type=parsed_args.job.value,
-        config=config_dict,
+        config=jsons.dump(config_obj),
     )
+    print(jsons.dump(config_obj))
     # Run main with parsed config
     main(parsed_args, config_obj)

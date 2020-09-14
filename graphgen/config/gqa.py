@@ -34,7 +34,7 @@ class GQAFeatures(Enum):
     SCENE_GRAPHS = "scene_graphs"
 
 
-@dataclass(frozen=True)
+@dataclass
 class GQAFilemap(DatasetFilemap):
     """A class defining the paths to relevant GQA dataset files.
 
@@ -105,7 +105,7 @@ class GQAFilemap(DatasetFilemap):
         return self.root / self.scene_graphs_dir / f"{split.value}_sceneGraphs.json"
 
 
-@dataclass(frozen=True)
+@dataclass
 class GQADatasetConfig(DatasetConfig):
     """A class specifying the valid values for a GQA dataset config."""
 

@@ -518,7 +518,7 @@ class ObjectTransformer:
         return (objects[:num_objects], boxes[:num_objects])
 
 
-@dataclass(frozen=True)
+@dataclass
 class PreprocessorCollection:
     """Wrapper class for storing a preprocessor feature mappings."""
 
@@ -526,7 +526,7 @@ class PreprocessorCollection:
     scene_graphs: SceneGraphPreprocessor
 
 
-@dataclass(frozen=True)
+@dataclass
 class DatasetCollection:
     """Wrapper class for storing a train and val dataset tuple."""
 

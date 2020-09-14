@@ -15,7 +15,7 @@ class CLEVRSplit(Enum):
     TEST = "test"
 
 
-@dataclass(frozen=True)
+@dataclass
 class CLEVRFilemap(DatasetFilemap):
     """A class defining the paths to relevant CLEVR dataset files.
 
@@ -46,7 +46,7 @@ class CLEVRFilemap(DatasetFilemap):
         return self.root / self.scene_graphs_dir / f"CLEVR_{split.value}_scenes.json"
 
 
-@dataclass(frozen=True)
+@dataclass
 class CLEVRDatasetConfig(DatasetConfig):
     """A class specifying the valid values for a CLEVR dataset config."""
 

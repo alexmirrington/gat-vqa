@@ -14,7 +14,7 @@ from .preprocessing import PreprocessingConfig
 from .training import TrainingConfig
 
 
-@dataclass(frozen=True)
+@dataclass
 class Config:
     """A class containing configuration information such as model parameters."""
 

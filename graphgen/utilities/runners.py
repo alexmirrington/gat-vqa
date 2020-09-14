@@ -20,7 +20,7 @@ from ..utilities.preprocessing import DatasetCollection, PreprocessorCollection
 from .logging import log_metrics_stdout
 
 
-@dataclass(frozen=True)
+@dataclass
 class ResumeInfo:
     """Information about the run being resumed."""
 

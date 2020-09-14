@@ -11,7 +11,7 @@ class OptimiserName(Enum):
     SGD = "sgd"
 
 
-@dataclass(frozen=True)
+@dataclass
 class DataloaderConfig:
     """A class specifying the common fields used across all data loaders."""
 
@@ -29,7 +29,7 @@ class DataloaderConfig:
             )
 
 
-@dataclass(frozen=True)
+@dataclass
 class OptimiserConfig:
     """Class storing optimiser configuration information."""
 
@@ -48,7 +48,7 @@ class OptimiserConfig:
             )
 
 
-@dataclass(frozen=True)
+@dataclass
 class DataSubsetConfig:
     """Class storing data subset information for model training."""
 
@@ -57,7 +57,7 @@ class DataSubsetConfig:
     subset: Tuple[float, float] = (0.0, 1.0)
 
 
-@dataclass(frozen=True)
+@dataclass
 class FeatureConfig:
     """Class storing information abeout features used for model training."""
 
@@ -65,7 +65,7 @@ class FeatureConfig:
     artifact: Optional[str]
 
 
-@dataclass(frozen=True)
+@dataclass
 class TrainingDataConfig:
     """Class storing dataset information for model training."""
 
@@ -75,7 +75,7 @@ class TrainingDataConfig:
     test: DataSubsetConfig
 
 
-@dataclass(frozen=True)
+@dataclass
 class TrainingConfig:
     """Class for storing training configuration information."""
 

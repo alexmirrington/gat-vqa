@@ -46,7 +46,7 @@ class Backbone(Enum):
     RESNET50 = "resnet50"
 
 
-@dataclass(frozen=True)
+@dataclass
 class BackboneConfig:
     """Class for storing R-CNN modlue configuration information."""
 
@@ -54,14 +54,14 @@ class BackboneConfig:
     pretrained: bool
 
 
-@dataclass(frozen=True)
+@dataclass
 class ModelConfig:
     """Class for storing general model configuration information."""
 
     name: ModelName
 
 
-@dataclass(frozen=True)
+@dataclass
 class FasterRCNNModelConfig(ModelConfig):
     """Class for storing model configuration information."""
 
@@ -76,7 +76,7 @@ class FasterRCNNModelConfig(ModelConfig):
             )
 
 
-@dataclass(frozen=True)
+@dataclass
 class E2EMultiGCNModelConfig(ModelConfig):
     """Class for storing model configuration information."""
 
@@ -88,7 +88,7 @@ class E2EMultiGCNModelConfig(ModelConfig):
             )
 
 
-@dataclass(frozen=True)
+@dataclass
 class GCNModelConfig:
     """Class for storing GCN model configuration information."""
 
@@ -98,7 +98,7 @@ class GCNModelConfig:
     embedding: Optional[EmbeddingName]
 
 
-@dataclass(frozen=True)
+@dataclass
 class MultiGCNModelConfig(ModelConfig):
     """Class for storing model configuration information."""
 
@@ -113,7 +113,7 @@ class MultiGCNModelConfig(ModelConfig):
             )
 
 
-@dataclass(frozen=True)
+@dataclass
 class LSTMModelConfig:
     """Class for storing LSTM model configuration information."""
 
@@ -122,14 +122,14 @@ class LSTMModelConfig:
     bidirectional: bool
 
 
-@dataclass(frozen=True)
+@dataclass
 class ReasoningModelConfig:
     """Class for storing general reasoning model configuration information."""
 
     name: ReasoningModelName
 
 
-@dataclass(frozen=True)
+@dataclass
 class MACModelConfig(ReasoningModelConfig):
     """Class for storing MAC network model configuration information."""
 
@@ -137,14 +137,14 @@ class MACModelConfig(ReasoningModelConfig):
     hidden_dim: int
 
 
-@dataclass(frozen=True)
+@dataclass
 class BottomUpModelConfig(ReasoningModelConfig):
     """Class for storing bottom-up model configuration information."""
 
     hidden_dim: int
 
 
-@dataclass(frozen=True)
+@dataclass
 class ReasoningMultiGCNModelConfig(ModelConfig):
     """Class for storing model configuration information."""
 
