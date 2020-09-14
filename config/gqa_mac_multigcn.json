@@ -47,9 +47,10 @@
       "bidirectional": true
     },
     "scene_graph": {
-      "input_dim": 900,
-      "hidden_dim": 512,
-      "bidirectional": true
+      "gcn": "gat",
+      "layer_sizes": [300, 300, 300],
+      "pooling": "global_mean",
+      "embedding": "glove"
     }
   },
   "training": {
@@ -62,11 +63,11 @@
     },
     "optimiser": {
       "name": "adam",
-      "learning_rate": 5e-4,
+      "learning_rate": 3e-4,
       "momentum": null,
       "weight_decay": 0,
-      "grad_clip": null,
-      "schedule": true
+      "grad_clip": 8,
+      "schedule": false
     },
     "data": {
       "features": [

@@ -101,8 +101,8 @@ class MACMultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-
                 scene_graph_feats = self.sg_proj(scene_graph_feats)
         else:
             sg_feats = objects.x
-            if self.scene_gcn is not None:
-                sg_feats, _ = self.scene_gcn(objects)
+            if self.scene_graph_module is not None:
+                sg_feats, _ = self.scene_graph_module(objects)
             # (batch_size, max_objects, object_dim)
             scene_graph_feats, _ = to_dense_batch(sg_feats, batch=objects.batch)
             if self.sg_proj is not None:
