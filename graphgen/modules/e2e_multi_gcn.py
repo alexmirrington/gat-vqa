@@ -6,8 +6,8 @@ import torch.nn.functional as F
 from torch_geometric.data import Data
 
 from .faster_rcnn import FasterRCNNTarget
-from .gcn import GCN
 from .graph_rcnn import GraphRCNN
+from .sparse.gcn import GCN
 
 
 class E2EMultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method

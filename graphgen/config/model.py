@@ -10,7 +10,7 @@ class ModelName(Enum):
     FASTER_RCNN = "faster_rcnn"
     E2E_MULTI_GCN = "e2e_multi_gcn"
     MULTI_GCN = "multi_gcn"
-    REASONING_MULTI_GCN = "reasoning_multi_gcn"
+    VQA = "vqa"
 
 
 class GCNName(Enum):
@@ -97,7 +97,7 @@ class GCNModelConfig:
     embedding: EmbeddingName
     gcn: GCNName
     pooling: Optional[GCNPoolingName]
-    layer_sizes: List[int]
+    shape: List[int]
 
 
 @dataclass
@@ -148,7 +148,7 @@ class BottomUpModelConfig(ReasoningModelConfig):
 
 
 @dataclass
-class ReasoningMultiGCNModelConfig(ModelConfig):
+class VQAModelConfig(ModelConfig):
     """Class for storing model configuration information."""
 
     reasoning: Union[MACModelConfig, BottomUpModelConfig]
@@ -157,7 +157,5 @@ class ReasoningMultiGCNModelConfig(ModelConfig):
 
     def __post_init__(self) -> None:
         """Perform post-init checks on fields."""
-        if self.name != ModelName.REASONING_MULTI_GCN:
-            raise ValueError(
-                f"Field {self.name=} must be equal to {ModelName.REASONING_MULTI_GCN}"
-            )
+        if self.name != ModelName.VQA:
+            raise ValueError(f"Field {self.name=} must be equal to {ModelName.VQA}")

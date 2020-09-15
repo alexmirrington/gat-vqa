@@ -52,11 +52,10 @@ class ReadUnit(nn.Module):  # type: ignore  # pylint: disable=abstract-method  #
                 last_mem = memories[-1] * masks
             else:
                 last_mem = self.read_dropout(memories[-1])
-        know = self.read_dropout(know.permute(0, 2, 1))
+        know = self.read_dropout(know)
         proj_mem = self.mem_proj(last_mem).unsqueeze(1)
-        proj_know = self.kb_proj(
-            know
-        )  # proj_know is (batch_size, num_objects, memory_dim)
+        # proj_know is (batch_size, num_objects, memory_dim)
+        proj_know = self.kb_proj(know)
         concat = torch.cat(
             [
                 proj_mem * proj_know,

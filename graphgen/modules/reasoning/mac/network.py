@@ -5,6 +5,7 @@ import torch
 from torch import nn
 from torch.nn.init import xavier_uniform_
 
+from ..abstract_reasoning_module import AbstractReasoningModule
 from .control import ControlUnit
 from .output import OutputUnit
 from .read import ReadUnit
@@ -129,7 +130,7 @@ class MACCell(nn.Module):  # type: ignore  # pylint: disable=abstract-method  # 
         return controls, memories
 
 
-class MACNetwork(nn.Module):  # type: ignore  # pylint: disable=abstract-method  # noqa: B950
+class MACNetwork(AbstractReasoningModule):
     """A wrapper for a sequence of MAC cells that handles propagation and output."""
 
     def __init__(
@@ -173,23 +174,31 @@ class MACNetwork(nn.Module):  # type: ignore  # pylint: disable=abstract-method 
 
         self.gate = xavier_uniform_linear(self.hidden_dim, 1)
 
-    def forward(self, inputs: Sequence[torch.Tensor]) -> torch.Tensor:
-        """Propagate data through the model.
+    def forward(
+        self, words: torch.Tensor, question: torch.Tensor, knowledge: torch.Tensor
+    ) -> torch.Tensor:
+        """Propagate data through the module.
 
         Params:
         -------
-        `inputs`: A tuple of tensors, `(contextual_words, question, img)`.
-        `contextual_words` has size `(batch_size, max_word_length, hidden_dim)`,
-        and is traditionally the output of the last BiLSTM layer at each timestep,
-        where questions shorter than `max_word_length` should be zero-padded.
-        `question` has size `(batch, hidden_dim)`, and is traditionally the
-        concatenated outputs of the forward and backward question BiLSTM passes.
-        `img` has size `(batch_size, hidden_dim, img_feat_dim)`.
+        `words`: Tensor of size `(batch_size, max_question_length, output_dim)`,
+        traditionally the output of the last LSTM/GRU layer at each timestep.
+        `question`: Tensor of size  `(batch_size, hidden_dim)`, traditionally the
+        last hidden state of a LSTM or GRU model.
+        `knowledge`: Tensor of size `(batch_size, max_object_count,
+        object_feature_dim)`, typically a tensor of object features from
+        Faster-RCNN, spatial features from a CNN (where an `object` is
+        interpreted as a spatial region) or scene graph object features.
+
+        Returns:
+        --------
+        `predictions`: Tensor of size `(batch_size, num_answers)`, activations
+        across all possible answer classes.
         """
-        state, masks = self.cell.init_hidden(inputs[1].size(0), inputs[1])
+        state, masks = self.cell.init_hidden(question.size(0), question)
 
         for _ in range(1, self.length + 1):
-            state = self.cell(inputs, state, masks)
+            state = self.cell((words, question, knowledge), state, masks)
 
             # memory gate
             if self.memory_gate:
@@ -199,7 +208,7 @@ class MACNetwork(nn.Module):  # type: ignore  # pylint: disable=abstract-method 
 
         _, memories = state
 
-        out = self.classifier(memories[-1], inputs[1])
+        out = self.classifier(memories[-1], question)
 
         return out
 
@@ -267,6 +276,7 @@ class OriginalMACNetwork(nn.Module):  # type: ignore  # pylint: disable=abstract
 
         img = self.conv(image)
         img = img.view(batch_size, self.hidden_dim, -1)
+        img = img.permute(0, 2, 1)
 
         embed = self.embed(question)
         embed = nn.utils.rnn.pack_padded_sequence(
@@ -277,6 +287,6 @@ class OriginalMACNetwork(nn.Module):  # type: ignore  # pylint: disable=abstract
         question = self.question_dropout(question)
         lstm_out, _ = nn.utils.rnn.pad_packed_sequence(lstm_out, batch_first=True)
         h_n = h_n.permute(1, 0, 2).contiguous().view(batch_size, -1)
-        out = self.actmac((lstm_out, question, img))
+        out = self.actmac(lstm_out, question, img)
 
         return out

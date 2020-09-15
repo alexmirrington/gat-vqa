@@ -629,8 +629,8 @@ class MultiChannelGCNRunner(Runner):
         return results
 
 
-class MACMultiChannelGCNRunner(Runner):
-    """Runner class for training a MultiChannelGCN model."""
+class VQAModelRunner(Runner):
+    """Runner class for training a VQA model."""
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
@@ -643,7 +643,7 @@ class MACMultiChannelGCNRunner(Runner):
         preprocessors: PreprocessorCollection,
         resume: Optional[ResumeInfo],
     ) -> None:
-        """Create a MultiChannelGCNRunner instance."""
+        """Create a `VQAModelRunner` instance."""
         if criterion is None:
             raise ValueError("This model requires a criterion.")
         super().__init__(
@@ -695,25 +695,22 @@ class MACMultiChannelGCNRunner(Runner):
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
                 dependencies = sample["question"]["dependencies"].to(self.device)
-                # word_embeddings = pack_sequence(
-                #     sample["question"]["embeddings"], enforce_sorted=False
-                # ).to(self.device)
                 objects = sample["scene_graph"]["objects"].to(self.device)
                 targets = sample["question"]["answer"].to(self.device)
 
-                # Labels can be indices or a object class probability distribution.
-                if self.config.training.optimiser.grad_clip:
-                    torch.nn.utils.clip_grad_norm_(
-                        self.model.parameters(),
-                        max_norm=self.config.training.optimiser.grad_clip,
-                    )
-                # Learn
                 self.optimiser.zero_grad()
                 preds = F.log_softmax(
                     self.model(dependencies=dependencies, objects=objects), dim=1
                 )
                 loss = self.criterion(preds, targets)  # type: ignore
                 loss.backward()
+
+                if self.config.training.optimiser.grad_clip:
+                    torch.nn.utils.clip_grad_norm_(
+                        self.model.parameters(),
+                        max_norm=self.config.training.optimiser.grad_clip,
+                    )
+
                 self.optimiser.step()
 
                 # Calculate and log metrics, using answer indices as we only want
@@ -779,13 +776,8 @@ class MACMultiChannelGCNRunner(Runner):
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
                 dependencies = sample["question"]["dependencies"].to(self.device)
-                # word_embeddings = pack_sequence(
-                #     sample["question"]["embeddings"], enforce_sorted=False
-                # ).to(self.device)
                 objects = sample["scene_graph"]["objects"].to(self.device)
                 targets = sample["question"]["answer"].to(self.device)
-
-                # Labels can be indices or a object class probability distribution.
 
                 # Learn
                 preds = F.log_softmax(

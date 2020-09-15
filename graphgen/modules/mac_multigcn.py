@@ -5,7 +5,7 @@ import torch
 from torch_geometric.data import Batch
 from torch_geometric.utils import to_dense_batch
 
-from . import GAT, GCN
+from .sparse import GAT, GCN
 
 
 class MACMultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
@@ -125,4 +125,4 @@ class MACMultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-
         # concatenated outputs of the forward and backward question BiLSTM passes.
         # `img` has size (batch_size, hidden_dim, img_feat_dim).
 
-        return self.mac_network((contextual_words, question, scene_graph_feats))
+        return self.mac_network(contextual_words, question, scene_graph_feats)

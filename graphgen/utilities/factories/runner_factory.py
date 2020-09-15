@@ -19,33 +19,27 @@ from ...config.model import (
     MACModelConfig,
     ModelName,
     MultiGCNModelConfig,
-    ReasoningMultiGCNModelConfig,
+    VQAModelConfig,
 )
 from ...config.training import OptimiserName
-from ...modules import (
-    GAT,
-    GCN,
-    BottomUpMultiGCN,
-    E2EMultiGCN,
-    FasterRCNN,
-    GraphRCNN,
-    MACMultiGCN,
-    MultiGCN,
-)
-from ...modules.bottomup import BottomUp
-from ...modules.mac import MACCell, MACNetwork
-from ...modules.mac.control import ControlUnit
-from ...modules.mac.output import OutputUnit
-from ...modules.mac.read import ReadUnit
-from ...modules.mac.write import WriteUnit
+from ...modules import E2EMultiGCN, FasterRCNN, GraphRCNN, MultiGCN, MultimodalReasoning
+from ...modules.question import GCNQuestionModule, RNNQuestionModule
+from ...modules.reasoning.bottomup import BottomUp
+from ...modules.reasoning.mac import MACCell, MACNetwork
+from ...modules.reasoning.mac.control import ControlUnit
+from ...modules.reasoning.mac.output import OutputUnit
+from ...modules.reasoning.mac.read import ReadUnit
+from ...modules.reasoning.mac.write import WriteUnit
+from ...modules.scene import GCNSceneGraphModule, RNNSceneGraphModule
+from ...modules.sparse import GAT, GCN, AbstractGCN
 from ..preprocessing import DatasetCollection, PreprocessorCollection
 from ..runners import (
     EndToEndMultiChannelGCNRunner,
     FasterRCNNRunner,
-    MACMultiChannelGCNRunner,
     MultiChannelGCNRunner,
     ResumeInfo,
     Runner,
+    VQAModelRunner,
 )
 
 
@@ -58,7 +52,7 @@ class RunnerFactory:
             ModelName.FASTER_RCNN: RunnerFactory.create_faster_rcnn,
             ModelName.E2E_MULTI_GCN: RunnerFactory.create_e2emultigcn,
             ModelName.MULTI_GCN: RunnerFactory.create_multigcn,
-            ModelName.REASONING_MULTI_GCN: RunnerFactory.create_reasoning_multigcn,
+            ModelName.VQA: RunnerFactory.create_vqa,
         }
 
     @staticmethod
@@ -66,6 +60,7 @@ class RunnerFactory:
         config: Config,
         model: torch.nn.Module,
     ) -> torch.optim.Optimizer:
+        """Build an optimiser from a config for a given model."""
         if config.training.optimiser.name == OptimiserName.ADAM:
             optimiser = torch.optim.Adam(
                 model.parameters(),
@@ -83,6 +78,32 @@ class RunnerFactory:
             raise NotImplementedError()
 
         return optimiser
+
+    @staticmethod
+    def _build_gcn(config: GCNModelConfig) -> AbstractGCN:
+        """Build a GCN model from a config."""
+        if config.pooling is None:
+            pooling = None
+        elif config.pooling == GCNPoolingName.GLOBAL_MEAN:
+            pooling = global_mean_pool
+        else:
+            raise NotImplementedError()
+        if config.gcn == GCNName.GCN:
+            return GCN(shape=config.shape, pooling=pooling)
+        if config.gcn == GCNName.GAT:
+            # TODO Configure number of heads in config
+            return GAT(shape=config.shape, pooling=pooling, heads=1)
+        raise NotImplementedError()
+
+    @staticmethod
+    def _build_lstm(config: LSTMModelConfig) -> torch.nn.LSTM:
+        """Build a LSTM model from a config."""
+        return torch.nn.LSTM(
+            config.embedding_dim,
+            config.hidden_dim // 2 if config.bidirectional else config.hidden_dim,
+            batch_first=True,
+            bidirectional=config.bidirectional,
+        )
 
     def create(
         self,
@@ -184,9 +205,9 @@ class RunnerFactory:
         # Create GCN
         model = MultiGCN(
             num_answer_classes=num_answer_classes,
-            text_gcn_shape=config.model.text_syntactic_graph.layer_sizes,
+            text_gcn_shape=config.model.text_syntactic_graph.shape,
             text_gcn_conv=config.model.text_syntactic_graph.gcn,
-            scene_gcn_shape=config.model.scene_graph.layer_sizes,
+            scene_gcn_shape=config.model.scene_graph.shape,
             scene_gcn_conv=config.model.scene_graph.gcn,
         )
         optimiser = RunnerFactory._build_optimiser(config, model)
@@ -198,7 +219,7 @@ class RunnerFactory:
         return runner
 
     @staticmethod
-    def create_reasoning_multigcn(
+    def create_vqa(
         config: Config,
         device: torch.device,
         preprocessors: PreprocessorCollection,
@@ -206,115 +227,87 @@ class RunnerFactory:
         resume: Optional[ResumeInfo],
     ) -> Runner:
         """Create a runner from a config."""
-        # pylint: disable=too-many-branches
-        if not isinstance(config.model, ReasoningMultiGCNModelConfig):
+        # pylint: disable=too-many-branches,too-many-locals
+        if not isinstance(config.model, VQAModelConfig):
             raise TypeError(
                 f"Expected model config of type \
-                {ReasoningMultiGCNModelConfig.__name__} \
+                {VQAModelConfig.__name__} \
                 but got {config.model.__class__.__name__}"
             )
 
         num_answer_classes = len(preprocessors.questions.index_to_answer)
 
-        assert config.model.question is not None
-
-        def build_gcn(config: GCNModelConfig) -> torch.nn.Module:
-            if config.pooling is None:
-                pool_func = None
-            elif config.pooling == GCNPoolingName.GLOBAL_MEAN:
-                pool_func = global_mean_pool
-            else:
-                raise NotImplementedError()
-            if config.gcn == GCNName.GCN:
-                return GCN(shape=config.layer_sizes, pool_func=pool_func)
-            if config.gcn == GCNName.GAT:
-                return GAT(shape=config.layer_sizes, heads=1, pool_func=pool_func)
-            raise NotImplementedError()
-
         # Create question module
         if isinstance(config.model.question, LSTMModelConfig):
-            question_module = torch.nn.LSTM(
-                config.model.question.embedding_dim,
-                config.model.question.hidden_dim // 2
-                if config.model.question.bidirectional
-                else config.model.question.hidden_dim,
-                batch_first=True,
-                bidirectional=config.model.question.bidirectional,
-            )
+            rnn = RunnerFactory._build_lstm(config.model.question)
+            question_module = RNNQuestionModule(rnn)
         elif isinstance(config.model.question, GCNModelConfig):
-            question_module = build_gcn(config.model.question)
+            gcn = RunnerFactory._build_gcn(config.model.question)
+            question_module = GCNQuestionModule(gcn)
 
         # Create scene gcn
-        scene_graph_module = None
         if isinstance(config.model.scene_graph, LSTMModelConfig):
-            scene_graph_module = torch.nn.LSTM(
-                config.model.scene_graph.embedding_dim,
-                config.model.scene_graph.hidden_dim // 2
-                if config.model.scene_graph.bidirectional
-                else config.model.scene_graph.hidden_dim,
-                batch_first=True,
-                bidirectional=config.model.scene_graph.bidirectional,
-            )
+            rnn = RunnerFactory._build_lstm(config.model.scene_graph)
+            scene_graph_module = RNNSceneGraphModule(rnn)
         elif isinstance(config.model.scene_graph, GCNModelConfig):
-            scene_graph_module = build_gcn(config.model.scene_graph)
+            gcn = RunnerFactory._build_gcn(config.model.scene_graph)
+            scene_graph_module = GCNSceneGraphModule(gcn)
 
+        # Create reasoning module
         if isinstance(config.model.reasoning, MACModelConfig):
-            model = MACMultiGCN(
-                mac_network=MACNetwork(
-                    length=config.model.reasoning.length,
-                    hidden_dim=config.model.reasoning.hidden_dim,
-                    classifier=OutputUnit(
-                        config.model.reasoning.hidden_dim, num_answer_classes
-                    ),
-                    cell=MACCell(
-                        config.model.reasoning.hidden_dim,
-                        control=ControlUnit(
-                            control_dim=config.model.reasoning.hidden_dim,
-                            length=config.model.reasoning.length,
-                        ),
-                        read=ReadUnit(
-                            memory_dim=config.model.reasoning.hidden_dim,
-                        ),
-                        write=WriteUnit(hidden_dim=config.model.reasoning.hidden_dim),
-                    ),
+            reasoning_module = MACNetwork(
+                length=config.model.reasoning.length,
+                hidden_dim=config.model.reasoning.hidden_dim,
+                classifier=OutputUnit(
+                    config.model.reasoning.hidden_dim, num_answer_classes
                 ),
-                question_module=question_module,
-                scene_graph_module=scene_graph_module,
-                scene_graph_embeddings=torch.nn.Embedding(
-                    num_embeddings=len(preprocessors.scene_graphs.object_to_index)
-                    + len(preprocessors.scene_graphs.rel_to_index)
-                    + len(preprocessors.scene_graphs.attr_to_index),
-                    embedding_dim=config.model.scene_graph.embedding_dim,
-                )
-                if config.model.scene_graph.embedding == EmbeddingName.NORMAL
-                else None,
+                cell=MACCell(
+                    config.model.reasoning.hidden_dim,
+                    control=ControlUnit(
+                        control_dim=config.model.reasoning.hidden_dim,
+                        length=config.model.reasoning.length,
+                    ),
+                    read=ReadUnit(
+                        memory_dim=config.model.reasoning.hidden_dim,
+                    ),
+                    write=WriteUnit(hidden_dim=config.model.reasoning.hidden_dim),
+                ),
             )
         elif isinstance(config.model.reasoning, BottomUpModelConfig):
             if isinstance(config.model.question, LSTMModelConfig):
                 question_dim = config.model.question.hidden_dim
             elif isinstance(config.model.question, GCNModelConfig):
-                question_dim = config.model.question.layer_sizes[-1]
+                question_dim = config.model.question.shape[-1]
             else:
                 raise NotImplementedError()
             if isinstance(config.model.scene_graph, LSTMModelConfig):
                 scene_graph_dim = config.model.scene_graph.hidden_dim
             elif isinstance(config.model.scene_graph, GCNModelConfig):
-                scene_graph_dim = config.model.scene_graph.layer_sizes[-1]
+                scene_graph_dim = config.model.scene_graph.shape[-1]
             else:
                 raise NotImplementedError()
-            model = BottomUpMultiGCN(
-                reasoning_module=BottomUp(
-                    question_dim=question_dim,
-                    knowledge_dim=scene_graph_dim,
-                    hidden_dim=config.model.reasoning.hidden_dim,
-                    output_dim=num_answer_classes,
-                ),
-                question_module=question_module,
-                scene_graph_module=scene_graph_module,
+            reasoning_module = BottomUp(
+                question_dim=question_dim,
+                knowledge_dim=scene_graph_dim,
+                hidden_dim=config.model.reasoning.hidden_dim,
+                output_dim=num_answer_classes,
             )
+        model = MultimodalReasoning(
+            reasoning_module=reasoning_module,
+            question_module=question_module,
+            scene_graph_module=scene_graph_module,
+            scene_graph_embeddings=torch.nn.Embedding(
+                num_embeddings=len(preprocessors.scene_graphs.object_to_index)
+                + len(preprocessors.scene_graphs.rel_to_index)
+                + len(preprocessors.scene_graphs.attr_to_index),
+                embedding_dim=config.model.scene_graph.embedding_dim,
+            )
+            if config.model.scene_graph.embedding == EmbeddingName.NORMAL
+            else None,
+        )
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()
-        runner = MACMultiChannelGCNRunner(
+        runner = VQAModelRunner(
             config, device, model, optimiser, criterion, datasets, preprocessors, resume
         )
 

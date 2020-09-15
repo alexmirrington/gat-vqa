@@ -8,7 +8,7 @@ from .model import (
     E2EMultiGCNModelConfig,
     FasterRCNNModelConfig,
     MultiGCNModelConfig,
-    ReasoningMultiGCNModelConfig,
+    VQAModelConfig,
 )
 from .preprocessing import PreprocessingConfig
 from .training import TrainingConfig
@@ -25,5 +25,5 @@ class Config:
         FasterRCNNModelConfig,
         E2EMultiGCNModelConfig,
         MultiGCNModelConfig,
-        ReasoningMultiGCNModelConfig,
+        VQAModelConfig,
     ]
