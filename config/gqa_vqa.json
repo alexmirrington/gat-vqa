@@ -50,16 +50,21 @@
     "scene_graph": {
       "embedding": "normal",
       "embedding_dim": 512,
+<<<<<<< HEAD:config/gqa_vqa.json
       "gcn": "gat",
       "shape": [512, 512, 512],
+=======
+      "gcn": "gcn",
+      "layer_sizes": [512, 512, 512, 512, 512],
+>>>>>>> b49d7457bb8f8f7186a63e3f2ec6666028c5b533:config/gqa_mac_t_bilstm_sg_gcn.json
       "pooling": null
     }
   },
   "training": {
     "epochs": 20,
-    "log_step": 1024,
+    "log_step": 512,
     "dataloader": {
-      "batch_size": 16,
+      "batch_size": 32,
       "workers": 1
     },
     "optimiser": {
