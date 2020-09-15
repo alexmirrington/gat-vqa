@@ -50,7 +50,7 @@
     "scene_graph": {
       "embedding": "normal",
       "embedding_dim": 512,
-      "gcn": "gat",
+      "gcn": "gcn",
       "layer_sizes": [512, 512, 512, 512, 512],
       "pooling": null
     }
