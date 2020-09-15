@@ -51,20 +51,20 @@
       "embedding": "normal",
       "embedding_dim": 512,
       "gcn": "gat",
-      "layer_sizes": [512, 512, 512],
+      "layer_sizes": [512, 512, 512, 512, 512],
       "pooling": null
     }
   },
   "training": {
     "epochs": 20,
-    "log_step": 1024,
+    "log_step": 512,
     "dataloader": {
-      "batch_size": 16,
+      "batch_size": 32,
       "workers": 1
     },
     "optimiser": {
       "name": "adam",
-      "learning_rate": 1e-4,
+      "learning_rate": 3e-4,
       "momentum": null,
       "weight_decay": 0,
       "grad_clip": 8,
