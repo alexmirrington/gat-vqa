@@ -27,11 +27,6 @@
       "feature": "questions",
       "split": "val",
       "version": "balanced"
-    },
-    {
-      "feature": "questions",
-      "split": "testdev",
-      "version": "balanced"
     }]
   },
   "model": {
