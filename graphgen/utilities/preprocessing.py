@@ -327,14 +327,12 @@ class QuestionTransformer:
         dependencies = torch.tensor(  # pylint: disable=not-callable
             data["dependencies"]
         )
-        embeddings = self.vectors.get_vecs_by_tokens(
-            data["tokens"], lower_case_backup=True
-        )
+        tokens = torch.tensor(data["tokens"])  # pylint: disable=not-callable
         return {
             "questionId": data["questionId"],
             "imageId": data["imageId"],
-            "embeddings": embeddings,
-            "dependencies": Data(edge_index=dependencies, x=embeddings),
+            "tokens": tokens,
+            "dependencies": Data(edge_index=dependencies, x=tokens),
             "answer": data["answer"],
         }
 
