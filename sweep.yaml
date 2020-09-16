@@ -2,23 +2,51 @@ description: "Sweep over Scene graph GCNs with different learning rates."
 program: main.py
 method: bayes
 metric:
-  name: val_loss
+  name: val/loss
   goal: minimize
+early_terminate:
+  type: hyperband
+  min_iter: 1  # Very aggressive, set to 2 or 3 for final param optimisation
+  eta: 3
 command:
   - ${env}
   - ${interpreter}
   - ${program}
   - "--config"
-  - "./config/gqa_mac_multigcn.json"
+  - "./config/gqa_vqa.json"
   - "--job"
   - "train"
   - "--sync"
   - ${args}
 parameters:
   training/optimiser/learning_rate:
-    min: 0.0001
-    max: 0.01
-  model/scene_graph/gcn:
+    min: 0.00005
+    max: 0.001
+  model/reasoning/length:
+    distribution: int_uniform
+    min: 4
+    max: 8
+  model/scene_graph/module/conv:
+    distribution: categorical
     values: ["gcn", "gat"]
-  model/scene_graph/layer_sizes:
-    values: ["[300,300,300]", "[300,300,300,300]"]
+  model/scene_graph/module/shape:
+    distribution: categorical
+    values: ["[300, 300, 512]", "[300, 300, 300, 300, 512]"]
+  model/scene_graph/embedding/init:
+    distribution: categorical
+    values: ["std_normal", "glove"]
+  model/scene_graph/embedding/trainable:
+    distribution: categorical
+    values: [true, false]
+  model/question/module/conv:
+    distribution: categorical
+    values: ["gcn", "gat"]
+  model/question/module/shape:
+    distribution: categorical
+    values: ["[300, 300, 512]", "[300, 300, 300, 300, 512]"]
+  model/question/embedding/init:
+    distribution: categorical
+    values: ["std_normal", "glove"]
+  model/question/embedding/trainable:
+    distribution: categorical
+    values: [true, false]
