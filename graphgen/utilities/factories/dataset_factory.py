@@ -16,7 +16,6 @@ from ...config.gqa import (
     GQASplit,
     GQAVersion,
 )
-from ...config.model import GCNModelConfig, VQAModelConfig
 from ...datasets.gqa import (
     GQA,
     GQAImages,
@@ -139,10 +138,6 @@ class DatasetFactory:
                             filemap,
                             GQASplit(subset.split),
                             transform=SceneGraphTransformer(
-                                embedding=config.model.scene_graph.embedding
-                                if isinstance(config.model, VQAModelConfig)
-                                and isinstance(config.model.scene_graph, GCNModelConfig)
-                                else None,  # TODO parameterise in config
                                 num_objects=len(
                                     preprocessors.scene_graphs.object_to_index
                                 ),

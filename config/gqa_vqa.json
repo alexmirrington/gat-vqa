@@ -42,24 +42,38 @@
       "hidden_dim": 512
     },
     "question": {
-      "embedding": "glove",
-      "embedding_dim": 300,
-      "hidden_dim": 512,
-      "bidirectional": true
+      "embedding": {
+        "init": "glove",
+        "dim": 300,
+        "trainable": false
+      },
+      "module": {
+        "name": "lstm",
+        "input_dim": 300,
+        "hidden_dim": 512,
+        "bidirectional": true
+      }
     },
     "scene_graph": {
-      "embedding": "normal",
-      "embedding_dim": 512,
-      "gcn": "gat",
-      "shape": [512, 512, 512],
-      "pooling": null
+      "embedding": {
+        "init": "glove",
+        "dim": 300,
+        "trainable": true
+      },
+      "module": {
+        "name": "gcn",
+        "conv": "gat",
+        "shape": [300, 300, 512],
+        "pooling": null,
+        "heads": 1
+      }
     }
   },
   "training": {
     "epochs": 20,
-    "log_step": 512,
+    "log_step": 1024,
     "dataloader": {
-      "batch_size": 32,
+      "batch_size": 16,
       "workers": 1
     },
     "optimiser": {

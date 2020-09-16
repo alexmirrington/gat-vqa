@@ -27,9 +27,10 @@ class GCNSceneGraphModule(AbstractSceneGraphModule):
 
         Returns:
         --------
-        `scene_graph`: A dense tensor of size `(batch_size, max_object_count,
+        `knowledge`: A dense tensor of size `(batch_size, max_object_count,
         object_feature_dim)`, the processed scene graph features for each graph
         in the batch.
         """
-        knowledge = self.scene_gcn(scene_graph)
+        knowledge, _ = self.gcn(scene_graph)
         knowledge, _ = to_dense_batch(knowledge, batch=scene_graph.batch)
+        return knowledge

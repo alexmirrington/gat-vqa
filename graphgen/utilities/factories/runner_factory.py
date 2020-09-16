@@ -1,19 +1,21 @@
 """Utilities for creating models from a config."""
 
-from typing import Optional
+from typing import Optional, Sequence
 
 import torch.nn
 from torch_geometric.nn import global_mean_pool
+from torchtext.vocab import GloVe
 
 from ...config import Config
 from ...config.model import (
     Backbone,
     BottomUpModelConfig,
     E2EMultiGCNModelConfig,
+    EmbeddingConfig,
     EmbeddingName,
     FasterRCNNModelConfig,
+    GCNConvName,
     GCNModelConfig,
-    GCNName,
     GCNPoolingName,
     LSTMModelConfig,
     MACModelConfig,
@@ -22,7 +24,7 @@ from ...config.model import (
     VQAModelConfig,
 )
 from ...config.training import OptimiserName
-from ...modules import E2EMultiGCN, FasterRCNN, GraphRCNN, MultiGCN, MultimodalReasoning
+from ...modules import VQA, E2EMultiGCN, FasterRCNN, GraphRCNN, MultiGCN
 from ...modules.question import GCNQuestionModule, RNNQuestionModule
 from ...modules.reasoning.bottomup import BottomUp
 from ...modules.reasoning.mac import MACCell, MACNetwork
@@ -88,22 +90,46 @@ class RunnerFactory:
             pooling = global_mean_pool
         else:
             raise NotImplementedError()
-        if config.gcn == GCNName.GCN:
+        if config.conv == GCNConvName.GCN:
             return GCN(shape=config.shape, pooling=pooling)
-        if config.gcn == GCNName.GAT:
+        if config.conv == GCNConvName.GAT:
             # TODO Configure number of heads in config
-            return GAT(shape=config.shape, pooling=pooling, heads=1)
+            return GAT(shape=config.shape, pooling=pooling, heads=config.heads)
         raise NotImplementedError()
 
     @staticmethod
     def _build_lstm(config: LSTMModelConfig) -> torch.nn.LSTM:
         """Build a LSTM model from a config."""
         return torch.nn.LSTM(
-            config.embedding_dim,
+            config.input_dim,
             config.hidden_dim // 2 if config.bidirectional else config.hidden_dim,
             batch_first=True,
             bidirectional=config.bidirectional,
         )
+
+    @staticmethod
+    def _build_embeddings(
+        config: EmbeddingConfig, words: Sequence[str]
+    ) -> torch.nn.Embedding:
+        """Build an embedding tensor."""
+        if config.init == EmbeddingName.GLOVE:
+            vectors = GloVe(name="6B", dim=config.dim)
+            return torch.nn.Embedding.from_pretrained(
+                vectors.get_vecs_by_tokens(words), freeze=not config.trainable
+            )
+        if config.init == EmbeddingName.ONE_HOT:
+            vectors = torch.eye(len(words))
+            return torch.nn.Embedding.from_pretrained(
+                vectors, freeze=not config.trainable
+            )
+        if config.init == EmbeddingName.STD_NORMAL:
+            embedding = torch.nn.Embedding(
+                num_embeddings=len(words),
+                embedding_dim=config.dim,
+            )
+            embedding.weight.requires_grad = config.trainable
+            return embedding
+        raise NotImplementedError()
 
     def create(
         self,
@@ -206,9 +232,9 @@ class RunnerFactory:
         model = MultiGCN(
             num_answer_classes=num_answer_classes,
             text_gcn_shape=config.model.text_syntactic_graph.shape,
-            text_gcn_conv=config.model.text_syntactic_graph.gcn,
+            text_gcn_conv=config.model.text_syntactic_graph.conv,
             scene_gcn_shape=config.model.scene_graph.shape,
-            scene_gcn_conv=config.model.scene_graph.gcn,
+            scene_gcn_conv=config.model.scene_graph.conv,
         )
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()
@@ -238,19 +264,19 @@ class RunnerFactory:
         num_answer_classes = len(preprocessors.questions.index_to_answer)
 
         # Create question module
-        if isinstance(config.model.question, LSTMModelConfig):
-            rnn = RunnerFactory._build_lstm(config.model.question)
+        if isinstance(config.model.question.module, LSTMModelConfig):
+            rnn = RunnerFactory._build_lstm(config.model.question.module)
             question_module = RNNQuestionModule(rnn)
-        elif isinstance(config.model.question, GCNModelConfig):
-            gcn = RunnerFactory._build_gcn(config.model.question)
+        elif isinstance(config.model.question.module, GCNModelConfig):
+            gcn = RunnerFactory._build_gcn(config.model.question.module)
             question_module = GCNQuestionModule(gcn)
 
         # Create scene gcn
-        if isinstance(config.model.scene_graph, LSTMModelConfig):
-            rnn = RunnerFactory._build_lstm(config.model.scene_graph)
+        if isinstance(config.model.scene_graph.module, LSTMModelConfig):
+            rnn = RunnerFactory._build_lstm(config.model.scene_graph.module)
             scene_graph_module = RNNSceneGraphModule(rnn)
-        elif isinstance(config.model.scene_graph, GCNModelConfig):
-            gcn = RunnerFactory._build_gcn(config.model.scene_graph)
+        elif isinstance(config.model.scene_graph.module, GCNModelConfig):
+            gcn = RunnerFactory._build_gcn(config.model.scene_graph.module)
             scene_graph_module = GCNSceneGraphModule(gcn)
 
         # Create reasoning module
@@ -292,18 +318,21 @@ class RunnerFactory:
                 hidden_dim=config.model.reasoning.hidden_dim,
                 output_dim=num_answer_classes,
             )
-        model = MultimodalReasoning(
+
+        # Create scene graph embeddings
+        scene_graph_embeddings = RunnerFactory._build_embeddings(
+            config.model.scene_graph.embedding,
+            list(preprocessors.scene_graphs.object_to_index.keys())
+            + list(preprocessors.scene_graphs.rel_to_index.keys())
+            + list(preprocessors.scene_graphs.attr_to_index.keys()),
+        )
+
+        # Assemble model
+        model = VQA(
             reasoning_module=reasoning_module,
             question_module=question_module,
             scene_graph_module=scene_graph_module,
-            scene_graph_embeddings=torch.nn.Embedding(
-                num_embeddings=len(preprocessors.scene_graphs.object_to_index)
-                + len(preprocessors.scene_graphs.rel_to_index)
-                + len(preprocessors.scene_graphs.attr_to_index),
-                embedding_dim=config.model.scene_graph.embedding_dim,
-            )
-            if config.model.scene_graph.embedding == EmbeddingName.NORMAL
-            else None,
+            scene_graph_embeddings=scene_graph_embeddings,
         )
         optimiser = RunnerFactory._build_optimiser(config, model)
         criterion = torch.nn.NLLLoss()

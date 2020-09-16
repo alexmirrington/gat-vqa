@@ -9,7 +9,7 @@ from torch_geometric.data import Data
 from torch_geometric.nn.conv import GATConv, GCNConv
 from torch_geometric.utils import to_dense_batch
 
-from ..config.model import GCNName
+from ..config.model import GCNConvName
 
 
 class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method
@@ -21,9 +21,9 @@ class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-met
         self,
         num_answer_classes: int,
         text_gcn_shape: Sequence[int],
-        text_gcn_conv: GCNName,
+        text_gcn_conv: GCNConvName,
         scene_gcn_shape: Sequence[int],
-        scene_gcn_conv: GCNName,
+        scene_gcn_conv: GCNConvName,
     ) -> None:
         """Create a multi-gcn model with bidirectional attention."""
         super().__init__()
@@ -31,11 +31,11 @@ class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-met
 
         self.text_gcn_layers = torch.nn.ModuleList([])
         for idx in range(1, len(text_gcn_shape)):
-            if text_gcn_conv == GCNName.GCN:
+            if text_gcn_conv == GCNConvName.GCN:
                 self.text_gcn_layers.append(
                     GCNConv(text_gcn_shape[idx - 1], text_gcn_shape[idx])
                 )
-            elif text_gcn_conv == GCNName.GAT:
+            elif text_gcn_conv == GCNConvName.GAT:
                 self.text_gcn_layers.append(
                     GATConv(text_gcn_shape[idx - 1], text_gcn_shape[idx], heads=1)
                 )
@@ -44,11 +44,11 @@ class MultiGCN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-met
 
         self.scene_gcn_layers = torch.nn.ModuleList([])
         for idx in range(1, len(scene_gcn_shape)):
-            if scene_gcn_conv == GCNName.GCN:
+            if scene_gcn_conv == GCNConvName.GCN:
                 self.scene_gcn_layers.append(
                     GCNConv(scene_gcn_shape[idx - 1], scene_gcn_shape[idx])
                 )
-            elif scene_gcn_conv == GCNName.GAT:
+            elif scene_gcn_conv == GCNConvName.GAT:
                 self.scene_gcn_layers.append(
                     GATConv(scene_gcn_shape[idx - 1], scene_gcn_shape[idx], heads=1)
                 )

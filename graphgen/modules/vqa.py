@@ -9,7 +9,7 @@ from .reasoning import AbstractReasoningModule
 from .scene import AbstractSceneGraphModule
 
 
-class MultimodalReasoning(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method  # noqa: B905
+class VQA(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method  # noqa: B905
     """Network that uses multiple GCN/BiLSTM inputs for its question and \
     knowledge-base representations, and a reasoning module for predictions."""
 
@@ -21,7 +21,7 @@ class MultimodalReasoning(torch.nn.Module):  # type: ignore  # pylint: disable=a
         scene_graph_module: AbstractSceneGraphModule,
         scene_graph_embeddings: Optional[torch.nn.Embedding],
     ) -> None:
-        """Create a `MultimodalReasoning` model."""
+        """Create a `VQA` model."""
         super().__init__()
         self.reasoning_module = reasoning_module
         self.question_module = question_module

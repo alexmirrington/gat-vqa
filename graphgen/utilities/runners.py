@@ -366,7 +366,7 @@ class EndToEndMultiChannelGCNRunner(Runner):
                 # Learn
                 self.optimiser.zero_grad()
                 rcnn_loss, preds = self.model(
-                    dependencies=deps, images=images, targets=bbox_targets
+                    question_graph=deps, images=images, targets=bbox_targets
                 )
                 pred_loss = self.criterion(preds, targets)  # type: ignore
 
@@ -450,7 +450,7 @@ class EndToEndMultiChannelGCNRunner(Runner):
                     )
                 ]
                 _, preds = self.model(  # First sample is rcnn_preds
-                    dependencies=deps, images=images, targets=bbox_targets
+                    question_graph=deps, images=images, targets=bbox_targets
                 )
                 loss = self.criterion(preds, targets)  # type: ignore
 
@@ -538,7 +538,7 @@ class MultiChannelGCNRunner(Runner):
 
                 # Learn
                 self.optimiser.zero_grad()
-                preds = self.model(dependencies=dependencies, objects=objects)
+                preds = self.model(question_graph=dependencies, scene_graph=objects)
                 loss = self.criterion(preds, targets)  # type: ignore
 
                 loss.backward()
@@ -611,7 +611,7 @@ class MultiChannelGCNRunner(Runner):
                 # Labels can be indices or a object class probability distribution.
 
                 # Learn
-                preds = self.model(dependencies=dependencies, objects=objects)
+                preds = self.model(question_graph=dependencies, scene_graph=objects)
                 loss = self.criterion(preds, targets)  # type: ignore
 
                 # Calculate and log metrics, using answer indices as we only want
@@ -700,7 +700,7 @@ class VQAModelRunner(Runner):
 
                 self.optimiser.zero_grad()
                 preds = F.log_softmax(
-                    self.model(dependencies=dependencies, objects=objects), dim=1
+                    self.model(question_graph=dependencies, scene_graph=objects), dim=1
                 )
                 loss = self.criterion(preds, targets)  # type: ignore
                 loss.backward()
@@ -770,8 +770,13 @@ class VQAModelRunner(Runner):
             self.config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
         )
 
+        # Prepare for evaluation
         self.model.eval()
+        train_reduction = self.criterion.reduction  # type: ignore
+        self.criterion.reduction = "sum"  # type: ignore
+        loss = 0
 
+        # Evaluate
         with torch.no_grad():
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
@@ -781,9 +786,9 @@ class VQAModelRunner(Runner):
 
                 # Learn
                 preds = F.log_softmax(
-                    self.model(dependencies=dependencies, objects=objects), dim=1
+                    self.model(question_graph=dependencies, scene_graph=objects), dim=1
                 )
-                loss = self.criterion(preds, targets)  # type: ignore
+                loss += self.criterion(preds, targets).item()  # type: ignore
 
                 # Calculate and log metrics, using answer indices as we only want
                 # basics for train set.
@@ -794,7 +799,10 @@ class VQAModelRunner(Runner):
                 )
                 print(f"eval: {batch + 1}/{len(dataloader)}", end="\r")
 
+        # Reset model to train and reset criterion reduction ready for training
         self.model.train()
-        results = {"loss": loss.item()}
+        self.criterion.reduction = train_reduction  # type: ignore
+        # Report average loss across all val samples
+        results = {"loss": loss / len(dataloader.dataset)}
         results.update(metrics.evaluate())
         return results
