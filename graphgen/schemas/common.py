@@ -12,7 +12,7 @@ class Question(TypedDict):
     questionId: str
     imageId: str
     question: str
-    tokens: List[str]  # List[str] over List[int] for GloVe vector lookup.
+    tokens: List[int]
     dependencies: List[List[int]]
     answer: Optional[int]
 

@@ -21,11 +21,19 @@ from .generators import slice_sequence
 class QuestionPreprocessor:
     """Abstract base class for all question preprocessors."""
 
-    def __init__(self, answer_to_index: Optional[Dict[str, int]] = None) -> None:
+    def __init__(
+        self,
+        answer_to_index: Optional[Dict[str, int]] = None,
+        word_to_index: Optional[Dict[str, int]] = None,
+    ) -> None:
         """Create a `QuestionPreprocessor` instance."""
         self._answer_to_index = answer_to_index if answer_to_index is not None else {}
         self._index_to_answer = (
             list(answer_to_index.keys()) if answer_to_index is not None else []
+        )
+        self._word_to_index = word_to_index if word_to_index is not None else {}
+        self._index_to_word = (
+            list(word_to_index.keys()) if word_to_index is not None else []
         )
 
     @property
@@ -39,6 +47,18 @@ class QuestionPreprocessor:
         """Set the int to str mapping of indices to answers."""
         self._index_to_answer = value
         self._answer_to_index = {key: idx for idx, key in enumerate(value)}
+
+    @property
+    def index_to_word(self) -> List[str]:
+        """Get the `int` to `str` mapping of indices to question words, based \
+        on the data that has been processed so far."""
+        return self._index_to_word.copy()
+
+    @index_to_word.setter
+    def index_to_word(self, value: List[str]) -> None:
+        """Set the int to str mapping of indices to question words."""
+        self._index_to_word = value
+        self._word_to_index = {key: idx for idx, key in enumerate(value)}
 
     def __call__(self, data: Sequence[Any]) -> List[Question]:
         """Preprocess a question sample."""
@@ -131,9 +151,13 @@ def dep_coordinate_list(
 class GQAQuestionPreprocessor(QuestionPreprocessor):
     """Class for preprocessing GQA questions."""
 
-    def __init__(self, answer_to_index: Optional[Dict[str, int]] = None) -> None:
+    def __init__(
+        self,
+        answer_to_index: Optional[Dict[str, int]] = None,
+        word_to_index: Optional[Dict[str, int]] = None,
+    ) -> None:
         """Create a `GQAQuestionPreprocessor` instance."""
-        super().__init__(answer_to_index)
+        super().__init__(answer_to_index, word_to_index)
         self._question_pipeline = stanza.Pipeline(
             lang="en",
             processors={
@@ -148,9 +172,16 @@ class GQAQuestionPreprocessor(QuestionPreprocessor):
 
     def _process_questions(
         self, questions: List[str]
-    ) -> Tuple[List[List[str]], List[List[List[int]]]]:
+    ) -> Tuple[List[List[int]], List[List[List[int]]]]:
         qdoc = self._question_pipeline("\n\n".join(questions))
-        tokens = [[word.text for word in sent.words] for sent in qdoc.sentences]
+        tokens: List[List[int]] = []
+        for sent in qdoc.sentences:
+            tokens.append([])
+            for word in sent.words:
+                if word.text not in self._index_to_word:
+                    self._word_to_index[word.text] = len(self._word_to_index)
+                    self._index_to_word.append(word.text)
+                tokens[-1].append(self._word_to_index[word.text])
         graphs = dep_coordinate_list(qdoc)
         return tokens, graphs
 

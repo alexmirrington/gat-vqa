@@ -319,6 +319,11 @@ class RunnerFactory:
                 output_dim=num_answer_classes,
             )
 
+        # Create question embeddings
+        question_embeddings = RunnerFactory._build_embeddings(
+            config.model.question.embedding, preprocessors.questions.index_to_word
+        )
+
         # Create scene graph embeddings
         scene_graph_embeddings = RunnerFactory._build_embeddings(
             config.model.scene_graph.embedding,
@@ -332,6 +337,7 @@ class RunnerFactory:
             reasoning_module=reasoning_module,
             question_module=question_module,
             scene_graph_module=scene_graph_module,
+            question_embeddings=question_embeddings,
             scene_graph_embeddings=scene_graph_embeddings,
         )
         optimiser = RunnerFactory._build_optimiser(config, model)
