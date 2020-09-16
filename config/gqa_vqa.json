@@ -40,13 +40,14 @@
       "embedding": {
         "init": "glove",
         "dim": 300,
-        "trainable": false
+        "trainable": true
       },
       "module": {
-        "name": "lstm",
-        "input_dim": 300,
-        "hidden_dim": 512,
-        "bidirectional": true
+        "name": "gcn",
+        "conv": "gat",
+        "shape": [300, 300, 512],
+        "pooling": "global_mean",
+        "heads": 1
       }
     },
     "scene_graph": {
