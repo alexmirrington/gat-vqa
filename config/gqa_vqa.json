@@ -38,28 +38,28 @@
     },
     "question": {
       "embedding": {
-        "init": "glove",
-        "dim": 300,
+        "init": "std_normal",
+        "dim": 512,
         "trainable": true
       },
       "module": {
         "name": "gcn",
         "conv": "gat",
-        "shape": [300, 300, 512],
+        "shape": [512, 512, 512],
         "pooling": "global_mean",
         "heads": 1
       }
     },
     "scene_graph": {
       "embedding": {
-        "init": "glove",
-        "dim": 300,
+        "init": "std_normal",
+        "dim": 512,
         "trainable": true
       },
       "module": {
         "name": "gcn",
         "conv": "gat",
-        "shape": [300, 300, 512],
+        "shape": [512, 512, 512],
         "pooling": null,
         "heads": 1
       }
