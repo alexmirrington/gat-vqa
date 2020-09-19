@@ -46,7 +46,7 @@
       "module": {
         "name": "gcn",
         "conv": "gat",
-        "shape": [512, 512, 512],
+        "shape": [300, 300, 512],
         "pooling": "global_mean",
         "heads": 1
       }
