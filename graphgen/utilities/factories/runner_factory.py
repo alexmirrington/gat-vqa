@@ -114,8 +114,26 @@ class RunnerFactory:
         """Build an embedding tensor."""
         if config.init == EmbeddingName.GLOVE:
             vectors = GloVe(name="6B", dim=config.dim)
+            # Handle OOV
+            if config.average_mwt:
+                # Split word by space e.g. "next to" -> ["next", "to"]
+                # so we can average tokens (esp. useful for relations)
+                embeds = torch.stack(
+                    [
+                        torch.mean(
+                            vectors.get_vecs_by_tokens(
+                                word.split(), lower_case_backup=True
+                            ),
+                            dim=0,
+                        )
+                        for word in words
+                    ],
+                    dim=0,
+                )
+            else:
+                embeds = vectors.get_vecs_by_tokens(words, lower_case_backup=True)
             return torch.nn.Embedding.from_pretrained(
-                vectors.get_vecs_by_tokens(words), freeze=not config.trainable
+                embeds, freeze=not config.trainable
             )
         if config.init == EmbeddingName.ONE_HOT:
             vectors = torch.eye(len(words))

@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import stanza
 import torch
 from torch_geometric.data import Data
-from torchtext.vocab import GloVe
 from tqdm import tqdm
 
 from ..schemas.common import (
@@ -317,10 +316,6 @@ class GQASceneGraphPreprocessor(SceneGraphPreprocessor):
 
 class QuestionTransformer:
     """Class for applying transformations to questions."""
-
-    def __init__(self) -> None:
-        """Initialise a `QuestionTransformer` instance."""
-        self.vectors = GloVe(name="6B", dim=300)
 
     def __call__(self, data: Question) -> TrainableQuestion:
         """Transform data into a trainable format and look up word embeddings."""

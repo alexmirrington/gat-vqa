@@ -114,6 +114,7 @@ class EmbeddingConfig:
     """Class for storing embedding configuration information."""
 
     init: EmbeddingName
+    average_mwt: bool
     dim: int
     trainable: bool
 
