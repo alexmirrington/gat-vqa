@@ -40,14 +40,15 @@
       "embedding": {
         "init": "glove",
         "dim": 300,
-        "trainable": false,
+        "trainable": true,
         "average_mwt": true
       },
       "module": {
-        "name": "lstm",
-        "input_dim": 300,
-        "hidden_dim": 512,
-        "bidirectional": true
+        "name": "gcn",
+        "conv": "gat",
+        "shape": [300, 300, 512],
+        "pooling": "global_mean",
+        "heads": 1
       }
     },
     "scene_graph": {
@@ -68,9 +69,9 @@
   },
   "training": {
     "epochs": 20,
-    "log_step": 1024,
+    "log_step": 512,
     "dataloader": {
-      "batch_size": 16,
+      "batch_size": 32,
       "workers": 1
     },
     "optimiser": {
@@ -85,11 +86,11 @@
       "features": [
         {
           "name": "questions",
-          "artifact": "gqa-preprocessed:latest"
+          "artifact": "gqa-preprocessed:v11"
         },
         {
           "name": "scene_graphs",
-          "artifact": "gqa-preprocessed:latest"
+          "artifact": "gqa-preprocessed:v11"
         }
       ],
       "train": {
