@@ -7,7 +7,6 @@ Top-Down_CVPR_2018_paper.html
 """
 import torch
 import torch.nn.functional as F
-from torch.nn.init import calculate_gain, xavier_uniform_
 
 from ..abstract_reasoning_module import AbstractReasoningModule
 from .gated_tanh import GatedTanh
@@ -39,15 +38,17 @@ class BottomUp(AbstractReasoningModule):
         self.question_proj = GatedTanh(question_dim, hidden_dim)
         self.knowledge_proj = GatedTanh(knowledge_dim, hidden_dim)
         self.classifier_0 = GatedTanh(hidden_dim, hidden_dim)
-        self.classifier_1 = torch.nn.Parameter(torch.empty(hidden_dim, output_dim))
+        self.classifier_1 = torch.nn.Linear(hidden_dim, output_dim, bias=False)
+
+        self.reset_parameters()
 
     def reset_parameters(self) -> None:
         """Reset the module's parameters."""
-        xavier_uniform_(
-            self.question_knowledge_attn_weights,
-            gain=calculate_gain("tanh"),
+        # Initialise additive attn weights like in https://arxiv.org/pdf/1409.0473.pdf
+        torch.nn.init.normal_(self.question_knowledge_attn_weights, 0, 0.01)
+        torch.nn.init.xavier_uniform_(
+            self.classifier_1.weight, gain=torch.nn.init.calculate_gain("linear")
         )
-        xavier_uniform_(self.classifier_1, gain=calculate_gain("tanh"))
 
     def forward(
         self, words: torch.Tensor, question: torch.Tensor, knowledge: torch.Tensor
@@ -86,5 +87,5 @@ class BottomUp(AbstractReasoningModule):
         intermediate_out = self.classifier_0(
             joint_embedding
         )  # (batch_size, hidden_dim)
-        out = torch.mm(intermediate_out, self.classifier_1)
+        out = self.classifier_1(intermediate_out)
         return out  # TODO BCE loss. Not strictly necessary for GQA but not bad practice

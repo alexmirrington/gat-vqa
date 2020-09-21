@@ -12,7 +12,6 @@ class GCNQuestionModule(torch.nn.Module):  # type: ignore  # pylint: disable=abs
     def __init__(self, gcn: AbstractGCN) -> None:
         """Initialise a `GCNQuestionModule` instance."""
         super().__init__()
-        # TODO incorporate learnable question word embeddings
         self.gcn = gcn
 
     def forward(self, question_graph: Batch) -> torch.Tensor:

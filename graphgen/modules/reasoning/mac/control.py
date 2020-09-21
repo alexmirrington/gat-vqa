@@ -49,7 +49,6 @@ class ControlUnit(nn.Module):  # type: ignore  # pylint: disable=abstract-method
     ) -> torch.Tensor:
         """Propagate data through the model."""
         cur_step = len(controls) - 1
-        control = controls[-1]  # Needed if using control_question
 
         # prepare question input to control
         question = F.elu(  # torch.tanh
@@ -67,11 +66,12 @@ class ControlUnit(nn.Module):  # type: ignore  # pylint: disable=abstract-method
         # Compute "continuous" control state given previous control and question.
         # control inputs: question and previous control. Runs if given CLEVR args1.txt,
         # but not included for GQA
-        control_question = torch.cat([control, position_aware], 1)
-        control_question = self.control_question(control_question)
-        control_question = control_question.unsqueeze(1)
+        # control = controls[-1]
+        # control_question = torch.cat([control, position_aware], 1)
+        # control_question = self.control_question(control_question)
+        # control_question = control_question.unsqueeze(1)
 
-        # control_question = position_aware.unsqueeze(1)
+        control_question = position_aware.unsqueeze(1)
 
         context_prod = control_question * context
 

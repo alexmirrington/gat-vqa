@@ -9,6 +9,7 @@ class OptimiserName(Enum):
 
     ADAM = "adam"
     SGD = "sgd"
+    ADADELTA = "adadelta"
 
 
 @dataclass
@@ -35,7 +36,7 @@ class OptimiserConfig:
 
     name: OptimiserName
     momentum: Optional[float]
-    learning_rate: float
+    learning_rate: Optional[float]
     weight_decay: float
     grad_clip: Optional[float]
     schedule: bool
@@ -45,6 +46,18 @@ class OptimiserConfig:
         if self.name == OptimiserName.ADAM and self.momentum is not None:
             raise ValueError(
                 f"Field {self.momentum=} must be {None} when using an Adam optimiser."
+            )
+        if self.name == OptimiserName.ADADELTA and self.momentum is not None:
+            raise ValueError(
+                f"Field {self.momentum=} must be {None} when using Adadelta."
+            )
+        if self.name == OptimiserName.ADADELTA and self.learning_rate is not None:
+            raise ValueError(
+                f"Field {self.learning_rate=} must be {None} when using Adadelta."
+            )
+        if self.name != OptimiserName.ADADELTA and self.learning_rate is None:
+            raise ValueError(
+                f"Field {self.learning_rate=} must be not be {None} for this optimiser."
             )
 
 

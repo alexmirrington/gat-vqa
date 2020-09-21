@@ -10,7 +10,6 @@ class RNNQuestionModule(torch.nn.Module):  # type: ignore  # pylint: disable=abs
     def __init__(self, rnn: torch.nn.RNNBase) -> None:
         """Initialise a `RNNQuestionModule` instance."""
         super().__init__()
-        # TODO incorporate learnable question word embeddings
         self.rnn = rnn
 
     def forward(self, question_graph: Batch) -> torch.Tensor:

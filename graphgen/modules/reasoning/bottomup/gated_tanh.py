@@ -20,6 +20,17 @@ class GatedTanh(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-me
         self.tanh_layer = torch.nn.Linear(input_dim, output_dim, bias=True)
         self.gate_layer = torch.nn.Linear(input_dim, output_dim, bias=True)
 
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        """Reset the module's parameters."""
+        torch.nn.init.xavier_uniform_(
+            self.tanh_layer.weight, gain=torch.nn.init.calculate_gain("tanh")
+        )
+        torch.nn.init.xavier_uniform_(
+            self.gate_layer.weight, gain=torch.nn.init.calculate_gain("sigmoid")
+        )
+
     def forward(self, data: torch.tensor) -> torch.Tensor:
         """Propagate data through the model.
 

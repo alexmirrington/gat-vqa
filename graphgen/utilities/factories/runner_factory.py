@@ -76,6 +76,11 @@ class RunnerFactory:
                 momentum=config.training.optimiser.momentum,
                 weight_decay=config.training.optimiser.weight_decay,
             )
+        elif config.training.optimiser.name == OptimiserName.ADADELTA:
+            optimiser = torch.optim.Adadelta(
+                model.parameters(),
+                weight_decay=config.training.optimiser.weight_decay,
+            )
         else:
             raise NotImplementedError()
 
@@ -318,16 +323,16 @@ class RunnerFactory:
                 ),
             )
         elif isinstance(config.model.reasoning, BottomUpModelConfig):
-            if isinstance(config.model.question, LSTMModelConfig):
-                question_dim = config.model.question.hidden_dim
-            elif isinstance(config.model.question, GCNModelConfig):
-                question_dim = config.model.question.shape[-1]
+            if isinstance(config.model.question.module, LSTMModelConfig):
+                question_dim = config.model.question.module.hidden_dim
+            elif isinstance(config.model.question.module, GCNModelConfig):
+                question_dim = config.model.question.module.shape[-1]
             else:
                 raise NotImplementedError()
-            if isinstance(config.model.scene_graph, LSTMModelConfig):
-                scene_graph_dim = config.model.scene_graph.hidden_dim
-            elif isinstance(config.model.scene_graph, GCNModelConfig):
-                scene_graph_dim = config.model.scene_graph.shape[-1]
+            if isinstance(config.model.scene_graph.module, LSTMModelConfig):
+                scene_graph_dim = config.model.scene_graph.module.hidden_dim
+            elif isinstance(config.model.scene_graph.module, GCNModelConfig):
+                scene_graph_dim = config.model.scene_graph.module.shape[-1]
             else:
                 raise NotImplementedError()
             reasoning_module = BottomUp(
