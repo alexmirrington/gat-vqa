@@ -61,7 +61,7 @@
         "conv": "gcn",
         "shape": [300, 300, 512],
         "pooling": null,
-        "heads": null
+        "heads": 0
       }
     }
   },
