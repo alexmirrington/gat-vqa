@@ -24,11 +24,14 @@ class GatedTanh(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-me
 
     def reset_parameters(self) -> None:
         """Reset the module's parameters."""
+        # torch.nn.init.xavier_uniform_(
+        #     self.tanh_layer.weight, gain=torch.nn.init.calculate_gain("tanh")
+        # )
+        # torch.nn.init.xavier_uniform_(
+        #     self.gate_layer.weight, gain=torch.nn.init.calculate_gain("sigmoid")
+        # )
         torch.nn.init.xavier_uniform_(
-            self.tanh_layer.weight, gain=torch.nn.init.calculate_gain("tanh")
-        )
-        torch.nn.init.xavier_uniform_(
-            self.gate_layer.weight, gain=torch.nn.init.calculate_gain("sigmoid")
+            self.gate_layer.weight, gain=torch.nn.init.calculate_gain("relu")
         )
 
     def forward(self, data: torch.tensor) -> torch.Tensor:
@@ -36,6 +39,7 @@ class GatedTanh(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-me
 
         Refer to `torch.nn.Linear` for compatible input and output shapes.
         """
-        out = torch.tanh(self.tanh_layer(data))
-        gate = torch.sigmoid(self.gate_layer(data))
-        return out * gate
+        # out = torch.tanh(self.tanh_layer(data))
+        # gate = torch.sigmoid(self.gate_layer(data))
+        # return out * gate
+        return torch.relu(self.gate_layer(data))

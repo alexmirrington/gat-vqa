@@ -58,10 +58,10 @@
       },
       "module": {
         "name": "gcn",
-        "conv": "gcn",
+        "conv": "gat",
         "shape": [300, 300, 512],
         "pooling": null,
-        "heads": 0
+        "heads": 1
       }
     }
   },
@@ -84,11 +84,11 @@
       "features": [
         {
           "name": "questions",
-          "artifact": "gqa-preprocessed:v11"
+          "artifact": "gqa-preprocessed:latest"
         },
         {
           "name": "scene_graphs",
-          "artifact": "gqa-preprocessed:v11"
+          "artifact": "gqa-preprocessed:latest"
         }
       ],
       "train": {
