@@ -44,11 +44,7 @@
         "average_mwt": true
       },
       "module": {
-        "name": "gcn",
-        "conv": "gat",
-        "shape": [300, 300, 512],
-        "pooling": "global_mean",
-        "heads": 1
+        "name": "text_cnn"
       }
     },
     "scene_graph": {
@@ -68,10 +64,10 @@
     }
   },
   "training": {
-    "epochs": 20,
-    "log_step": 512,
+    "epochs": 25,
+    "log_step": 1024,
     "dataloader": {
-      "batch_size": 32,
+      "batch_size": 16,
       "workers": 1
     },
     "optimiser": {

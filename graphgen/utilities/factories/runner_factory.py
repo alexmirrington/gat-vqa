@@ -21,11 +21,12 @@ from ...config.model import (
     MACModelConfig,
     ModelName,
     MultiGCNModelConfig,
+    TextCNNModelConfig,
     VQAModelConfig,
 )
 from ...config.training import OptimiserName
 from ...modules import VQA, E2EMultiGCN, FasterRCNN, GraphRCNN, MultiGCN
-from ...modules.question import GCNQuestionModule, RNNQuestionModule
+from ...modules.question import CNNQuestionModule, GCNQuestionModule, RNNQuestionModule
 from ...modules.reasoning.bottomup import BottomUp
 from ...modules.reasoning.mac import MACCell, MACNetwork
 from ...modules.reasoning.mac.control import ControlUnit
@@ -293,6 +294,13 @@ class RunnerFactory:
         elif isinstance(config.model.question.module, GCNModelConfig):
             gcn = RunnerFactory._build_gcn(config.model.question.module)
             question_module = GCNQuestionModule(gcn)
+        elif isinstance(config.model.question.module, TextCNNModelConfig):
+            question_module = CNNQuestionModule(
+                input_dim=config.model.question.embedding.dim,
+                out_channels=config.model.reasoning.hidden_dim,
+            )
+        else:
+            raise NotImplementedError()
 
         # Create scene gcn
         if isinstance(config.model.scene_graph.module, LSTMModelConfig):
@@ -301,6 +309,8 @@ class RunnerFactory:
         elif isinstance(config.model.scene_graph.module, GCNModelConfig):
             gcn = RunnerFactory._build_gcn(config.model.scene_graph.module)
             scene_graph_module = GCNSceneGraphModule(gcn)
+        else:
+            raise NotImplementedError()
 
         # Create reasoning module
         if isinstance(config.model.reasoning, MACModelConfig):

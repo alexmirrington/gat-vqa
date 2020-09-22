@@ -13,6 +13,7 @@ class ModelName(Enum):
     VQA = "vqa"
     GCN = "gcn"
     LSTM = "lstm"
+    TEXT_CNN = "text_cnn"
 
 
 class GCNConvName(Enum):
@@ -88,6 +89,18 @@ class LSTMModelConfig(ModelConfig):
 
 
 @dataclass
+class TextCNNModelConfig(ModelConfig):
+    """Class for storing text cnn model configuration information."""
+
+    def __post_init__(self) -> None:
+        """Perform post-init checks on fields."""
+        if self.name != ModelName.TEXT_CNN:
+            raise ValueError(
+                f"Field {self.name=} must be equal to {ModelName.TEXT_CNN}"
+            )
+
+
+@dataclass
 class ReasoningModelConfig:
     """Class for storing general reasoning model configuration information."""
 
@@ -124,7 +137,7 @@ class EmbeddingModuleConfig:
     """Class for storing embedding module configuration information."""
 
     embedding: EmbeddingConfig
-    module: Union[LSTMModelConfig, GCNModelConfig]
+    module: Union[LSTMModelConfig, GCNModelConfig, TextCNNModelConfig]
 
 
 @dataclass
