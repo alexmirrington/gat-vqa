@@ -10,9 +10,9 @@ from typing import Iterable, List, Optional, Tuple
 import jsons
 import stanza
 import torch
-import wandb
 from termcolor import colored
 
+import wandb
 from graphgen.config import Config
 from graphgen.utilities.factories import (
     DatasetFactory,
@@ -129,7 +129,7 @@ def parse_args() -> Tuple[argparse.Namespace, List[str]]:
         type=str,
         default="",
         help="A wandb run and filename to resume training a model from, \
-        e.g. graphgen/a1b2c3d:latest.pt",
+        e.g. graphgen/a1b2c3d:checkpoints/current.pt",
     )
     parser.add_argument(
         "--sync", action="store_true", help="Sync results to wandb if specified."

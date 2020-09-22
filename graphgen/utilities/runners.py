@@ -8,9 +8,10 @@ from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
-import wandb
 from termcolor import colored
 from torch.utils.data import DataLoader
+
+import wandb
 
 from ..config import Config
 from ..datasets.collators import VariableSizeTensorCollator
@@ -88,7 +89,7 @@ class Runner(ABC):
         print(colored("loading checkpoint:", attrs=["bold"]))
         if self.resume is None:
             raise ValueError("Cannot load model without resume information.")
-        root = Path(wandb.run.dir) / "checkpoints"
+        root = Path(wandb.run.dir)
         if not root.exists():
             root.mkdir(parents=True)
         restored = wandb.restore(
@@ -96,8 +97,12 @@ class Runner(ABC):
         )
         checkpoint = torch.load(restored.name)
         self.model.load_state_dict(checkpoint["model_state_dict"])
+        self.model.to(self.device)
         self.optimiser.load_state_dict(checkpoint["optimizer_state_dict"])
-
+        for state in self.optimiser.state.values():
+            for key, val in state.items():
+                if isinstance(val, torch.Tensor):
+                    state[key] = val.to(self.device)
         epoch: int = checkpoint["epoch"]
 
         print(f"loaded checkpoint from {restored.name}")
