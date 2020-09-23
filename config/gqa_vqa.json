@@ -47,7 +47,7 @@
         "name": "gcn",
         "conv": "gat",
         "shape": [300, 300, 300, 300, 512],
-        "pooling": null,
+        "pooling": "global_mean",
         "heads": 1
       }
     },
