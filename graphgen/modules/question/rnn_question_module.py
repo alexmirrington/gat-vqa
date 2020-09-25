@@ -42,7 +42,9 @@ class RNNQuestionModule(torch.nn.Module):  # type: ignore  # pylint: disable=abs
             enforce_sorted=False,
         )
         words, (h_n, _) = self.rnn(packed_text_feats)
-        question_graph = torch.cat([h_n[0], h_n[1]], -1)
+        question_graph = (
+            torch.cat([h_n[0], h_n[1]], -1) if self.rnn.bidirectional else h_n[0]
+        )
         words, _ = torch.nn.utils.rnn.pad_packed_sequence(words, batch_first=True)
         # TODO verify if this is necessary
         h_n = h_n.permute(1, 0, 2).contiguous().view(batch_size, -1)
