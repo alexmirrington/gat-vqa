@@ -47,7 +47,7 @@
         "name": "lstm",
         "hidden_dim": 512,
         "input_dim": 300,
-        "bidirectional": false
+        "bidirectional": true
       }
     },
     "scene_graph": {
@@ -60,7 +60,7 @@
       "module": {
         "name": "gcn",
         "conv": "gat",
-        "shape": [300, 300, 512],
+        "shape": [300, 300, 300, 300, 512],
         "pooling": null,
         "heads": 1
       }
