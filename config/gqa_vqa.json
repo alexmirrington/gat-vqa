@@ -68,9 +68,9 @@
   },
   "training": {
     "epochs": 25,
-    "log_step": 1024,
+    "log_step": 512,
     "dataloader": {
-      "batch_size": 16,
+      "batch_size": 32,
       "workers": 1
     },
     "optimiser": {
