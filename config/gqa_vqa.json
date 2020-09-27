@@ -45,7 +45,7 @@
       },
       "module": {
         "name": "lstm",
-        "hidden_dim": 1024,
+        "hidden_dim": 512,
         "input_dim": 300,
         "bidirectional": true
       }
@@ -74,8 +74,8 @@
       "workers": 1
     },
     "optimiser": {
-      "name": "adam",
-      "learning_rate": 1e-4,
+      "name": "amsgrad",
+      "learning_rate": null,
       "momentum": null,
       "weight_decay": 0,
       "grad_clip": 8,
