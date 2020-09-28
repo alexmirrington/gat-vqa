@@ -44,6 +44,15 @@ class VQA(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method  
             # assert len(scene_graph.x.size()) == 1
             question_graph.x = self.question_embeddings(question_graph.x.long())
 
+        # `words`: Tensor of size `(batch_size, max_question_length, output_dim)`,
+        # traditionally the output of the last LSTM/GRU layer at each timestep.
+        # `question`: Tensor of size  `(batch_size, hidden_dim)`, traditionally the
+        # last hidden state of a LSTM or GRU model.
+        # `knowledge`: Tensor of size `(batch_size, max_object_count,
+        # object_feature_dim)`, typically a tensor of object features from
+        # Faster-RCNN, spatial features from a CNN (where an `object` is
+        # interpreted as a spatial region) or scene graph object features.
+
         words, question = self.question_module(question_graph)
         knowledge = self.scene_graph_module(scene_graph)
         return self.reasoning_module(words, question, knowledge)

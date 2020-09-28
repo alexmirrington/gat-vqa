@@ -10,9 +10,9 @@ from typing import Iterable, List, Optional, Tuple
 import jsons
 import stanza
 import torch
+import wandb
 from termcolor import colored
 
-import wandb
 from graphgen.config import Config
 from graphgen.utilities.factories import (
     DatasetFactory,

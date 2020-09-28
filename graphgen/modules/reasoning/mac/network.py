@@ -133,10 +133,14 @@ class MACCell(nn.Module):  # type: ignore  # pylint: disable=abstract-method  # 
 class MACNetwork(AbstractReasoningModule):
     """A wrapper for a sequence of MAC cells that handles propagation and output."""
 
+    # pylint: disable=too-many-instance-attributes,too-many-arguments
     def __init__(
         self,
         length: int = 12,
         hidden_dim: int = 512,
+        question_dim: int = 512,
+        knowledge_dim: int = 512,
+        project_inputs: bool = False,
         memory_gate: bool = True,
         memory_gate_bias: float = 1.0,
         classifier: Optional[OutputUnit] = None,
@@ -144,8 +148,10 @@ class MACNetwork(AbstractReasoningModule):
     ):
         """Initialise a `RecurrentWrapper` intsance."""
         super().__init__()
-        self.hidden_dim = hidden_dim
         self.length = length
+        self.hidden_dim = hidden_dim
+        self.question_dim = question_dim
+        self.knowledge_dim = knowledge_dim
         self.memory_gate = memory_gate
         self.memory_gate_bias = memory_gate_bias
 
@@ -174,6 +180,20 @@ class MACNetwork(AbstractReasoningModule):
 
         self.gate = xavier_uniform_linear(self.hidden_dim, 1)
 
+        self.question_proj = None
+        self.words_proj = None
+        self.knowledge_proj = None
+        if project_inputs:
+            self.question_proj = torch.nn.Linear(
+                self.question_dim, self.hidden_dim, bias=False
+            )
+            self.words_proj = torch.nn.Linear(
+                self.question_dim, self.hidden_dim, bias=False
+            )
+            self.knowledge_proj = torch.nn.Linear(
+                self.knowledge_dim, self.hidden_dim, bias=False
+            )
+
     def forward(
         self, words: torch.Tensor, question: torch.Tensor, knowledge: torch.Tensor
     ) -> torch.Tensor:
@@ -195,6 +215,14 @@ class MACNetwork(AbstractReasoningModule):
         `predictions`: Tensor of size `(batch_size, num_answers)`, activations
         across all possible answer classes.
         """
+        # Project inputs to be of dimension `hidden_dim` if necessary
+        if self.question_proj is not None:
+            question = self.question_proj(question)
+        if self.words_proj is not None:
+            words = self.words_proj(words)
+        if self.knowledge_proj is not None:
+            knowledge = self.knowledge_proj(knowledge)
+
         state, masks = self.cell.init_hidden(question.size(0), question)
 
         for _ in range(1, self.length + 1):

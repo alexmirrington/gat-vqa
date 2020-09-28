@@ -45,8 +45,7 @@
       },
       "module": {
         "name": "lstm",
-        "hidden_dim": 512,
-        "input_dim": 300,
+        "hidden_dim": 1024,
         "bidirectional": true
       }
     },
@@ -60,9 +59,11 @@
       "module": {
         "name": "gcn",
         "conv": "gat",
-        "shape": [300, 300, 512],
+        "layers": 3,
+        "dim": 512,
         "pooling": null,
-        "heads": 1
+        "heads": 4,
+        "concat": true
       }
     }
   },
@@ -74,8 +75,8 @@
       "workers": 1
     },
     "optimiser": {
-      "name": "adadelta",
-      "learning_rate": null,
+      "name": "adam",
+      "learning_rate": 1e-4,
       "momentum": null,
       "weight_decay": 0,
       "grad_clip": 8,

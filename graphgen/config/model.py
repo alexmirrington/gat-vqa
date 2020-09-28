@@ -1,7 +1,7 @@
 """Classes storing model configuration information."""
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 
 class ModelName(Enum):
@@ -56,9 +56,11 @@ class GCNModelConfig(ModelConfig):
     """Class for storing GCN model configuration information."""
 
     conv: GCNConvName
-    shape: List[int]
+    layers: int
     pooling: Optional[GCNPoolingName]
     heads: int
+    concat: bool
+    dim: int
 
     def __post_init__(self) -> None:
         """Perform post-init checks on fields."""
@@ -72,13 +74,14 @@ class GCNModelConfig(ModelConfig):
             raise ValueError(
                 f"Field {self.heads=} must be zero for non-attention GCNs."
             )
+        if self.layers <= 0:
+            raise ValueError(f"Field {self.layers=} must be non-negative.")
 
 
 @dataclass
 class LSTMModelConfig(ModelConfig):
     """Class for storing LSTM model configuration information."""
 
-    input_dim: int
     hidden_dim: int
     bidirectional: bool
 

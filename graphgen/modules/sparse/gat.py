@@ -16,14 +16,23 @@ class GAT(AbstractGCN):
         shape: Sequence[int],
         pooling: Optional[Callable[..., torch.Tensor]],
         heads: int,
+        concat: bool,
     ) -> None:
         """Create a GAT with layer sizes according to `shape`."""
         super().__init__(shape, pooling)
         self.layers = torch.nn.ModuleList([])
         for idx in range(1, len(shape)):
-            self.layers.append(GATConv(shape[idx - 1], shape[idx], heads=heads))
+            self.layers.append(
+                GATConv(
+                    shape[idx - 1],
+                    shape[idx] // heads if concat else shape[idx],
+                    heads=heads,
+                    concat=concat,
+                )
+            )
         self.pool = pooling
         self.shape = shape
+        self.concat = concat
 
     def forward(self, graphs: Batch) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Perform a forward GAT pass."""

@@ -88,7 +88,7 @@ class RunnerFactory:
         return optimiser
 
     @staticmethod
-    def _build_gcn(config: GCNModelConfig) -> AbstractGCN:
+    def _build_gcn(config: GCNModelConfig, input_dim: int) -> AbstractGCN:
         """Build a GCN model from a config."""
         if config.pooling is None:
             pooling = None
@@ -97,17 +97,24 @@ class RunnerFactory:
         else:
             raise NotImplementedError()
         if config.conv == GCNConvName.GCN:
-            return GCN(shape=config.shape, pooling=pooling)
+            return GCN(
+                shape=[input_dim] + [config.dim for _ in range(config.layers)],
+                pooling=pooling,
+            )
         if config.conv == GCNConvName.GAT:
-            # TODO Configure number of heads in config
-            return GAT(shape=config.shape, pooling=pooling, heads=config.heads)
+            return GAT(
+                shape=[input_dim] + [config.dim for _ in range(config.layers)],
+                pooling=pooling,
+                heads=config.heads,
+                concat=config.concat,
+            )
         raise NotImplementedError()
 
     @staticmethod
-    def _build_lstm(config: LSTMModelConfig) -> torch.nn.LSTM:
+    def _build_lstm(config: LSTMModelConfig, input_dim: int) -> torch.nn.LSTM:
         """Build a LSTM model from a config."""
         return torch.nn.LSTM(
-            config.input_dim,
+            input_dim,
             config.hidden_dim // 2 if config.bidirectional else config.hidden_dim,
             batch_first=True,
             bidirectional=config.bidirectional,
@@ -253,11 +260,16 @@ class RunnerFactory:
         assert config.model.scene_graph is not None
 
         # Create GCN
+        input_dim = 300
         model = MultiGCN(
             num_answer_classes=num_answer_classes,
-            text_gcn_shape=config.model.text_syntactic_graph.shape,
+            text_gcn_shape=[
+                input_dim for _ in range(config.model.text_syntactic_graph.layers + 1)
+            ],
             text_gcn_conv=config.model.text_syntactic_graph.conv,
-            scene_gcn_shape=config.model.scene_graph.shape,
+            scene_gcn_shape=[
+                input_dim for _ in range(config.model.scene_graph.layers + 1)
+            ],
             scene_gcn_conv=config.model.scene_graph.conv,
         )
         optimiser = RunnerFactory._build_optimiser(config, model)
@@ -289,10 +301,14 @@ class RunnerFactory:
 
         # Create question module
         if isinstance(config.model.question.module, LSTMModelConfig):
-            rnn = RunnerFactory._build_lstm(config.model.question.module)
+            rnn = RunnerFactory._build_lstm(
+                config.model.question.module, config.model.question.embedding.dim
+            )
             question_module = RNNQuestionModule(rnn)
         elif isinstance(config.model.question.module, GCNModelConfig):
-            gcn = RunnerFactory._build_gcn(config.model.question.module)
+            gcn = RunnerFactory._build_gcn(
+                config.model.question.module, config.model.question.embedding.dim
+            )
             question_module = GCNQuestionModule(gcn)
         elif isinstance(config.model.question.module, TextCNNModelConfig):
             question_module = CNNQuestionModule(
@@ -304,19 +320,38 @@ class RunnerFactory:
 
         # Create scene gcn
         if isinstance(config.model.scene_graph.module, LSTMModelConfig):
-            rnn = RunnerFactory._build_lstm(config.model.scene_graph.module)
+            rnn = RunnerFactory._build_lstm(
+                config.model.scene_graph.module, config.model.scene_graph.embedding.dim
+            )
             scene_graph_module = RNNSceneGraphModule(rnn)
         elif isinstance(config.model.scene_graph.module, GCNModelConfig):
-            gcn = RunnerFactory._build_gcn(config.model.scene_graph.module)
+            gcn = RunnerFactory._build_gcn(
+                config.model.scene_graph.module, config.model.scene_graph.embedding.dim
+            )
             scene_graph_module = GCNSceneGraphModule(gcn)
         else:
             raise NotImplementedError()
 
         # Create reasoning module
+        if isinstance(config.model.question.module, LSTMModelConfig):
+            question_dim = config.model.question.module.hidden_dim
+        elif isinstance(config.model.question.module, GCNModelConfig):
+            question_dim = config.model.question.embedding.dim
+        else:
+            raise NotImplementedError()
+        if isinstance(config.model.scene_graph.module, LSTMModelConfig):
+            scene_graph_dim = config.model.scene_graph.module.hidden_dim
+        elif isinstance(config.model.scene_graph.module, GCNModelConfig):
+            scene_graph_dim = config.model.scene_graph.module.dim
+        else:
+            raise NotImplementedError()
         if isinstance(config.model.reasoning, MACModelConfig):
             reasoning_module = MACNetwork(
                 length=config.model.reasoning.length,
                 hidden_dim=config.model.reasoning.hidden_dim,
+                question_dim=question_dim,
+                knowledge_dim=scene_graph_dim,
+                project_inputs=True,
                 classifier=OutputUnit(
                     config.model.reasoning.hidden_dim, num_answer_classes
                 ),
@@ -333,18 +368,6 @@ class RunnerFactory:
                 ),
             )
         elif isinstance(config.model.reasoning, BottomUpModelConfig):
-            if isinstance(config.model.question.module, LSTMModelConfig):
-                question_dim = config.model.question.module.hidden_dim
-            elif isinstance(config.model.question.module, GCNModelConfig):
-                question_dim = config.model.question.module.shape[-1]
-            else:
-                raise NotImplementedError()
-            if isinstance(config.model.scene_graph.module, LSTMModelConfig):
-                scene_graph_dim = config.model.scene_graph.module.hidden_dim
-            elif isinstance(config.model.scene_graph.module, GCNModelConfig):
-                scene_graph_dim = config.model.scene_graph.module.shape[-1]
-            else:
-                raise NotImplementedError()
             reasoning_module = BottomUp(
                 question_dim=question_dim,
                 knowledge_dim=scene_graph_dim,
