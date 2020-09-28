@@ -62,7 +62,7 @@
         "layers": 3,
         "dim": 1024,
         "pooling": null,
-        "heads": 8,
+        "heads": 2,
         "concat": true
       }
     }
