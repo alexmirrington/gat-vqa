@@ -60,9 +60,9 @@
         "name": "gcn",
         "conv": "gat",
         "layers": 3,
-        "dim": 1024,
+        "dim": 512,
         "pooling": null,
-        "heads": 2,
+        "heads": 1,
         "concat": true
       }
     }
