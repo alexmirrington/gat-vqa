@@ -1,6 +1,16 @@
 # Graphgen
 
 ![tests](https://github.com/alexmirrington/graphgen/workflows/tests/badge.svg)
+<p align="center">
+  <a href="https://github.com/alexmirrington/graphgen/workflows/tests">
+    <img src="https://github.com/alexmirrington/graphgen/workflows/tests/badge.svg" alt="Tests status" />
+  </a>
+  <a href="https://github.com/psf/black">
+    <img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code style: black" />
+  </a>
+</p>
+
+----------------------
 
 Generate graph representations of images and text for downstream multimodal
 tasks like VQA.
