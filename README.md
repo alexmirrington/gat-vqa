@@ -1,5 +1,6 @@
+# Graphgen
+
 <p align="center">
-  Graphgen
   <a href="https://github.com/alexmirrington/graphgen/workflows/tests">
     <img src="https://github.com/alexmirrington/graphgen/workflows/tests/badge.svg" alt="Tests status" />
   </a>
