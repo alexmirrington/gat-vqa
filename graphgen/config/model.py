@@ -16,6 +16,12 @@ class ModelName(Enum):
     TEXT_CNN = "text_cnn"
 
 
+class SceneGraphAggregationName(Enum):
+    """Enum specifying possible scene graph names."""
+
+    PER_OBJ_CONCAT_MEAN_REL_ATTR = "per_obj_concat_mean_rel_attr"
+
+
 class GCNConvName(Enum):
     """Enum specifying possible GCN conv layer names."""
 
@@ -136,6 +142,20 @@ class EmbeddingConfig:
 
 
 @dataclass
+class SceneGraphConfig:
+    """Class for storing scene graph configuration information."""
+
+    directed: bool
+    object_skip_edges: bool
+    aggregation: Optional[SceneGraphAggregationName]
+
+    def __post_init__(self) -> None:
+        """Perform post-init checks on fields."""
+        if not self.directed:
+            raise ValueError(f"Field {self.directed=} must be True")
+
+
+@dataclass
 class EmbeddingModuleConfig:
     """Class for storing embedding module configuration information."""
 
@@ -144,12 +164,19 @@ class EmbeddingModuleConfig:
 
 
 @dataclass
+class SceneGraphEmbeddingModuleConfig(EmbeddingModuleConfig):
+    """Class for storing scene graph embedding module configuration information."""
+
+    graph: SceneGraphConfig
+
+
+@dataclass
 class VQAModelConfig(ModelConfig):
     """Class for storing model configuration information."""
 
     reasoning: Union[MACModelConfig, BottomUpModelConfig]
     question: EmbeddingModuleConfig
-    scene_graph: EmbeddingModuleConfig
+    scene_graph: SceneGraphEmbeddingModuleConfig
 
     def __post_init__(self) -> None:
         """Perform post-init checks on fields."""
@@ -157,57 +184,57 @@ class VQAModelConfig(ModelConfig):
             raise ValueError(f"Field {self.name=} must be equal to {ModelName.VQA}")
 
 
-@dataclass
-class MultiGCNModelConfig(ModelConfig):
-    """Class for storing model configuration information."""
+# @dataclass
+# class MultiGCNModelConfig(ModelConfig):
+#     """Class for storing model configuration information."""
 
-    text_syntactic_graph: Optional[GCNModelConfig]
-    scene_graph: Optional[GCNModelConfig]
+#     text_syntactic_graph: Optional[GCNModelConfig]
+#     scene_graph: Optional[GCNModelConfig]
 
-    def __post_init__(self) -> None:
-        """Perform post-init checks on fields."""
-        if self.name != ModelName.MULTI_GCN:
-            raise ValueError(
-                f"Field {self.name=} must be equal to {ModelName.MULTI_GCN}"
-            )
-
-
-class Backbone(Enum):
-    """Enum specifying possible backbones for the FasterRCNN object detector."""
-
-    RESNET50 = "resnet50"
+#     def __post_init__(self) -> None:
+#         """Perform post-init checks on fields."""
+#         if self.name != ModelName.MULTI_GCN:
+#             raise ValueError(
+#                 f"Field {self.name=} must be equal to {ModelName.MULTI_GCN}"
+#             )
 
 
-@dataclass
-class BackboneConfig:
-    """Class for storing R-CNN modlue configuration information."""
+# class Backbone(Enum):
+#     """Enum specifying possible backbones for the FasterRCNN object detector."""
 
-    name: Backbone
-    pretrained: bool
+#     RESNET50 = "resnet50"
 
 
-@dataclass
-class FasterRCNNModelConfig(ModelConfig):
-    """Class for storing model configuration information."""
+# @dataclass
+# class BackboneConfig:
+#     """Class for storing R-CNN modlue configuration information."""
 
-    pretrained: bool
-    backbone: BackboneConfig
-
-    def __post_init__(self) -> None:
-        """Perform post-init checks on fields."""
-        if self.name != ModelName.FASTER_RCNN:
-            raise ValueError(
-                f"Field {self.name=} must be equal to {ModelName.FASTER_RCNN}."
-            )
+#     name: Backbone
+#     pretrained: bool
 
 
-@dataclass
-class E2EMultiGCNModelConfig(ModelConfig):
-    """Class for storing model configuration information."""
+# @dataclass
+# class FasterRCNNModelConfig(ModelConfig):
+#     """Class for storing model configuration information."""
 
-    def __post_init__(self) -> None:
-        """Perform post-init checks on fields."""
-        if self.name != ModelName.E2E_MULTI_GCN:
-            raise ValueError(
-                f"Field {self.name=} must be equal to {ModelName.E2E_MULTI_GCN}"
-            )
+#     pretrained: bool
+#     backbone: BackboneConfig
+
+#     def __post_init__(self) -> None:
+#         """Perform post-init checks on fields."""
+#         if self.name != ModelName.FASTER_RCNN:
+#             raise ValueError(
+#                 f"Field {self.name=} must be equal to {ModelName.FASTER_RCNN}."
+#             )
+
+
+# @dataclass
+# class E2EMultiGCNModelConfig(ModelConfig):
+#     """Class for storing model configuration information."""
+
+#     def __post_init__(self) -> None:
+#         """Perform post-init checks on fields."""
+#         if self.name != ModelName.E2E_MULTI_GCN:
+#             raise ValueError(
+#                 f"Field {self.name=} must be equal to {ModelName.E2E_MULTI_GCN}"
+#             )

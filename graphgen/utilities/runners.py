@@ -699,12 +699,12 @@ class VQAModelRunner(Runner):
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
                 dependencies = sample["question"]["dependencies"].to(self.device)
-                objects = sample["scene_graph"]["objects"].to(self.device)
+                graph = sample["scene_graph"]["graph"].to(self.device)
                 targets = sample["question"]["answer"].to(self.device)
 
                 self.optimiser.zero_grad()
                 preds = F.log_softmax(
-                    self.model(question_graph=dependencies, scene_graph=objects), dim=1
+                    self.model(question_graph=dependencies, scene_graph=graph), dim=1
                 )
                 loss = self.criterion(preds, targets)  # type: ignore
                 loss.backward()
@@ -785,12 +785,12 @@ class VQAModelRunner(Runner):
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
                 dependencies = sample["question"]["dependencies"].to(self.device)
-                objects = sample["scene_graph"]["objects"].to(self.device)
+                graph = sample["scene_graph"]["graph"].to(self.device)
                 targets = sample["question"]["answer"].to(self.device)
 
                 # Learn
                 preds = F.log_softmax(
-                    self.model(question_graph=dependencies, scene_graph=objects), dim=1
+                    self.model(question_graph=dependencies, scene_graph=graph), dim=1
                 )
                 loss += self.criterion(preds, targets).item()  # type: ignore
 

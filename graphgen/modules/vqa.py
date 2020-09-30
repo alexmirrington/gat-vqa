@@ -35,7 +35,7 @@ class VQA(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method  
         # Lookup scene graph embeddings if supplied.
         if self.scene_graph_embeddings is not None:
             # scene_graph.x should be tensor of indices
-            # assert len(scene_graph.x.size()) == 1
+            assert len(scene_graph.x.size()) == 1
             scene_graph.x = self.scene_graph_embeddings(scene_graph.x.long())
 
         # Lookup question embeddings if supplied.

@@ -45,7 +45,7 @@
       },
       "module": {
         "name": "lstm",
-        "hidden_dim": 1024,
+        "hidden_dim": 512,
         "bidirectional": true
       }
     },
@@ -53,22 +53,18 @@
       "embedding": {
         "init": "glove",
         "dim": 300,
-        "trainable": true,
+        "trainable": false,
         "average_mwt": true
       },
       "graph": {
         "directed": true,
-        "object_skip_edges": false,
-        "aggregation": null
+        "object_skip_edges": true,
+        "aggregation": "per_obj_concat_mean_rel_attr"
       },
       "module": {
-        "name": "gcn",
-        "conv": "gat",
-        "layers": 3,
-        "dim": 512,
-        "pooling": null,
-        "heads": 1,
-        "concat": true
+        "name": "lstm",
+        "hidden_dim": 512,
+        "bidirectional": true
       }
     }
   },
