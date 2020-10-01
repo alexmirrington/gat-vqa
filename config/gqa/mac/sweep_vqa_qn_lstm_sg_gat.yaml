@@ -2,7 +2,7 @@ description: "Sweep over Scene graph GCNs with different learning rates."
 program: main.py
 method: bayes
 metric:
-  name: val.loss
+  name: val/loss
   goal: minimize
 early_terminate:
   type: hyperband
@@ -13,7 +13,7 @@ command:
   - ${interpreter}
   - ${program}
   - "--config"
-  - "..config.gqa_vqa.json"
+  - "vqa_qn_lstm_sg_gat.json"
   - "--job"
   - "train"
   - "--sync"
