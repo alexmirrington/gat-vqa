@@ -455,12 +455,12 @@ class SceneGraphTransformer:
         assert self.embeddings is not None
         sources = object_coos[0]
         targets = object_coos[1]
-        feats = self.embeddings(
-            torch.tensor(objects, dtype=torch.long)  # pylint:disable=not-callable
-        )
+        feats = torch.tensor([])  # pylint:disable=not-callable
         # Mean pool relations
         if len(objects) > 0:
-
+            feats = self.embeddings(
+                torch.tensor(objects, dtype=torch.long)  # pylint:disable=not-callable
+            )
             rels: List[List[int]] = [[] for _ in objects]  # relations for each object
             for idx, rel in enumerate(relations):
                 source_obj_idx = sources[idx]
@@ -525,9 +525,6 @@ class SceneGraphTransformer:
         relations = data["indexed_relations"]
         attributes = data["indexed_attributes"]
         if self.graph.aggregation is None:
-            # objects = data["indexed_labels"]
-            # relations = data["indexed_relations"]
-            # attributes = data["indexed_attributes"]
             coos, feats = self.build_graph(
                 data["coos"],
                 objects,
@@ -539,9 +536,6 @@ class SceneGraphTransformer:
             self.graph.aggregation
             == SceneGraphAggregationName.PER_OBJ_CONCAT_MEAN_REL_ATTR
         ):
-            # objects = data["labels"]
-            # relations = data["relations"]
-            # attributes = data["attributes"]
             coos, feats = self.build_concat_mean_graph(
                 data["coos"], objects, relations, attributes
             )
