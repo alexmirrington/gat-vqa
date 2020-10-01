@@ -10,9 +10,9 @@ from typing import Iterable, List, Optional, Tuple
 import jsons
 import stanza
 import torch
+import wandb
 from termcolor import colored
 
-import wandb
 from graphgen.config import Config
 from graphgen.utilities.factories import (
     DatasetFactory,
@@ -166,7 +166,7 @@ def merge_config(args: Iterable[str], config: Config) -> Config:
     for arg in args:
         arg = arg.lstrip("-")
         param, value = arg.split("=")
-        param_keys = param.split("/")
+        param_keys = param.split(".")
         subconfig = config
         for idx, key in enumerate(param_keys):
             try:

@@ -7,6 +7,7 @@ import torch
 from torch_geometric.data import Data
 from tqdm import tqdm
 
+from ..config.model import SceneGraphAggregationName, SceneGraphConfig
 from ..schemas.common import (
     Question,
     SceneGraph,
@@ -340,13 +341,17 @@ class SceneGraphTransformer:
         num_objects: int,
         num_relations: int,
         num_attributes: int,
+        graph: SceneGraphConfig,
+        embeddings: Optional[torch.nn.Embedding],
     ) -> None:
         """Initialise a `SceneGraphTransformer` instance."""
         self.num_objects = num_objects
         self.num_relations = num_relations
         self.num_attributes = num_attributes
+        self.graph = graph
+        self.embeddings = embeddings
 
-    def build_node_graph(
+    def build_graph(
         self,
         object_coos: Tuple[List[int], List[int]],
         objects: List[int],
@@ -362,7 +367,16 @@ class SceneGraphTransformer:
         feats = []
 
         # Add objects to node features
-        feats.append(torch.tensor(objects))  # pylint: disable=not-callable
+        if self.embeddings is None:
+            feats.append(torch.tensor(objects))  # pylint: disable=not-callable
+        else:
+            feats.append(
+                self.embeddings(
+                    torch.tensor(  # pylint:disable=not-callable
+                        objects, dtype=torch.long
+                    )
+                )
+            )
         offset_idx = len(objects)
 
         # Add source->relation and relation->target edges
@@ -376,9 +390,20 @@ class SceneGraphTransformer:
             targets += [offset_idx + idx, target_node]
 
         # Add relations to node features
-        feats.append(
-            torch.tensor(relations) + self.num_objects  # pylint: disable=not-callable
-        )
+        if self.embeddings is None:
+            feats.append(
+                torch.tensor(relations)  # pylint: disable=not-callable
+                + self.num_objects
+            )
+        else:
+            feats.append(
+                self.embeddings(
+                    torch.tensor(  # pylint:disable=not-callable
+                        relations, dtype=torch.long
+                    )
+                    + self.num_objects
+                )
+            )
         offset_idx += len(relations)
 
         # Add attr->object edges
@@ -396,12 +421,22 @@ class SceneGraphTransformer:
 
         # Add attributes to node features
         # (requires python 3.7+, to assert order of inserted keys in attr_to_idx)
-        feats.append(
-            torch.tensor(list(attr_to_idx.keys()))  # pylint: disable=not-callable
-            + self.num_objects
-            + self.num_relations
-        )
-
+        if self.embeddings is None:
+            feats.append(
+                torch.tensor(list(attr_to_idx.keys()))  # pylint: disable=not-callable
+                + self.num_objects
+                + self.num_relations
+            )
+        else:
+            feats.append(
+                self.embeddings(
+                    torch.tensor(  # pylint:disable=not-callable
+                        list(attr_to_idx.keys()), dtype=torch.long
+                    )
+                    + self.num_objects
+                    + self.num_relations
+                )
+            )
         return (
             torch.tensor(  # pylint:disable=not-callable
                 (sources, targets), dtype=torch.long
@@ -409,83 +444,110 @@ class SceneGraphTransformer:
             torch.cat(feats, dim=0),
         )
 
-    # def build_concat_kb(
-    #     self,
-    #     object_coos: Tuple[List[int], List[int]],
-    #     objects: List[str],
-    #     relations: List[str],
-    #     attributes: List[List[str]],
-    # ) -> Tuple[torch.Tensor, torch.Tensor]:
-    #     """Build a knowledgebase of concatenated glove vectors."""
-    #     sources = object_coos[0]
-    #     targets = object_coos[1]
-    #     feats = self.embed_feats(objects)
-    #     # Mean pool relations
-    #     if len(objects) > 0:
-    #         rels: List[List[str]] = [[] for _ in objects]  # relations for each object
-    #         for idx, rel in enumerate(relations):
-    #             source_obj_idx = sources[idx]
-    #             target_obj_idx = targets[idx]
-    #             # TODO determine whether to add source
-    #             rels[source_obj_idx].append(rel)
-    #             rels[target_obj_idx].append(rel)
-    #         rel_feats = torch.stack(
-    #             [
-    #                 torch.mean(self.embed_feats(obj_rels), axis=0)
-    #                 if len(obj_rels) > 0
-    #                 else torch.zeros(self.vectors.dim)
-    #                 for obj_rels in rels
-    #             ],
-    #             dim=0,
-    #         )
-    #         assert rel_feats.size() == feats.size()
-    #         attr_feats = torch.stack(
-    #             [
-    #                 torch.mean(self.embed_feats(obj_attrs), axis=0)
-    #                 if len(obj_attrs) > 0
-    #                 else torch.zeros(self.vectors.dim)
-    #                 for obj_attrs in attributes
-    #             ],
-    #             dim=0,
-    #         )
-    #         assert attr_feats.size() == feats.size()
+    def build_concat_mean_graph(
+        self,
+        object_coos: Tuple[List[int], List[int]],
+        objects: List[int],
+        relations: List[int],
+        attributes: List[List[int]],
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Build a knowledgebase of concatenated glove vectors."""
+        assert self.embeddings is not None
+        sources = object_coos[0]
+        targets = object_coos[1]
+        feats = torch.tensor([])  # pylint:disable=not-callable
+        # Mean pool relations
+        if len(objects) > 0:
+            feats = self.embeddings(
+                torch.tensor(objects, dtype=torch.long)  # pylint:disable=not-callable
+            )
+            rels: List[List[int]] = [[] for _ in objects]  # relations for each object
+            for idx, rel in enumerate(relations):
+                source_obj_idx = sources[idx]
+                target_obj_idx = targets[idx]
+                # TODO flag to determine whether to add source
+                rels[source_obj_idx].append(rel)
+                rels[target_obj_idx].append(rel)
+            rel_feats = torch.stack(
+                [
+                    torch.mean(
+                        self.embeddings(
+                            torch.tensor(  # pylint:disable=not-callable
+                                obj_rels, dtype=torch.long
+                            )
+                            + self.num_objects
+                        ),
+                        axis=0,
+                    )
+                    if len(obj_rels) > 0
+                    else torch.zeros(self.embeddings.embedding_dim)
+                    for obj_rels in rels
+                ],
+                dim=0,
+            )
+            assert rel_feats.size() == feats.size()
+            attr_feats = torch.stack(
+                [
+                    torch.mean(
+                        self.embeddings(
+                            torch.tensor(  # pylint:disable=not-callable
+                                obj_attrs, dtype=torch.long
+                            )
+                            + self.num_objects
+                            + self.num_relations
+                        ),
+                        axis=0,
+                    )
+                    if len(obj_attrs) > 0
+                    else torch.zeros(self.embeddings.embedding_dim)
+                    for obj_attrs in attributes
+                ],
+                dim=0,
+            )
+            assert attr_feats.size() == feats.size()
 
-    #         return (
-    #             torch.tensor(  # pylint:disable=not-callable
-    #                 (sources, targets), dtype=torch.long
-    #             ),
-    #             torch.cat((feats, rel_feats, attr_feats), dim=1),
-    #         )
-    #     return (
-    #         torch.tensor(  # pylint:disable=not-callable
-    #             (sources, targets), dtype=torch.long
-    #         ),
-    #         feats,
-    #     )
+            return (
+                torch.tensor(  # pylint:disable=not-callable
+                    (sources, targets), dtype=torch.long
+                ),
+                torch.cat((feats, rel_feats, attr_feats), dim=1),
+            )
+        return (
+            torch.tensor(  # pylint:disable=not-callable
+                (sources, targets), dtype=torch.long
+            ),
+            feats,
+        )
 
     def __call__(self, data: SceneGraph) -> TrainableSceneGraph:
         """Transform data into a trainable format."""
         objects = data["indexed_labels"]
-        # data["labels"] if self.vectors is not None else data["indexed_labels"]
-
         relations = data["indexed_relations"]
-        # data["relations"] if self.vectors is not None else data["indexed_relations"]
-
         attributes = data["indexed_attributes"]
-        # data["attributes"] if self.vectors is not None else data["indexed_attributes"]
-
-        coos, feats = self.build_node_graph(
-            data["coos"], objects, relations, attributes
-        )
-        # TODO add concat_kb support
-        # coos, feats = self.build_concat_kb(data["coos"], objects, relations, attributes)  # type: ignore  # noqa: B950
+        if self.graph.aggregation is None:
+            coos, feats = self.build_graph(
+                data["coos"],
+                objects,
+                relations,
+                attributes,
+                self.graph.object_skip_edges,
+            )
+        elif (
+            self.graph.aggregation
+            == SceneGraphAggregationName.PER_OBJ_CONCAT_MEAN_REL_ATTR
+        ):
+            coos, feats = self.build_concat_mean_graph(
+                data["coos"], objects, relations, attributes
+            )
+        else:
+            raise NotImplementedError()
 
         return {
             "imageId": data["imageId"],
             "boxes": torch.tensor(  # pylint: disable=not-callable
                 data["boxes"], dtype=torch.float
             ),
-            "objects": Data(edge_index=coos, x=feats),
+            "graph": Data(edge_index=coos, x=feats),
         }
 
 

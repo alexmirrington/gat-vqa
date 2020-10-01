@@ -12,7 +12,6 @@ class RNNSceneGraphModule(AbstractSceneGraphModule):
     def __init__(self, rnn: torch.nn.RNNBase) -> None:
         """Initialise a `RNNSceneGraphModule` instance."""
         super().__init__()
-        # TODO incorporate learnable question word embeddings
         self.rnn = rnn
 
     def forward(self, scene_graph: Batch) -> torch.Tensor:
@@ -44,7 +43,7 @@ class RNNSceneGraphModule(AbstractSceneGraphModule):
             batch_first=True,
             enforce_sorted=False,
         )
-        knowledge, _ = self.scene_graph_module(packed_object_feats)
+        knowledge, _ = self.rnn(packed_object_feats)
         knowledge, _ = torch.nn.utils.rnn.pad_packed_sequence(
             knowledge, batch_first=True
         )

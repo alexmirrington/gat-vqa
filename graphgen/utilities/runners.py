@@ -8,10 +8,9 @@ from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
+import wandb
 from termcolor import colored
 from torch.utils.data import DataLoader
-
-import wandb
 
 from ..config import Config
 from ..datasets.collators import VariableSizeTensorCollator
@@ -689,23 +688,30 @@ class VQAModelRunner(Runner):
             self.config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
         )
 
-        if self._start_epoch == 0:
-            self.save(self._start_epoch, "current.pt")
-
         self.model.train()
         self.model.to(self.device)
 
         best_val_loss = math.inf
+        if self._start_epoch == 0:
+            # Start with val to offset hyperband indices
+            self.save(self._start_epoch, "current.pt")
+            self.save(self._start_epoch, "best.pt")
+            results = {f"val/{key}": val for key, val in self.evaluate().items()}
+            best_val_loss = results["val/loss"]
+            log_metrics_stdout(results)
+            wandb.log(results)
+            metrics.reset()
+
         for epoch in range(self._start_epoch, self.config.training.epochs):
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
                 dependencies = sample["question"]["dependencies"].to(self.device)
-                objects = sample["scene_graph"]["objects"].to(self.device)
+                graph = sample["scene_graph"]["graph"].to(self.device)
                 targets = sample["question"]["answer"].to(self.device)
 
                 self.optimiser.zero_grad()
                 preds = F.log_softmax(
-                    self.model(question_graph=dependencies, scene_graph=objects), dim=1
+                    self.model(question_graph=dependencies, scene_graph=graph), dim=1
                 )
                 loss = self.criterion(preds, targets)  # type: ignore
                 loss.backward()
@@ -786,12 +792,12 @@ class VQAModelRunner(Runner):
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
                 dependencies = sample["question"]["dependencies"].to(self.device)
-                objects = sample["scene_graph"]["objects"].to(self.device)
+                graph = sample["scene_graph"]["graph"].to(self.device)
                 targets = sample["question"]["answer"].to(self.device)
 
                 # Learn
                 preds = F.log_softmax(
-                    self.model(question_graph=dependencies, scene_graph=objects), dim=1
+                    self.model(question_graph=dependencies, scene_graph=graph), dim=1
                 )
                 loss += self.criterion(preds, targets).item()  # type: ignore
 

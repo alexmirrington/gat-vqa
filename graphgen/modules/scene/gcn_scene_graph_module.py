@@ -13,7 +13,6 @@ class GCNSceneGraphModule(AbstractSceneGraphModule):
     def __init__(self, gcn: AbstractGCN) -> None:
         """Initialise a `GCNSceneGraphModule` instance."""
         super().__init__()
-        # TODO incorporate learnable question word embeddings
         self.gcn = gcn
 
     def forward(self, scene_graph: Batch) -> torch.Tensor:

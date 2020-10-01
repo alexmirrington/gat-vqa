@@ -8,24 +8,21 @@ from torchtext.vocab import GloVe
 
 from ...config import Config
 from ...config.model import (
-    Backbone,
     BottomUpModelConfig,
-    E2EMultiGCNModelConfig,
     EmbeddingConfig,
     EmbeddingName,
-    FasterRCNNModelConfig,
     GCNConvName,
     GCNModelConfig,
     GCNPoolingName,
     LSTMModelConfig,
     MACModelConfig,
     ModelName,
-    MultiGCNModelConfig,
+    SceneGraphAggregationName,
     TextCNNModelConfig,
     VQAModelConfig,
 )
 from ...config.training import OptimiserName
-from ...modules import VQA, E2EMultiGCN, FasterRCNN, GraphRCNN, MultiGCN
+from ...modules import VQA
 from ...modules.question import CNNQuestionModule, GCNQuestionModule, RNNQuestionModule
 from ...modules.reasoning.bottomup import BottomUp
 from ...modules.reasoning.mac import MACCell, MACNetwork
@@ -36,14 +33,7 @@ from ...modules.reasoning.mac.write import WriteUnit
 from ...modules.scene import GCNSceneGraphModule, RNNSceneGraphModule
 from ...modules.sparse import GAT, GCN, AbstractGCN
 from ..preprocessing import DatasetCollection, PreprocessorCollection
-from ..runners import (
-    EndToEndMultiChannelGCNRunner,
-    FasterRCNNRunner,
-    MultiChannelGCNRunner,
-    ResumeInfo,
-    Runner,
-    VQAModelRunner,
-)
+from ..runners import ResumeInfo, Runner, VQAModelRunner
 
 
 class RunnerFactory:
@@ -52,9 +42,6 @@ class RunnerFactory:
     def __init__(self) -> None:
         """Create a RunnerFactory instance."""
         self._factory_methods = {
-            ModelName.FASTER_RCNN: RunnerFactory.create_faster_rcnn,
-            ModelName.E2E_MULTI_GCN: RunnerFactory.create_e2emultigcn,
-            ModelName.MULTI_GCN: RunnerFactory.create_multigcn,
             ModelName.VQA: RunnerFactory.create_vqa,
         }
 
@@ -88,7 +75,7 @@ class RunnerFactory:
         return optimiser
 
     @staticmethod
-    def _build_gcn(config: GCNModelConfig) -> AbstractGCN:
+    def _build_gcn(config: GCNModelConfig, input_dim: int) -> AbstractGCN:
         """Build a GCN model from a config."""
         if config.pooling is None:
             pooling = None
@@ -97,24 +84,31 @@ class RunnerFactory:
         else:
             raise NotImplementedError()
         if config.conv == GCNConvName.GCN:
-            return GCN(shape=config.shape, pooling=pooling)
+            return GCN(
+                shape=[input_dim] + [config.dim for _ in range(config.layers)],
+                pooling=pooling,
+            )
         if config.conv == GCNConvName.GAT:
-            # TODO Configure number of heads in config
-            return GAT(shape=config.shape, pooling=pooling, heads=config.heads)
+            return GAT(
+                shape=[input_dim] + [config.dim for _ in range(config.layers)],
+                pooling=pooling,
+                heads=config.heads,
+                concat=config.concat,
+            )
         raise NotImplementedError()
 
     @staticmethod
-    def _build_lstm(config: LSTMModelConfig) -> torch.nn.LSTM:
+    def _build_lstm(config: LSTMModelConfig, input_dim: int) -> torch.nn.LSTM:
         """Build a LSTM model from a config."""
         return torch.nn.LSTM(
-            config.input_dim,
+            input_dim,
             config.hidden_dim // 2 if config.bidirectional else config.hidden_dim,
             batch_first=True,
             bidirectional=config.bidirectional,
         )
 
     @staticmethod
-    def _build_embeddings(
+    def build_embeddings(  # TODO move to EmbeddingFactory
         config: EmbeddingConfig, words: Sequence[str]
     ) -> torch.nn.Embedding:
         """Build an embedding tensor."""
@@ -168,105 +162,112 @@ class RunnerFactory:
             config, device, preprocessors, datasets, resume
         )
 
-    @staticmethod
-    def create_faster_rcnn(
-        config: Config,
-        device: torch.device,
-        preprocessors: PreprocessorCollection,
-        datasets: DatasetCollection,
-        resume: Optional[ResumeInfo],
-    ) -> Runner:
-        """Create a Faster-RCNN runner from a config."""
-        if not isinstance(config.model, FasterRCNNModelConfig):
-            raise TypeError(
-                f"Expected model config of type {FasterRCNNModelConfig.__name__} \
-                but got {config.model.__class__.__name__}"
-            )
+    # @staticmethod
+    # def create_faster_rcnn(
+    #     config: Config,
+    #     device: torch.device,
+    #     preprocessors: PreprocessorCollection,
+    #     datasets: DatasetCollection,
+    #     resume: Optional[ResumeInfo],
+    # ) -> Runner:
+    #     """Create a Faster-RCNN runner from a config."""
+    #     if not isinstance(config.model, FasterRCNNModelConfig):
+    #         raise TypeError(
+    #             f"Expected model config of type {FasterRCNNModelConfig.__name__} \
+    #             but got {config.model.__class__.__name__}"
+    #         )
 
-        # Add one for background
-        num_classes = len(set(preprocessors.scene_graphs.object_to_index.values()))
-        print(num_classes)
+    #     # Add one for background
+    #     num_classes = len(set(preprocessors.scene_graphs.object_to_index.values()))
+    #     print(num_classes)
 
-        if config.model.backbone.name == Backbone.RESNET50:
-            model = FasterRCNN(
-                pretrained=config.model.pretrained,
-                num_classes=num_classes,
-                pretrained_backbone=config.model.backbone.pretrained,
-            )
-        else:
-            raise NotImplementedError()
+    #     if config.model.backbone.name == Backbone.RESNET50:
+    #         model = FasterRCNN(
+    #             pretrained=config.model.pretrained,
+    #             num_classes=num_classes,
+    #             pretrained_backbone=config.model.backbone.pretrained,
+    #         )
+    #     else:
+    #         raise NotImplementedError()
 
-        optimiser = RunnerFactory._build_optimiser(config, model)
-        runner = FasterRCNNRunner(
-            config, device, model, optimiser, None, datasets, preprocessors, resume
-        )
+    #     optimiser = RunnerFactory._build_optimiser(config, model)
+    #     runner = FasterRCNNRunner(
+    #         config, device, model, optimiser, None, datasets, preprocessors, resume
+    #     )
 
-        return runner
+    #     return runner
 
-    @staticmethod
-    def create_e2emultigcn(
-        config: Config,
-        device: torch.device,
-        preprocessors: PreprocessorCollection,
-        datasets: DatasetCollection,
-        resume: Optional[ResumeInfo],
-    ) -> Runner:
-        """Create an End-to-end multi-channel GCN runner from a config."""
-        if not isinstance(config.model, E2EMultiGCNModelConfig):
-            raise TypeError(
-                f"Expected model config of type {E2EMultiGCNModelConfig.__name__} \
-                but got {config.model.__class__.__name__}"
-            )
+    # @staticmethod
+    # def create_e2emultigcn(
+    #     config: Config,
+    #     device: torch.device,
+    #     preprocessors: PreprocessorCollection,
+    #     datasets: DatasetCollection,
+    #     resume: Optional[ResumeInfo],
+    # ) -> Runner:
+    #     """Create an End-to-end multi-channel GCN runner from a config."""
+    #     if not isinstance(config.model, E2EMultiGCNModelConfig):
+    #         raise TypeError(
+    #             f"Expected model config of type {E2EMultiGCNModelConfig.__name__} \
+    #             but got {config.model.__class__.__name__}"
+    #         )
 
-        model = E2EMultiGCN(
-            len(preprocessors.questions.index_to_answer),
-            GraphRCNN(num_classes=91, pretrained=True),
-            dep_gcn=GCN((300, 512, 768, 1024), global_mean_pool),
-            obj_semantic_gcn=GCN((91, 256, 512, 1024), global_mean_pool),
-        )
-        optimiser = RunnerFactory._build_optimiser(config, model)
-        criterion = torch.nn.NLLLoss()
-        runner = EndToEndMultiChannelGCNRunner(
-            config, device, model, optimiser, criterion, datasets, preprocessors, resume
-        )
+    #     model = E2EMultiGCN(
+    #         len(preprocessors.questions.index_to_answer),
+    #         GraphRCNN(num_classes=91, pretrained=True),
+    #         dep_gcn=GCN((300, 512, 768, 1024), global_mean_pool),
+    #         obj_semantic_gcn=GCN((91, 256, 512, 1024), global_mean_pool),
+    #     )
+    #     optimiser = RunnerFactory._build_optimiser(config, model)
+    #     criterion = torch.nn.NLLLoss()
+    #     runner = EndToEndMultiChannelGCNRunner(
+    #         config, device, model, optimiser, criterion,
+    #         datasets, preprocessors, resume
+    #     )
 
-        return runner
+    #     return runner
 
-    @staticmethod
-    def create_multigcn(
-        config: Config,
-        device: torch.device,
-        preprocessors: PreprocessorCollection,
-        datasets: DatasetCollection,
-        resume: Optional[ResumeInfo],
-    ) -> Runner:
-        """Create an End-to-end multi-channel GCN runner from a config."""
-        if not isinstance(config.model, MultiGCNModelConfig):
-            raise TypeError(
-                f"Expected model config of type {MultiGCNModelConfig.__name__} \
-                but got {config.model.__class__.__name__}"
-            )
+    # @staticmethod
+    # def create_multigcn(
+    #     config: Config,
+    #     device: torch.device,
+    #     preprocessors: PreprocessorCollection,
+    #     datasets: DatasetCollection,
+    #     resume: Optional[ResumeInfo],
+    # ) -> Runner:
+    #     """Create an End-to-end multi-channel GCN runner from a config."""
+    #     if not isinstance(config.model, MultiGCNModelConfig):
+    #         raise TypeError(
+    #             f"Expected model config of type {MultiGCNModelConfig.__name__} \
+    #             but got {config.model.__class__.__name__}"
+    #         )
 
-        num_answer_classes = len(preprocessors.questions.index_to_answer)
+    #     num_answer_classes = len(preprocessors.questions.index_to_answer)
 
-        assert config.model.text_syntactic_graph is not None
-        assert config.model.scene_graph is not None
+    #     assert config.model.text_syntactic_graph is not None
+    #     assert config.model.scene_graph is not None
 
-        # Create GCN
-        model = MultiGCN(
-            num_answer_classes=num_answer_classes,
-            text_gcn_shape=config.model.text_syntactic_graph.shape,
-            text_gcn_conv=config.model.text_syntactic_graph.conv,
-            scene_gcn_shape=config.model.scene_graph.shape,
-            scene_gcn_conv=config.model.scene_graph.conv,
-        )
-        optimiser = RunnerFactory._build_optimiser(config, model)
-        criterion = torch.nn.NLLLoss()
-        runner = MultiChannelGCNRunner(
-            config, device, model, optimiser, criterion, datasets, preprocessors, resume
-        )
+    #     # Create GCN
+    #     input_dim = 300
+    #     model = MultiGCN(
+    #         num_answer_classes=num_answer_classes,
+    #         text_gcn_shape=[
+    #             input_dim for _ in range(config.model.text_syntactic_graph.layers + 1)
+    #         ],
+    #         text_gcn_conv=config.model.text_syntactic_graph.conv,
+    #         scene_gcn_shape=[
+    #             input_dim for _ in range(config.model.scene_graph.layers + 1)
+    #         ],
+    #         scene_gcn_conv=config.model.scene_graph.conv,
+    #     )
+    #     optimiser = RunnerFactory._build_optimiser(config, model)
+    #     criterion = torch.nn.NLLLoss()
+    #     runner = MultiChannelGCNRunner(
+    #         config, device, model, optimiser, criterion,
+    #         datasets, preprocessors, resume
+    #     )
 
-        return runner
+    #     return runner
 
     @staticmethod
     def create_vqa(
@@ -289,10 +290,14 @@ class RunnerFactory:
 
         # Create question module
         if isinstance(config.model.question.module, LSTMModelConfig):
-            rnn = RunnerFactory._build_lstm(config.model.question.module)
+            rnn = RunnerFactory._build_lstm(
+                config.model.question.module, config.model.question.embedding.dim
+            )
             question_module = RNNQuestionModule(rnn)
         elif isinstance(config.model.question.module, GCNModelConfig):
-            gcn = RunnerFactory._build_gcn(config.model.question.module)
+            gcn = RunnerFactory._build_gcn(
+                config.model.question.module, config.model.question.embedding.dim
+            )
             question_module = GCNQuestionModule(gcn)
         elif isinstance(config.model.question.module, TextCNNModelConfig):
             question_module = CNNQuestionModule(
@@ -304,19 +309,42 @@ class RunnerFactory:
 
         # Create scene gcn
         if isinstance(config.model.scene_graph.module, LSTMModelConfig):
-            rnn = RunnerFactory._build_lstm(config.model.scene_graph.module)
+            input_dim = config.model.scene_graph.embedding.dim
+            if (
+                config.model.scene_graph.graph.aggregation
+                == SceneGraphAggregationName.PER_OBJ_CONCAT_MEAN_REL_ATTR
+            ):
+                input_dim = 3 * config.model.scene_graph.embedding.dim
+            rnn = RunnerFactory._build_lstm(config.model.scene_graph.module, input_dim)
             scene_graph_module = RNNSceneGraphModule(rnn)
         elif isinstance(config.model.scene_graph.module, GCNModelConfig):
-            gcn = RunnerFactory._build_gcn(config.model.scene_graph.module)
+            gcn = RunnerFactory._build_gcn(
+                config.model.scene_graph.module, config.model.scene_graph.embedding.dim
+            )
             scene_graph_module = GCNSceneGraphModule(gcn)
         else:
             raise NotImplementedError()
 
         # Create reasoning module
+        if isinstance(config.model.question.module, LSTMModelConfig):
+            question_dim = config.model.question.module.hidden_dim
+        elif isinstance(config.model.question.module, GCNModelConfig):
+            question_dim = config.model.question.embedding.dim
+        else:
+            raise NotImplementedError()
+        if isinstance(config.model.scene_graph.module, LSTMModelConfig):
+            scene_graph_dim = config.model.scene_graph.module.hidden_dim
+        elif isinstance(config.model.scene_graph.module, GCNModelConfig):
+            scene_graph_dim = config.model.scene_graph.module.dim
+        else:
+            raise NotImplementedError()
         if isinstance(config.model.reasoning, MACModelConfig):
             reasoning_module = MACNetwork(
                 length=config.model.reasoning.length,
                 hidden_dim=config.model.reasoning.hidden_dim,
+                question_dim=question_dim,
+                knowledge_dim=scene_graph_dim,
+                project_inputs=True,
                 classifier=OutputUnit(
                     config.model.reasoning.hidden_dim, num_answer_classes
                 ),
@@ -333,18 +361,6 @@ class RunnerFactory:
                 ),
             )
         elif isinstance(config.model.reasoning, BottomUpModelConfig):
-            if isinstance(config.model.question.module, LSTMModelConfig):
-                question_dim = config.model.question.module.hidden_dim
-            elif isinstance(config.model.question.module, GCNModelConfig):
-                question_dim = config.model.question.module.shape[-1]
-            else:
-                raise NotImplementedError()
-            if isinstance(config.model.scene_graph.module, LSTMModelConfig):
-                scene_graph_dim = config.model.scene_graph.module.hidden_dim
-            elif isinstance(config.model.scene_graph.module, GCNModelConfig):
-                scene_graph_dim = config.model.scene_graph.module.shape[-1]
-            else:
-                raise NotImplementedError()
             reasoning_module = BottomUp(
                 question_dim=question_dim,
                 knowledge_dim=scene_graph_dim,
@@ -353,17 +369,19 @@ class RunnerFactory:
             )
 
         # Create question embeddings
-        question_embeddings = RunnerFactory._build_embeddings(
+        question_embeddings = RunnerFactory.build_embeddings(
             config.model.question.embedding, preprocessors.questions.index_to_word
         )
 
-        # Create scene graph embeddings
-        scene_graph_embeddings = RunnerFactory._build_embeddings(
-            config.model.scene_graph.embedding,
-            list(preprocessors.scene_graphs.object_to_index.keys())
-            + list(preprocessors.scene_graphs.rel_to_index.keys())
-            + list(preprocessors.scene_graphs.attr_to_index.keys()),
-        )
+        scene_graph_embeddings = None
+        if config.model.scene_graph.embedding.trainable:
+            # Create scene graph embeddings
+            scene_graph_embeddings = RunnerFactory.build_embeddings(
+                config.model.scene_graph.embedding,
+                list(preprocessors.scene_graphs.object_to_index.keys())
+                + list(preprocessors.scene_graphs.rel_to_index.keys())
+                + list(preprocessors.scene_graphs.attr_to_index.keys()),
+            )
 
         # Assemble model
         model = VQA(
