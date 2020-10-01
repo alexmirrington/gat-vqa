@@ -6,14 +6,14 @@ metric:
   goal: minimize
 early_terminate:
   type: hyperband
-  min_iter: 2  # Very aggressive, set to 2 or 3 for final param optimisation
+  min_iter: 2
   eta: 2
 command:
   - ${env}
   - ${interpreter}
   - ${program}
   - "--config"
-  - "vqa_qn_lstm_sg_gat.json"
+  - "config/gqa/mac/vqa_qn_lstm_sg_gat.json"
   - "--job"
   - "train"
   - "--sync"
