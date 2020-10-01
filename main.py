@@ -166,7 +166,7 @@ def merge_config(args: Iterable[str], config: Config) -> Config:
     for arg in args:
         arg = arg.lstrip("-")
         param, value = arg.split("=")
-        param_keys = param.split("/")
+        param_keys = param.split(".")
         subconfig = config
         for idx, key in enumerate(param_keys):
             try:

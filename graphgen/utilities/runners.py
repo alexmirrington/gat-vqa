@@ -688,13 +688,20 @@ class VQAModelRunner(Runner):
             self.config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
         )
 
-        if self._start_epoch == 0:
-            self.save(self._start_epoch, "current.pt")
-
         self.model.train()
         self.model.to(self.device)
 
         best_val_loss = math.inf
+        if self._start_epoch == 0:
+            # Start with val to offset hyperband indices
+            self.save(self._start_epoch, "current.pt")
+            self.save(self._start_epoch, "best.pt")
+            results = {f"val/{key}": val for key, val in self.evaluate().items()}
+            best_val_loss = results["val/loss"]
+            log_metrics_stdout(results)
+            wandb.log(results)
+            metrics.reset()
+
         for epoch in range(self._start_epoch, self.config.training.epochs):
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
