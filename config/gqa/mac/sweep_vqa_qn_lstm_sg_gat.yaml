@@ -19,57 +19,46 @@ command:
   - "--sync"
   - ${args}
 parameters:
-  training.optimiser.learning_rate:
+  training/optimiser/learning_rate:
     distribution: uniform
     min: 0.00001
     max: 0.01
-  training.optimiser.weight_decay:
-    distribution: uniform
-    min: 0.0
-    max: 0.001
-  model.reasoning.length:
+  model/reasoning/length:
     distribution: categorical
     values:
     - 4
     - 6
     - 8
-  model.question.embedding.trainable:
+  model/question/embedding/trainable:
     distribution: categorical
     values: [true, false]
-  model.question.module.bidirectional:
+  model/question/module/bidirectional:
     distribution: categorical
     values: [true, false]
-  model.question.module.hidden_dim:
+  model/question/module/hidden_dim:
     distribution: categorical
     values:
     - 256
     - 512
     - 1024
-  model.scene_graph.embedding.trainable:
+  model/scene_graph/embedding/trainable:
     distribution: categorical
     values: [true, false]
-  model.scene_graph.graph.object_skip_edges:
+  model/scene_graph/graph/object_skip_edges:
     distribution: categorical
     values: [true, false]
-  model.scene_graph.module.layers:
+  model/scene_graph/module/layers:
     distribution: int_uniform
     min: 2
     max: 5
-  model.scene_graph.module.dim:
+  model/scene_graph/module/dim:
     distribution: categorical
     values:
     - 128
     - 256
     - 512
     - 1024
-  model.scene_graph.module.dim:
-    distribution: categorical
-    values:
-    - 128
-    - 256
-    - 512
-    - 1024
-  model.scene_graph.module.heads:
+  model/scene_graph/module/heads:
     distribution: categorical
     values:
     - 1
