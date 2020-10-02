@@ -18,10 +18,10 @@ class OutputUnit(nn.Module):  # type: ignore  # pylint: disable=abstract-method 
         self.question_proj = nn.Linear(self.input_dim, self.input_dim)
         self.classifier_out = nn.Sequential(
             nn.Dropout(p=self.dropout),  # output dropout outputDropout=0.85
-            nn.Linear(self.input_dim * 2, self.input_dim + self.output_dim // 2),
+            nn.Linear(self.input_dim * 2, self.input_dim),
             nn.ELU(),
             nn.Dropout(p=self.dropout),  # output dropout outputDropout=0.85
-            nn.Linear(self.input_dim + self.output_dim // 2, self.output_dim),
+            nn.Linear(self.input_dim, self.output_dim),
         )
         xavier_uniform_(self.classifier_out[1].weight)
         xavier_uniform_(self.classifier_out[4].weight)
