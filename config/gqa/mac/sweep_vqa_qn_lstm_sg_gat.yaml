@@ -22,7 +22,7 @@ parameters:
   training/optimiser/learning_rate:
     distribution: uniform
     min: 0.00001
-    max: 0.01
+    max: 0.001
   model/reasoning/length:
     distribution: categorical
     values:
