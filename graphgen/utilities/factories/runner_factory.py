@@ -159,6 +159,9 @@ class RunnerFactory:
         num_object_classes = len(
             set(preprocessors.scene_graphs.object_to_index.values())
         )
+        num_relation_classes = len(
+            set(preprocessors.scene_graphs.rel_to_index.values())
+        )
 
         def create_gcn(config: GCNModelConfig) -> torch.nn.Module:
             # Determine pooling function
@@ -186,6 +189,7 @@ class RunnerFactory:
         model = MultiGCN(
             num_answer_classes,
             num_object_classes,
+            num_relation_classes,
             txt_syntactic_gcn=txt_syntactic_gcn,
             txt_semantic_gcn=txt_semantic_gcn,
             obj_feat_gcn=obj_feat_gcn,

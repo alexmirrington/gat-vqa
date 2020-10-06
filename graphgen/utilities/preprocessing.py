@@ -409,12 +409,12 @@ class SceneGraphTransformer:
         coos = torch.tensor(  # pylint: disable=not-callable
             data["coos"], dtype=torch.long
         )
-        relations = torch.tensor(  # pylint: disable=not-callable
-            data["relations"]
-        ).unsqueeze(-1)
-        attributes = self.vectors.get_vecs_by_tokens(
-            data["attributes"], lower_case_backup=True
-        )
+        attributes = [
+            self.vectors.get_vecs_by_tokens(obj_attrs, lower_case_backup=True)
+            if len(obj_attrs) > 0
+            else torch.tensor([])
+            for obj_attrs in data["attributes"]
+        ]
         return {
             "imageId": data["imageId"],
             "boxes": torch.tensor(  # pylint: disable=not-callable
@@ -424,7 +424,10 @@ class SceneGraphTransformer:
                 data["labels"], dtype=torch.int64
             ),
             "attributes": attributes,
-            "relations": Data(edge_index=coos, x=relations),
+            "coos": coos,
+            "relations": torch.tensor(  # pylint: disable=not-callable
+                data["relations"]
+            ),
         }
 
 
@@ -436,7 +439,11 @@ class ObjectTransformer:
 
     def __call__(
         self, objects: torch.Tensor, boxes: torch.Tensor, meta: Dict[str, Any]
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]]:
         """Transform data into a trainable format."""
         num_objects = meta["objectsNum"]
-        return (objects[:num_objects], boxes[:num_objects])
+        return (
+            objects[:num_objects],
+            boxes[:num_objects],
+            {"width": meta["width"], "height": meta["height"]},
+        )

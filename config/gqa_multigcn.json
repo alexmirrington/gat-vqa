@@ -54,7 +54,7 @@
     "object_positional_graph": {
       "gcn": "gat",
       "pooling": "global_mean",
-      "layer_sizes": [8, 8, 8, 8]
+      "layer_sizes": [310, 310, 310, 310]
     }
   },
   "training": {

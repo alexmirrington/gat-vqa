@@ -44,5 +44,6 @@ class TrainableSceneGraph(TypedDict):
     imageId: str
     boxes: torch.FloatTensor  # FloatTensor[N, 4] (x1, y1, x2, y2) format
     labels: torch.IntTensor  # Int64Tensor[N] class labels for boxes
-    attributes: torch.Tensor
-    relations: Data
+    attributes: List[torch.Tensor]
+    coos: torch.LongTensor
+    relations: torch.IntTensor

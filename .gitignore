@@ -5,6 +5,7 @@ artifacts
 .wandb
 .vector_cache
 .stanza
+.virtualenvs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
