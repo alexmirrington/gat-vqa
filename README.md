@@ -1,7 +1,7 @@
 # Graphgen
 
 <p align="center">
-  <a href="https://github.com/alexmirrington/graphgen/workflows/tests">
+  <a href="https://github.com/alexmirrington/graphgen/actions?query=branch%3Adevelop+workflow%3Atests">
     <img src="https://github.com/alexmirrington/graphgen/workflows/tests/badge.svg" alt="Tests status" />
   </a>
   <a href="https://github.com/psf/black">
