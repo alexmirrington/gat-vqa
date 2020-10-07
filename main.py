@@ -10,9 +10,9 @@ from typing import Iterable, List, Optional, Tuple
 import jsons
 import stanza
 import torch
-import wandb
 from termcolor import colored
 
+import wandb
 from graphgen.config import Config
 from graphgen.utilities.factories import (
     DatasetFactory,
@@ -199,6 +199,7 @@ if __name__ == "__main__":
     config_obj = load_config(parsed_args.config)
     config_obj = merge_config(remaining_args, config_obj)
     # Set up wandb
+    # os.environ["WANDB_SILENT"] = "false" if parsed_args.sync else "true"
     os.environ["WANDB_MODE"] = "run" if parsed_args.sync else "dryrun"
     if not Path(".wandb").exists():
         Path(".wandb").mkdir()

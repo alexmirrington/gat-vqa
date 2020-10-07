@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 import jsons
+
 import wandb
 
 from ...config import Config
@@ -100,29 +101,41 @@ class DatasetFactory:
 
                 # If an artifact is specified, use it for that feature instead.
                 if feature.artifact is not None:
+                    artifact_dir = None
+
+                    # Try and load artifact from wandb
                     try:
-                        # Load artifact
+                        # Load artifact from wandb
                         artifact = wandb.run.use_artifact(feature.artifact)
                         artifact_dir = Path(artifact.download())
-                        filemap = GQAFilemap(root=artifact_dir)
-                        # Load preprocessor for this feature
-                        with open(
-                            artifact_dir / "preprocessors.json", "r"
-                        ) as json_file:
-                            preprocessors = jsons.load(
-                                json.load(json_file),
-                                PreprocessorCollection,
-                            )
                     except (wandb.CommError, AttributeError):
-                        print(
-                            "Could not load artifact for feature",
-                            f'"{feature.name}", using raw dataset instead.',
-                        )
-                    except FileNotFoundError as ex:
-                        raise ValueError(
-                            "Could not load preprocessor for feature",
-                            f'"{feature.name}" in artifact "{feature.artifact}".',
-                        ) from ex
+                        pass
+
+                    # Try and load artifact from local directory
+                    if artifact_dir is None:
+                        artifact_dir = Path(feature.artifact)
+                        if not artifact_dir.is_dir():
+                            artifact_dir = None
+
+                    # Assume we have a valid artifact directory now
+                    if artifact_dir is not None:
+                        try:
+                            filemap = GQAFilemap(root=artifact_dir)
+                            # Load preprocessor for this feature
+                            with open(
+                                artifact_dir / "preprocessors.json", "r"
+                            ) as json_file:
+                                preprocessors = jsons.load(
+                                    json.load(json_file),
+                                    PreprocessorCollection,
+                                )
+                            print(f'Loaded data for feature "{feature.name}"')
+                        except FileNotFoundError as ex:
+                            raise ValueError(
+                                "Could not load preprocessor for feature",
+                                f'"{feature.name}" from path/artifact',
+                                f"{feature.artifact}.",
+                            ) from ex
 
                 if feature.name == GQAFeatures.QUESTIONS.value:
                     questions = GQAQuestions(

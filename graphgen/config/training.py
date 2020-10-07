@@ -75,6 +75,8 @@ class FeatureConfig:
     """Class storing information abeout features used for model training."""
 
     name: str
+    # artifact can point to a wandb artifact or just a file path.
+    # If None, we use the raw dataset.
     artifact: Optional[str]
 
 

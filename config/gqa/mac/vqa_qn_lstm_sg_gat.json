@@ -91,11 +91,11 @@
       "features": [
         {
           "name": "questions",
-          "artifact": "gqa-preprocessed:v11"
+          "artifact": "./data/preprocessed/gqa"
         },
         {
           "name": "scene_graphs",
-          "artifact": "gqa-preprocessed:v11"
+          "artifact": "./data/preprocessed/gqa"
         }
       ],
       "train": {

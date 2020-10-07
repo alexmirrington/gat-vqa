@@ -8,9 +8,10 @@ from typing import Any, Callable, Dict, Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
-import wandb
 from termcolor import colored
 from torch.utils.data import DataLoader
+
+import wandb
 
 from ..config import Config
 from ..datasets.collators import VariableSizeTensorCollator
@@ -81,7 +82,7 @@ class Runner(ABC):
             },
             str(root / name),
         )
-        wandb.save(str(root / "*"))
+        wandb.save(str(root / "*"), wandb.run.dir)
 
     def load(self) -> int:
         """Load a model's state dict from file."""
