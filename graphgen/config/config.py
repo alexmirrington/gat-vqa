@@ -3,19 +3,17 @@ from dataclasses import dataclass
 from typing import Union
 
 from .clevr import CLEVRDatasetConfig
-from .dataloader import DataloaderConfig
 from .gqa import GQADatasetConfig
-from .model import ModelConfig
+from .model import VQAModelConfig
 from .preprocessing import PreprocessingConfig
 from .training import TrainingConfig
 
 
-@dataclass(frozen=True)
+@dataclass
 class Config:
     """A class containing configuration information such as model parameters."""
 
     dataset: Union[CLEVRDatasetConfig, GQADatasetConfig]
     preprocessing: PreprocessingConfig
-    dataloader: DataloaderConfig
     training: TrainingConfig
-    model: ModelConfig
+    model: VQAModelConfig

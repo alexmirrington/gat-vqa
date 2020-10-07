@@ -1,12 +1,10 @@
 """Tools for creating trainable datasets given configuration objects."""
 import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
 
 import jsons
 import wandb
-from torch.utils.data import Dataset
 
 from ...config import Config
 from ...config.clevr import CLEVRDatasetConfig
@@ -26,17 +24,14 @@ from ...datasets.gqa import (
     GQASceneGraphs,
     GQASpatial,
 )
-from ..preprocessing import QuestionTransformer
-from .preprocessing_factory import PreprocessorCollection
-
-
-@dataclass(frozen=True)
-class DatasetCollection:
-    """Wrapper class for storing a train, val and test dataset tuple."""
-
-    train: Dataset
-    val: Dataset
-    test: Dataset
+from ..preprocessing import (
+    DatasetCollection,
+    ObjectTransformer,
+    PreprocessorCollection,
+    QuestionTransformer,
+    SceneGraphTransformer,
+)
+from .runner_factory import RunnerFactory
 
 
 class DatasetFactory:
@@ -61,7 +56,7 @@ class DatasetFactory:
     ) -> Tuple[DatasetCollection, PreprocessorCollection]:
         if not isinstance(config.dataset, CLEVRDatasetConfig):
             raise ValueError(
-                f"Param {config.dataset=} must be of type",
+                f"Param {config.dataset} must be of type",
                 f"{CLEVRDatasetConfig.__name__}.",
             )
         raise NotImplementedError()
@@ -70,19 +65,18 @@ class DatasetFactory:
     def _create_gqa(
         config: Config,
     ) -> Tuple[DatasetCollection, PreprocessorCollection]:
-        # pylint: disable=too-many-branches
+        # pylint: disable=too-many-branches,too-many-locals
 
         if not isinstance(config.dataset, GQADatasetConfig):
             raise ValueError(
-                f"Param {config.dataset=} must be of type {GQADatasetConfig.__name__}."
+                f"Param {config.dataset} must be of type {GQADatasetConfig.__name__}."
             )
 
         datasets: List[GQA] = []
 
         for split_key, subset in {
-            "train": config.model.data.train,
-            "val": config.model.data.val,
-            "test": config.model.data.test,
+            "train": config.training.data.train,
+            "val": config.training.data.val,
         }.items():
 
             if subset.split not in [split.value for split in iter(GQASplit)]:
@@ -97,14 +91,7 @@ class DatasetFactory:
             spatial = None
             scene_graphs = None
 
-            if GQAFeatures.QUESTIONS.value not in [
-                feat.name for feat in config.model.data.features
-            ]:
-                raise ValueError(
-                    f'List of features must contain "{GQAFeatures.QUESTIONS.value}"'
-                )
-
-            for feature in config.model.data.features:
+            for feature in config.training.data.features:
                 if feature.name not in [feature.value for feature in iter(GQAFeatures)]:
                     raise ValueError("Invalid feature string.")
 
@@ -113,29 +100,41 @@ class DatasetFactory:
 
                 # If an artifact is specified, use it for that feature instead.
                 if feature.artifact is not None:
+                    artifact_dir = None
+
+                    # Try and load artifact from wandb
                     try:
-                        # Load artifact
+                        # Load artifact from wandb
                         artifact = wandb.run.use_artifact(feature.artifact)
                         artifact_dir = Path(artifact.download())
-                        filemap = GQAFilemap(root=artifact_dir)
-                        # Load preprocessor for this feature
-                        with open(
-                            artifact_dir / "preprocessors.json", "r"
-                        ) as json_file:
-                            preprocessors = jsons.load(
-                                json.load(json_file),
-                                PreprocessorCollection,
-                            )
                     except (wandb.CommError, AttributeError):
-                        print(
-                            "Could not load artifact for feature",
-                            f'"{feature.name}", using raw dataset instead.',
-                        )
-                    except FileNotFoundError as ex:
-                        raise ValueError(
-                            "Could not load preprocessor for feature",
-                            f'"{feature.name}" in artifact "{feature.artifact}".',
-                        ) from ex
+                        pass
+
+                    # Try and load artifact from local directory
+                    if artifact_dir is None:
+                        artifact_dir = Path(feature.artifact)
+                        if not artifact_dir.is_dir():
+                            artifact_dir = None
+
+                    # Assume we have a valid artifact directory now
+                    if artifact_dir is not None:
+                        try:
+                            filemap = GQAFilemap(root=artifact_dir)
+                            # Load preprocessor for this feature
+                            with open(
+                                artifact_dir / "preprocessors.json", "r"
+                            ) as json_file:
+                                preprocessors = jsons.load(
+                                    json.load(json_file),
+                                    PreprocessorCollection,
+                                )
+                            print(f'Loaded data for feature "{feature.name}"')
+                        except FileNotFoundError as ex:
+                            raise ValueError(
+                                "Could not load preprocessor for feature",
+                                f'"{feature.name}" from path/artifact',
+                                f"{feature.artifact}.",
+                            ) from ex
 
                 if feature.name == GQAFeatures.QUESTIONS.value:
                     questions = GQAQuestions(
@@ -147,29 +146,57 @@ class DatasetFactory:
                 elif feature.name == GQAFeatures.IMAGES.value:
                     images = GQAImages(filemap, transform=None)
                 elif feature.name == GQAFeatures.SCENE_GRAPHS.value:
-                    scene_graphs = GQASceneGraphs(
-                        filemap, GQASplit(subset.split), transform=None
-                    )
+                    if GQASplit(subset.split) in (GQASplit.TRAIN, GQASplit.VAL):
+                        scene_graphs = GQASceneGraphs(
+                            filemap,
+                            GQASplit(subset.split),
+                            transform=SceneGraphTransformer(
+                                num_objects=len(
+                                    preprocessors.scene_graphs.object_to_index
+                                ),
+                                num_relations=len(
+                                    preprocessors.scene_graphs.rel_to_index
+                                ),
+                                num_attributes=len(
+                                    preprocessors.scene_graphs.attr_to_index
+                                ),
+                                graph=config.model.scene_graph.graph,
+                                embeddings=RunnerFactory.build_embeddings(
+                                    config.model.scene_graph.embedding,
+                                    list(
+                                        preprocessors.scene_graphs.object_to_index.keys()  # noqa: B950
+                                    )
+                                    + list(
+                                        preprocessors.scene_graphs.rel_to_index.keys()
+                                    )
+                                    + list(
+                                        preprocessors.scene_graphs.attr_to_index.keys()
+                                    ),
+                                )
+                                if not config.model.scene_graph.embedding.trainable
+                                else None,
+                            ),
+                        )
                 elif feature.name == GQAFeatures.SPATIAL.value:
                     spatial = GQASpatial(filemap)
                 elif feature.name == GQAFeatures.OBJECTS.value:
-                    objects = GQAObjects(filemap)
+                    objects = GQAObjects(filemap, transform=ObjectTransformer())
                 else:
                     raise NotImplementedError()
 
-                datasets.append(
-                    GQA(
-                        GQASplit(subset.split),
-                        GQAVersion(subset.version),
-                        questions=questions,
-                        images=images,
-                        objects=objects,
-                        spatial=spatial,
-                        scene_graphs=scene_graphs,
-                    )
+            datasets.append(
+                GQA(
+                    GQASplit(subset.split),
+                    GQAVersion(subset.version),
+                    questions=questions,
+                    images=images,
+                    objects=objects,
+                    spatial=spatial,
+                    scene_graphs=scene_graphs,
                 )
+            )
 
         return (
-            DatasetCollection(train=datasets[0], val=datasets[1], test=datasets[2]),
+            DatasetCollection(train=datasets[0], val=datasets[1]),
             preprocessors,
         )

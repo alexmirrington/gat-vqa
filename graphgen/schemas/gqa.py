@@ -121,6 +121,7 @@ class GQASceneGraphObject(TypedDict):
 class _GQASceneGraphBase(TypedDict):
     """Class wrapper for required GQA scene graph information."""
 
+    imageId: str
     width: int
     height: int
     objects: Dict[str, GQASceneGraphObject]

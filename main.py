@@ -5,26 +5,21 @@ import json
 import os
 from enum import Enum
 from pathlib import Path, PurePath
-from typing import Any, Callable, Dict, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 import jsons
-import numpy as np
 import stanza
 import torch
 import wandb
 from termcolor import colored
-from torch_geometric.data import DataLoader
 
 from graphgen.config import Config
-from graphgen.datasets.utilities import ChunkedRandomSampler
-from graphgen.metrics import Metric, MetricCollection
-from graphgen.models.gcn import GCN
 from graphgen.utilities.factories import (
-    DatasetCollection,
     DatasetFactory,
     PreprocessingFactory,
+    RunnerFactory,
 )
-from graphgen.utilities.logging import log_metrics_stdout
+from graphgen.utilities.runners import ResumeInfo
 from graphgen.utilities.serialisation import path_deserializer, path_serializer
 
 
@@ -48,9 +43,13 @@ def main(args: argparse.Namespace, config: Config) -> None:
     --------
     None.
     """
+    # Notes:
+    # - 1878 is the number of unique answers from the GQA paper
+    # - 1843 is the number of answers across train, val and testdev
+
     # Download and initialise resources
     print(colored("initialisation:", attrs=["bold"]))
-    stanza.download(lang="en")
+    stanza.download(lang="en", dir=".stanza")
 
     # Print environment info
     print(colored("environment:", attrs=["bold"]))
@@ -62,7 +61,11 @@ def main(args: argparse.Namespace, config: Config) -> None:
     if args.job == JobType.PREPROCESS:
         preprocess(config)
     elif args.job == JobType.TRAIN:
-        run(config, device)
+        resume = None
+        if args.resume != "":
+            run_id, checkpoint = args.resume.split(":")
+            resume = ResumeInfo(run_id, checkpoint)
+        run(config, device, resume)
     elif args.job == JobType.TEST:
         raise NotImplementedError()
     else:
@@ -76,165 +79,29 @@ def preprocess(config: Config) -> None:
     factory.process(config)
 
 
-def run(config: Config, device: torch.device) -> None:
+def run(config: Config, device: torch.device, resume: Optional[ResumeInfo]) -> None:
     """Train a model according to the `config.model` config."""
+    # Load datasets
     print(colored("loading datasets:", attrs=["bold"]))
-    factory = DatasetFactory()
-    datasets, preprocessors = factory.create(config)
+    dataset_factory = DatasetFactory()
+    datasets, preprocessors = dataset_factory.create(config)
     print(f"train: {len(datasets.train)}")
     print(f"val: {len(datasets.val)}")
-    print(f"test: {len(datasets.test)}")
+
+    # Create model runner
     print(colored("model:", attrs=["bold"]))
-    # TODO Use model factory
-    # 1878 is the number of unique answers from the GQA paper
-    # 1843 is the number of answers across train, val and testdev, returned by
-    # len(preprocessors.questions.index_to_answer)
-    model = GCN(
-        (300, 600, 900, 1200, 1500, len(preprocessors.questions.index_to_answer))
-    )
-    model.to(device)
-    model.train()
-    print(f"{model=}")
-    optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=config.model.optimiser.learning_rate,
-        weight_decay=config.model.optimiser.weight_decay,
-    )
-    print(f"{optimizer=}")
-    criterion = torch.nn.NLLLoss()
-    print(f"{criterion=}")
+    runner_factory = RunnerFactory()
+    runner = runner_factory.create(config, device, preprocessors, datasets, resume)
+    print(f"{runner.model=}")
+    print(f"{runner.criterion=}")
+    print(f"{runner.optimiser=}")
 
     # Run model
     print(colored("running:", attrs=["bold"]))
-    train(model, criterion, optimizer, datasets, device, config)
+    runner.train()
 
 
-def train(
-    model: torch.nn.Module,
-    criterion: Callable[..., torch.Tensor],
-    optimizer: torch.optim.Optimizer,
-    datasets: DatasetCollection,
-    device: torch.device,
-    config: Config,
-) -> None:
-    """Train a model on the data in `train_dataloader`, evaluating every epoch."""
-    # pylint: disable=too-many-locals
-    dataloader = DataLoader(
-        datasets.train,
-        batch_size=config.dataloader.batch_size,
-        num_workers=config.dataloader.workers,
-        sampler=ChunkedRandomSampler(datasets.train.questions),
-    )
-    metrics = MetricCollection(
-        config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
-    )
-    for epoch in range(config.training.epochs):
-        for batch, sample in enumerate(dataloader):
-            # Move data to GPU
-            data = sample["question"]["dependencies"].to(device)
-            targets = sample["question"]["answer"].to(device)
-
-            # Learn
-            optimizer.zero_grad()
-            preds = model(data)
-            loss = criterion(preds, targets)
-            loss.backward()
-            optimizer.step()
-
-            # Calculate and log metrics, using answer indices as we only want
-            # basics for train set.
-            metrics.append(
-                sample["question"]["questionId"],
-                np.argmax(preds.detach().cpu().numpy(), axis=1),
-                targets.detach().cpu().numpy(),
-            )
-            if (
-                batch % config.training.log_step == config.training.log_step - 1
-                or batch == len(dataloader) - 1
-            ):
-                results = {
-                    "epoch": epoch + (batch + 1) / len(dataloader),
-                    "train/loss": loss.item(),
-                }
-                results.update(
-                    {f"train/{key}": val for key, val in metrics.evaluate().items()}
-                )
-                log_metrics_stdout(
-                    results,
-                    colors=(None, "yellow", "blue", "cyan", "cyan", "cyan"),
-                    newline=False,
-                )
-                wandb.log(results)
-                metrics.reset()
-        results.update(
-            {
-                f"val/{key}": val
-                for key, val in evaluate(
-                    model, criterion, datasets, metrics, device, config
-                ).items()
-            }
-        )
-        log_metrics_stdout(
-            results,
-            colors=(
-                None,
-                "yellow",
-                "blue",
-                "cyan",
-                "cyan",
-                "cyan",
-                "yellow",
-                "magenta",
-                "magenta",
-                "magenta",
-                "magenta",
-            ),
-        )
-        wandb.log(results)
-        metrics.reset()
-
-
-def evaluate(
-    model: torch.nn.Module,
-    criterion: Callable[..., torch.Tensor],
-    datasets: DatasetCollection,
-    metrics: MetricCollection,
-    device: torch.device,
-    config: Config,
-) -> Dict[str, Any]:
-    """Evaluate a model according to a criterion on a given dataset."""
-    dataloader = DataLoader(
-        datasets.val,
-        batch_size=config.dataloader.batch_size,
-        num_workers=config.dataloader.workers,
-    )
-    metrics = MetricCollection(
-        config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
-    )
-    model.eval()
-    with torch.no_grad():
-        for batch, sample in enumerate(dataloader):
-            question = sample["question"]
-            data = question["dependencies"].to(device)
-            targets = question["answer"].to(device)
-            preds = model(data)
-            loss = criterion(preds, targets)
-            # Calculate and log metrics, using answer indices as we only want
-            # basics for train set.
-            metrics.append(
-                sample["question"]["questionId"],
-                np.argmax(preds.detach().cpu().numpy(), axis=1),
-                targets.detach().cpu().numpy(),
-            )
-            print(f"eval: {batch + 1}/{len(dataloader)}", end="\r")
-    model.train()
-
-    results = {"loss": loss.item()}
-    results.update(metrics.evaluate())
-    return results
-
-
-def parse_args() -> argparse.Namespace:
+def parse_args() -> Tuple[argparse.Namespace, List[str]]:
     """Parse `sys.argv` and return an `argparse.Namespace` object.
 
     Params:
@@ -258,12 +125,19 @@ def parse_args() -> argparse.Namespace:
         help="Job type for this run.",
     )
     parser.add_argument(
+        "--resume",
+        type=str,
+        default="",
+        help="A wandb run and filename to resume training a model from, \
+        e.g. graphgen/a1b2c3d:checkpoints/current.pt",
+    )
+    parser.add_argument(
         "--sync", action="store_true", help="Sync results to wandb if specified."
     )
-    return parser.parse_args()
+    return parser.parse_known_intermixed_args()
 
 
-def load_config(filename: str) -> Tuple[Config, Any]:
+def load_config(filename: str) -> Config:
     """Load a JSON configuration from `filename` into a `Config` object.
 
     Params:
@@ -283,13 +157,47 @@ def load_config(filename: str) -> Tuple[Config, Any]:
     jsons.set_serializer(path_serializer, PurePath)
 
     config: Config = jsons.load(config_json, Config)
-    return config, config_json
+    return config
+
+
+def merge_config(args: Iterable[str], config: Config) -> Config:
+    """Merge any leftover args of form param/nested_param=value into config object."""
+    # Apply override args
+    for arg in args:
+        arg = arg.lstrip("-")
+        param, value = arg.split("=")
+        param_keys = param.split("/")
+        subconfig = config
+        for idx, key in enumerate(param_keys):
+            try:
+                if idx == len(param_keys) - 1:
+                    # Cast value to type of field value and set attribute
+                    field_type = type(getattr(subconfig, key))
+                    try:
+                        deserialised_value = jsons.loads(value, field_type)
+                    except jsons.exceptions.DecodeError:
+                        deserialised_value = field_type(value)
+                    setattr(subconfig, key, deserialised_value)
+                else:
+                    # Get subconfig from key
+                    subconfig = getattr(subconfig, key)
+            except AttributeError as ex:  # Ensure the attribute exists
+                raise ValueError(
+                    f"Invalid argument {arg}. Could not merge with config object."
+                ) from ex
+            except (ValueError, TypeError) as ex:
+                raise ValueError(
+                    f"Invalid argument {arg}. Value could not be converted to \
+                    type {field_type}"
+                ) from ex
+    return config
 
 
 if __name__ == "__main__":
     # Parse config
-    parsed_args = parse_args()
-    config_obj, config_dict = load_config(parsed_args.config)
+    parsed_args, remaining_args = parse_args()
+    config_obj = load_config(parsed_args.config)
+    config_obj = merge_config(remaining_args, config_obj)
     # Set up wandb
     os.environ["WANDB_MODE"] = "run" if parsed_args.sync else "dryrun"
     if not Path(".wandb").exists():
@@ -298,7 +206,7 @@ if __name__ == "__main__":
         project="graphgen",
         dir=".wandb",
         job_type=parsed_args.job.value,
-        config=config_dict,
+        config=jsons.dump(config_obj),
     )
     # Run main with parsed config
     main(parsed_args, config_obj)

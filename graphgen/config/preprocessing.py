@@ -2,19 +2,19 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 
-@dataclass(frozen=True)
+@dataclass
 class PipelineStepConfig:
     """Class for storing preprocessor pipeline step information."""
 
     feature: str
     split: str
-    version: str
+    version: Optional[str]
 
 
-@dataclass(frozen=True)
+@dataclass
 class PreprocessingCacheConfig:
     """Class for storing preprocessor caching information."""
 
@@ -27,7 +27,7 @@ class PreprocessingCacheConfig:
             raise ValueError(f"Field {self.root=} must point to a valid directory.")
 
 
-@dataclass(frozen=True)
+@dataclass
 class PreprocessingConfig:
     """Class for storing preprocessoing configuration information."""
 

@@ -1,0 +1,117 @@
+{
+  "dataset": {
+    "name": "gqa",
+    "filemap": {
+      "root": "./data/gqa"
+    }
+  },
+  "preprocessing": {
+    "cache": {
+      "root": "./cache",
+      "artifact": "gqa-preprocessed"
+    },
+    "pipeline": [{
+      "feature": "scene_graphs",
+      "split": "train"
+    },
+    {
+      "feature": "scene_graphs",
+      "split": "val"
+    },
+    {
+      "feature": "questions",
+      "split": "train",
+      "version": "balanced"
+    },
+    {
+      "feature": "questions",
+      "split": "val",
+      "version": "balanced"
+    }]
+  },
+  "model": {
+    "name": "vqa",
+    "reasoning": {
+      "name": "mac",
+      "length": 6,
+      "hidden_dim": 512
+    },
+    "question": {
+      "embedding": {
+        "init": "glove",
+        "dim": 300,
+        "trainable": false,
+        "average_mwt": true
+      },
+      "module": {
+        "name": "lstm",
+        "hidden_dim": 1024,
+        "bidirectional": true
+      }
+    },
+    "scene_graph": {
+      "embedding": {
+        "init": "glove",
+        "dim": 300,
+        "trainable": true,
+        "average_mwt": true
+      },
+      "graph": {
+        "directed": true,
+        "object_skip_edges": false,
+        "aggregation": null
+      },
+      "module": {
+        "name": "gcn",
+        "conv": "gat",
+        "layers": 3,
+        "dim": 512,
+        "pooling": null,
+        "heads": 1,
+        "concat": true
+      }
+    }
+  },
+  "training": {
+    "epochs": 32,
+    "log_step": 1024,
+    "dataloader": {
+      "batch_size": 16,
+      "workers": 1
+    },
+    "optimiser": {
+      "name": "adam",
+      "learning_rate": 3e-4,
+      "momentum": null,
+      "weight_decay": 0,
+      "grad_clip": 8,
+      "schedule": false
+    },
+    "data": {
+      "features": [
+        {
+          "name": "questions",
+          "artifact": "./data/preprocessed/gqa"
+        },
+        {
+          "name": "scene_graphs",
+          "artifact": "./data/preprocessed/gqa"
+        }
+      ],
+      "train": {
+        "split": "train",
+        "version": "balanced"
+      },
+      "val": {
+        "split": "val",
+        "version": "balanced",
+        "subset": [0.0, 0.5]
+      },
+      "test": {
+        "split": "val",
+        "version": "balanced",
+        "subset": [0.5, 1.0]
+      }
+    }
+  }
+}

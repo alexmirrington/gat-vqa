@@ -11,14 +11,14 @@ class DatasetName(Enum):
     CLEVR = "clevr"
 
 
-@dataclass(frozen=True)
+@dataclass
 class DatasetConfig:
     """A class specifying the common fields used across all datasets."""
 
     name: DatasetName
 
 
-@dataclass(frozen=True)
+@dataclass
 class DatasetFilemap:
     """A class specifying the common fields used across all dataset filemaps."""
 

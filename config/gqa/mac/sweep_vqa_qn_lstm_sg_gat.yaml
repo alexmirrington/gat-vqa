@@ -1,0 +1,67 @@
+description: "Sweep over Scene graph GCNs with different learning rates."
+program: main.py
+method: bayes
+metric:
+  name: val/loss
+  goal: minimize
+early_terminate:
+  type: hyperband
+  min_iter: 2
+  eta: 2
+command:
+  - ${env}
+  - ${interpreter}
+  - ${program}
+  - "--config"
+  - "config/gqa/mac/vqa_qn_lstm_sg_gat.json"
+  - "--job"
+  - "train"
+  - "--sync"
+  - ${args}
+parameters:
+  training/optimiser/learning_rate:
+    distribution: uniform
+    min: 0.00001
+    max: 0.001
+  model/reasoning/length:
+    distribution: categorical
+    values:
+    - 4
+    - 6
+    - 8
+  model/question/embedding/trainable:
+    distribution: categorical
+    values: [true, false]
+  model/question/module/bidirectional:
+    distribution: categorical
+    values: [true, false]
+  model/question/module/hidden_dim:
+    distribution: categorical
+    values:
+    - 256
+    - 512
+    - 1024
+  model/scene_graph/embedding/trainable:
+    distribution: categorical
+    values: [true, false]
+  model/scene_graph/graph/object_skip_edges:
+    distribution: categorical
+    values: [true, false]
+  model/scene_graph/module/layers:
+    distribution: int_uniform
+    min: 2
+    max: 5
+  model/scene_graph/module/dim:
+    distribution: categorical
+    values:
+    - 128
+    - 256
+    - 512
+    - 1024
+  model/scene_graph/module/heads:
+    distribution: categorical
+    values:
+    - 1
+    - 2
+    - 4
+    - 8

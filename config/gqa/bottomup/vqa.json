@@ -1,0 +1,110 @@
+{
+  "dataset": {
+    "name": "gqa",
+    "filemap": {
+      "root": "./data/gqa"
+    }
+  },
+  "preprocessing": {
+    "cache": {
+      "root": "./cache",
+      "artifact": "gqa-preprocessed"
+    },
+    "pipeline": [{
+      "feature": "scene_graphs",
+      "split": "train"
+    },
+    {
+      "feature": "scene_graphs",
+      "split": "val"
+    },
+    {
+      "feature": "questions",
+      "split": "train",
+      "version": "balanced"
+    },
+    {
+      "feature": "questions",
+      "split": "val",
+      "version": "balanced"
+    }]
+  },
+  "model": {
+    "name": "vqa",
+    "reasoning": {
+      "name": "bottom_up",
+      "hidden_dim": 512
+    },
+    "question": {
+      "embedding": {
+        "init": "glove",
+        "dim": 300,
+        "trainable": false,
+        "average_mwt": true
+      },
+      "module": {
+        "name": "lstm",
+        "input_dim": 300,
+        "hidden_dim": 512,
+        "bidirectional": true
+      }
+    },
+    "scene_graph": {
+      "embedding": {
+        "init": "glove",
+        "dim": 300,
+        "trainable": true,
+        "average_mwt": true
+      },
+      "module": {
+        "name": "gcn",
+        "conv": "gat",
+        "shape": [300, 300, 512],
+        "pooling": null,
+        "heads": 1
+      }
+    }
+  },
+  "training": {
+    "epochs": 25,
+    "log_step": 512,
+    "dataloader": {
+      "batch_size": 32,
+      "workers": 1
+    },
+    "optimiser": {
+      "name": "adadelta",
+      "learning_rate": null,
+      "momentum": null,
+      "weight_decay": 0,
+      "grad_clip": 8,
+      "schedule": false
+    },
+    "data": {
+      "features": [
+        {
+          "name": "questions",
+          "artifact": "gqa-preprocessed:latest"
+        },
+        {
+          "name": "scene_graphs",
+          "artifact": "gqa-preprocessed:latest"
+        }
+      ],
+      "train": {
+        "split": "train",
+        "version": "balanced"
+      },
+      "val": {
+        "split": "val",
+        "version": "balanced",
+        "subset": [0.0, 0.5]
+      },
+      "test": {
+        "split": "val",
+        "version": "balanced",
+        "subset": [0.5, 1.0]
+      }
+    }
+  }
+}
