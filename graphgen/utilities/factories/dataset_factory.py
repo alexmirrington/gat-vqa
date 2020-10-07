@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import List, Tuple
 
 import jsons
-
 import wandb
 
 from ...config import Config

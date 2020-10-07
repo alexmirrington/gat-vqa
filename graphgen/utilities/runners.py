@@ -8,10 +8,9 @@ from typing import Any, Callable, Dict, Optional
 import numpy as np
 import torch
 import torch.nn.functional as F
+import wandb
 from termcolor import colored
 from torch.utils.data import DataLoader
-
-import wandb
 
 from ..config import Config
 from ..datasets.collators import VariableSizeTensorCollator
