@@ -44,7 +44,17 @@
     "scene_graph": {
       "gcn": "gat",
       "pooling": "global_mean",
-      "layer_sizes": [300, 300, 300]
+      "layer_sizes": [512, 512, 512, 512]
+    },
+    "object_feature_graph": {
+      "gcn": "gat",
+      "pooling": "global_mean",
+      "layer_sizes": [2048, 1536, 1024, 1024]
+    },
+    "object_positional_graph": {
+      "gcn": "gat",
+      "pooling": "global_mean",
+      "layer_sizes": [310, 310, 310, 310]
     }
   },
   "training": {

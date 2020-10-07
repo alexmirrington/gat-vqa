@@ -548,6 +548,14 @@ class SceneGraphTransformer:
                 data["boxes"], dtype=torch.float
             ),
             "graph": Data(edge_index=coos, x=feats),
+            # "labels": torch.tensor(  # pylint: disable=not-callable
+            #     data["labels"], dtype=torch.int64
+            # ),
+            # "attributes": attributes,
+            # "coos": coos,
+            # "relations": torch.tensor(  # pylint: disable=not-callable
+            #     data["relations"]
+            # ),
         }
 
 
@@ -559,11 +567,15 @@ class ObjectTransformer:
 
     def __call__(
         self, objects: torch.Tensor, boxes: torch.Tensor, meta: Dict[str, Any]
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]]:
         """Transform data into a trainable format."""
         num_objects = meta["objectsNum"]
         return (objects[:num_objects], boxes[:num_objects])
-
+        # return (
+        #     objects[:num_objects],
+        #     boxes[:num_objects],
+        #     {"width": meta["width"], "height": meta["height"]},
+        # )
 
 @dataclass
 class PreprocessorCollection:
