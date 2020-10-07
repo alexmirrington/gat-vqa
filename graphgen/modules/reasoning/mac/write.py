@@ -31,11 +31,6 @@ class WriteUnit(nn.Module):  # type: ignore  # pylint: disable=abstract-method  
         controls: Sequence[torch.Tensor],
     ) -> torch.Tensor:
         """Propagate data through the model."""
-        # print(f"{self.__class__.__name__}")
-        # print(f"{[m.size() for m in memories]=}")
-        # print(f"{retrieved.size()=}")
-        # print(f"{[c.size() for c in controls]=}")
-
         # optionally project info if config.writeInfoProj:
 
         # optional info nonlinearity if writeInfoAct != 'NON'

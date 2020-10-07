@@ -77,15 +77,9 @@ class BidirectionalAttention(torch.nn.Module):  # type: ignore  # pylint: disabl
         """Propagate data through the module."""
         c_k, c_q = self.key_shape[1], self.query_shape[1]
 
-        # print(f"{x_k.size()=}")
-        # print(f"{x_q.size()=}")
-
         # Apply linear layers to each node feature set
         x_k_proj = torch.transpose(self.k_lin(x_k).view(-1, self.heads, c_k), 0, 1)
         x_q_proj = torch.transpose(self.q_lin(x_q).view(-1, self.heads, c_q), 0, 1)
-
-        # print(f"{x_k_proj.size()=}")
-        # print(f"{x_q_proj.size()=}")
 
         # x_k has shape (self.heads, num_nodes_k, c_k)
         # x_q has shape (self.heads, num_nodes_q, c_q)
@@ -95,8 +89,6 @@ class BidirectionalAttention(torch.nn.Module):  # type: ignore  # pylint: disabl
             torch.bmm(x_k_proj, self.attn_weight),
             torch.transpose(x_q_proj, 1, 2),
         )
-
-        # print(f"{alphas.size()=}")
 
         # Calculate attention weighted sums of node features from the query graph
         # for each node in the key graph. If bidirectional, do the converse, using
@@ -117,25 +109,21 @@ class BidirectionalAttention(torch.nn.Module):  # type: ignore  # pylint: disabl
 
         alpha_ks = F.softmax(alphas, dim=2)
         alpha_k_feats = torch.bmm(alpha_ks, x_q_proj)  # TODO add more weights?
-        # print(f"{alpha_k_feats.size()=}")
-        # Map query feature space back to key feature space
 
+        # Map query feature space back to key feature space
         # TODO experiment with different multihead pooling (concat, average etc)
         alpha_k_agg = torch.mean(alpha_k_feats, dim=0)
         x_k_update = torch.mm(alpha_k_agg, self.projection_weight.t())
-        # print(f"{x_k_update.size()=}")
 
         if self.bidirectional:
             alpha_qs = F.softmax(
                 torch.transpose(alphas, 1, 2), dim=2
             )  # Try tanh/additive attention for stability?
             alpha_q_feats = torch.bmm(alpha_qs, x_k_proj)  # TODO add more weights?
-            # print(f"{alpha_q_feats.size()=}")
 
             # TODO experiment with different multihead pooling (concat, average etc)
             alpha_q_agg = torch.mean(alpha_q_feats, dim=0)
             x_q_update = torch.mm(alpha_q_agg, self.projection_weight)
-            # print(f"{x_q_update.size()=}")
 
         # TODO consider placing a sigmoid gate on the update, so the model can
         # learn to cut off attention signals if needed.

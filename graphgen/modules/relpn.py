@@ -188,7 +188,6 @@ class SpatialRelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract
             self.box_intersect(img_proposals, img_proposals)
             for img_proposals in proposals
         ]  # TODO experiment with more than intersections
-        # print(f"{[img_intersections.size() for img_intersections in intersections]=}")
 
         # Take only the intersections indexed by `relation_pairs`
         pre_nms_intersections = [

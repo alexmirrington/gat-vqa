@@ -39,12 +39,6 @@ class ReadUnit(nn.Module):  # type: ignore  # pylint: disable=abstract-method  #
         masks: torch.Tensor,
     ) -> torch.Tensor:
         """Propagate data through the model."""
-        # print(f"{self.__class__.__name__}")
-        # print(f"{[m.size() for m in memories]=}")
-        # print(f"{know.size()=}")
-        # print(f"{[c.size() for c in controls]=}")
-        # print(f"{masks.size()=}")
-
         # Step 1: knowledge base / memory interactions
         last_mem = memories[-1]
         if self.training:

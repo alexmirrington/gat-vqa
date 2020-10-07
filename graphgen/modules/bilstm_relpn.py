@@ -46,14 +46,11 @@ class BiLSTMRelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-
         # Make batch the first dimension
         lstm_out = torch.transpose(lstm_out, 0, 1)
 
-        # print(f"{lstm_out.size()=}")
-
         # Compute scaled dot product self-attention over lstm outputs
         alignment = torch.bmm(lstm_out, torch.transpose(lstm_out, 1, 2)) / math.sqrt(
             lstm_out.size(-1)
         )
         # alignment has size (batch_size, seq_len, seq_len)
-        # print(f"{alignment.size()=}")
 
         # Get most K important vectors for each vector, this will become a directed
         # adjacency matrix where each vector is connected to K others. A higher K
@@ -64,12 +61,8 @@ class BiLSTMRelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-
         sorted_alignment, sorted_alignment_indices = torch.sort(
             alignment, dim=-1, descending=True
         )
-        # print(f"{sorted_alignment.size()=}")
-        # print(f"{sorted_alignment_indices.size()=}")
 
         adj_list = sorted_alignment_indices[:, :, :k]
-        # print(f"{adj_list.size()=}")
-        # print(f"{adj_list[0]=}")
         # adj_list has size (batch_size, seq_len, k)
         indices = (
             torch.arange(seq_len)
@@ -78,13 +71,9 @@ class BiLSTMRelPN(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-
             .repeat(adj_list.size(0), 1, k)
             .to("cuda")
         )
-        # print(f"{indices.size()=}")
-        # print(f"{indices[0]=}")
 
         coo = torch.stack((adj_list.flatten(1, 2), indices.flatten(1, 2)), dim=1)
         # coo has size (batch_size, 2, seq_len * k)
-        # print(f"{coo.size()=}")
-        # print(f"{coo[0]=}")
 
         # Convert the selected alignment indices to COO format
         # alignment = F.softmax(alignment, dim=-1)
