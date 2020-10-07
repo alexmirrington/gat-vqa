@@ -7,9 +7,6 @@ from typing import Optional, Union
 class ModelName(Enum):
     """Enum specifying possible model names."""
 
-    FASTER_RCNN = "faster_rcnn"
-    E2E_MULTI_GCN = "e2e_multi_gcn"
-    MULTI_GCN = "multi_gcn"
     VQA = "vqa"
     GCN = "gcn"
     LSTM = "lstm"
@@ -182,59 +179,3 @@ class VQAModelConfig(ModelConfig):
         """Perform post-init checks on fields."""
         if self.name != ModelName.VQA:
             raise ValueError(f"Field {self.name=} must be equal to {ModelName.VQA}")
-
-
-# @dataclass
-# class MultiGCNModelConfig(ModelConfig):
-#     """Class for storing model configuration information."""
-
-#     text_syntactic_graph: Optional[GCNModelConfig]
-#     scene_graph: Optional[GCNModelConfig]
-
-#     def __post_init__(self) -> None:
-#         """Perform post-init checks on fields."""
-#         if self.name != ModelName.MULTI_GCN:
-#             raise ValueError(
-#                 f"Field {self.name=} must be equal to {ModelName.MULTI_GCN}"
-#             )
-
-
-# class Backbone(Enum):
-#     """Enum specifying possible backbones for the FasterRCNN object detector."""
-
-#     RESNET50 = "resnet50"
-
-
-# @dataclass
-# class BackboneConfig:
-#     """Class for storing R-CNN modlue configuration information."""
-
-#     name: Backbone
-#     pretrained: bool
-
-
-# @dataclass
-# class FasterRCNNModelConfig(ModelConfig):
-#     """Class for storing model configuration information."""
-
-#     pretrained: bool
-#     backbone: BackboneConfig
-
-#     def __post_init__(self) -> None:
-#         """Perform post-init checks on fields."""
-#         if self.name != ModelName.FASTER_RCNN:
-#             raise ValueError(
-#                 f"Field {self.name=} must be equal to {ModelName.FASTER_RCNN}."
-#             )
-
-
-# @dataclass
-# class E2EMultiGCNModelConfig(ModelConfig):
-#     """Class for storing model configuration information."""
-
-#     def __post_init__(self) -> None:
-#         """Perform post-init checks on fields."""
-#         if self.name != ModelName.E2E_MULTI_GCN:
-#             raise ValueError(
-#                 f"Field {self.name=} must be equal to {ModelName.E2E_MULTI_GCN}"
-#             )

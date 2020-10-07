@@ -8,13 +8,6 @@ from .model import VQAModelConfig
 from .preprocessing import PreprocessingConfig
 from .training import TrainingConfig
 
-# from .model import (
-#     E2EMultiGCNModelConfig,
-#     FasterRCNNModelConfig,
-#     MultiGCNModelConfig,
-#     VQAModelConfig,
-# )
-
 
 @dataclass
 class Config:
@@ -24,9 +17,3 @@ class Config:
     preprocessing: PreprocessingConfig
     training: TrainingConfig
     model: VQAModelConfig
-    # model: Union[
-    #     FasterRCNNModelConfig,
-    #     E2EMultiGCNModelConfig,
-    #     MultiGCNModelConfig,
-    #     VQAModelConfig,
-    # ]
