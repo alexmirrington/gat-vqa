@@ -1,27 +1,49 @@
 """Functions for computing various metrics."""
 from typing import Any, Iterable
 
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+import sklearn.metrics
+import wandb
 
 
 def accuracy(targets: Iterable[Any], preds: Iterable[Any], **_: Any) -> Any:
     """Compute standard accuracy metric."""
-    return float(accuracy_score(targets, preds))
+    return float(sklearn.metrics.accuracy_score(targets, preds))
 
 
 def precision(targets: Iterable[Any], preds: Iterable[Any], **_: Any) -> Any:
     """Compute standard precision metric."""
-    return float(precision_score(targets, preds, average="micro", zero_division=0))
+    return float(
+        sklearn.metrics.precision_score(
+            targets, preds, average="micro", zero_division=0
+        )
+    )
 
 
 def recall(targets: Iterable[Any], preds: Iterable[Any], **_: Any) -> Any:
     """Compute standard recall metric."""
-    return float(recall_score(targets, preds, average="micro", zero_division=0))
+    return float(
+        sklearn.metrics.recall_score(targets, preds, average="micro", zero_division=0)
+    )
 
 
 def f_1(targets: Iterable[Any], preds: Iterable[Any], **_: Any) -> Any:
     """Compute standard f1 metric."""
-    return float(f1_score(targets, preds, average="micro", zero_division=0))
+    return float(
+        sklearn.metrics.f1_score(targets, preds, average="micro", zero_division=0)
+    )
+
+
+def confusion_matrix(
+    targets: Iterable[Any], preds: Iterable[Any], **kwargs: Any
+) -> Any:
+    """Compute confusion matrix."""
+    return wandb.plots.HeatMap(
+        kwargs["labels"],
+        kwargs["labels"],
+        sklearn.metrics.confusion_matrix(
+            targets, preds, labels=list(range(len(kwargs["labels"])))
+        ),
+    )
 
 
 def consistency(targets: Iterable[Any], preds: Iterable[Any], **kwargs: Any) -> Any:

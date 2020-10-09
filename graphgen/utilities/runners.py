@@ -160,7 +160,8 @@ class VQAModelRunner(Runner):
             collate_fn=VariableSizeTensorCollator(),
         )
         metrics = MetricCollection(
-            self.config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
+            metrics=[Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1],
+            labels=self.preprocessors.questions.index_to_answer,
         )
 
         self.model.train()
@@ -253,7 +254,8 @@ class VQAModelRunner(Runner):
             collate_fn=VariableSizeTensorCollator(),
         )
         metrics = MetricCollection(
-            self.config, [Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1]
+            metrics=[Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1],
+            labels=self.preprocessors.questions.index_to_answer,
         )
 
         # Prepare for evaluation
@@ -290,5 +292,6 @@ class VQAModelRunner(Runner):
         self.criterion.reduction = train_reduction  # type: ignore
         # Report average loss across all val samples
         results = {"loss": loss / len(dataloader.dataset)}
+        # Include metrics like accuracy, precision etc. from MetricCollection
         results.update(metrics.evaluate())
         return results

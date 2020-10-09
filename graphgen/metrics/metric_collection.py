@@ -1,9 +1,8 @@
 """Utilities for efficient management of metric calculation."""
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 
-from ..config import Config
-from .metrics import accuracy, consistency, f_1, precision, recall
+from .metrics import accuracy, confusion_matrix, consistency, f_1, precision, recall
 
 
 class Metric(Enum):
@@ -14,13 +13,14 @@ class Metric(Enum):
     PRECISION = "precision"
     F1 = "f1"
     CONSISTENCY = "consistency"
+    CONFUSION_MATRIX = "confusion_matrix"
 
 
 class MetricCollection:
     """Wrapper class for storing a collection of metrics to evaluate."""
 
     def __init__(
-        self, config: Config, metrics: Union[Metric, Iterable[Metric]]
+        self, metrics: Union[Metric, Iterable[Metric]], labels: Sequence[str]
     ) -> None:
         """Create a new collection of metrics."""
         self._metrics: Dict[Metric, Optional[float]] = {}
@@ -30,14 +30,15 @@ class MetricCollection:
         else:
             for key in metrics:
                 self._metrics[key] = None
+        self._labels = labels
         self._metric_funcs = {
             Metric.ACCURACY: accuracy,
             Metric.RECALL: recall,
             Metric.PRECISION: precision,
             Metric.F1: f_1,
             Metric.CONSISTENCY: consistency,
+            Metric.CONFUSION_MATRIX: confusion_matrix,
         }
-        self._config = config
         self._ids: List[str] = []
         self._preds: List[str] = []
         self._targets: List[str] = []
@@ -56,7 +57,7 @@ class MetricCollection:
 
     def evaluate(self) -> Dict[str, Any]:
         """Evaluate all metrics in the collection and return the results."""
-        kwargs = {"ids": self._ids}
+        kwargs = {"ids": self._ids, "labels": self._labels}
         return {
             metric.value: self._metric_funcs[metric](
                 self._targets, self._preds, **kwargs
