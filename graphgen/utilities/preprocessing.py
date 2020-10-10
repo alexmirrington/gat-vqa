@@ -547,6 +547,7 @@ class SceneGraphTransformer:
             "boxes": torch.tensor(  # pylint: disable=not-callable
                 data["boxes"], dtype=torch.float
             ),
+            "labels": data["labels"],
             "graph": Data(edge_index=coos, x=feats),
         }
 
@@ -579,3 +580,4 @@ class DatasetCollection:
 
     train: torch.utils.data.Dataset
     val: torch.utils.data.Dataset
+    images: torch.utils.data.Dataset

@@ -11,13 +11,17 @@ import torch.nn.functional as F
 import wandb
 from termcolor import colored
 from torch.utils.data import DataLoader
+from torch_geometric.nn.conv import GATConv
 
 from ..config import Config
 from ..datasets.collators import VariableSizeTensorCollator
 from ..datasets.utilities.chunked_random_sampler import ChunkedRandomSampler
 from ..metrics import Metric, MetricCollection
+from ..schemas.common import BoundingBox
 from ..utilities.preprocessing import DatasetCollection, PreprocessorCollection
+from .hooks import GATConvAttentionHook
 from .logging import log_metrics_stdout
+from .visualisation import wandb_image
 
 
 @dataclass
@@ -66,6 +70,10 @@ class Runner(ABC):
     @abstractmethod
     def evaluate(self) -> Dict[str, Any]:
         """Evaluate a model according to a criterion on a given dataset."""
+
+    @abstractmethod
+    def visualise(self) -> Dict[str, Any]:
+        """Visualise samples from the validation set."""
 
     def save(self, epoch: int, name: str) -> None:
         """Save a model's state dict to file."""
@@ -236,6 +244,7 @@ class VQAModelRunner(Runner):
                 best_val_loss = results["val/loss"]
                 self.save(epoch + 1, "best.pt")
             log_metrics_stdout(results)
+            results.update({f"val/{key}": val for key, val in self.visualise().items()})
             wandb.log(results)
             metrics.reset()
 
@@ -245,18 +254,9 @@ class VQAModelRunner(Runner):
 
     def evaluate(self) -> Dict[str, Any]:
         """Evaluate a model according to a criterion on a given dataset."""
+        # Determine dataset bounds
         start = int(self.config.training.data.val.subset[0] * len(self.datasets.val))
         end = int(self.config.training.data.val.subset[1] * len(self.datasets.val))
-        dataloader = DataLoader(
-            torch.utils.data.Subset(self.datasets.val, range(start, end)),
-            batch_size=self.config.training.dataloader.batch_size,
-            num_workers=self.config.training.dataloader.workers,
-            collate_fn=VariableSizeTensorCollator(),
-        )
-        metrics = MetricCollection(
-            metrics=[Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1],
-            labels=self.preprocessors.questions.index_to_answer,
-        )
 
         # Prepare for evaluation
         self.model.eval()
@@ -264,7 +264,17 @@ class VQAModelRunner(Runner):
         self.criterion.reduction = "sum"  # type: ignore
         loss = 0
 
-        # Evaluate
+        # Evaluate metrics
+        metrics = MetricCollection(
+            metrics=[Metric.ACCURACY, Metric.PRECISION, Metric.RECALL, Metric.F1],
+            labels=self.preprocessors.questions.index_to_answer,
+        )
+        dataloader = DataLoader(
+            torch.utils.data.Subset(self.datasets.val, range(start, end)),
+            batch_size=self.config.training.dataloader.batch_size,
+            num_workers=self.config.training.dataloader.workers,
+            collate_fn=VariableSizeTensorCollator(),
+        )
         with torch.no_grad():
             for batch, sample in enumerate(dataloader):
                 # Move data to GPU
@@ -287,11 +297,88 @@ class VQAModelRunner(Runner):
                 )
                 print(f"eval: {batch + 1}/{len(dataloader)}", end="\r")
 
-        # Reset model to train and reset criterion reduction ready for training
+        # Reset model to train, reset criterion reduction ready for training
         self.model.train()
         self.criterion.reduction = train_reduction  # type: ignore
+
         # Report average loss across all val samples
         results = {"loss": loss / len(dataloader.dataset)}
+
         # Include metrics like accuracy, precision etc. from MetricCollection
         results.update(metrics.evaluate())
+
         return results
+
+    def visualise(self) -> Dict[str, Any]:
+        """Visualise a fixed number of samples to view the model's reasoning."""
+        # Determine dataset bounds
+        start = int(self.config.training.data.val.subset[0] * len(self.datasets.val))
+        end = int(self.config.training.data.val.subset[1] * len(self.datasets.val))
+        end = min(10, end)  # TODO: move 10 to visualisation config, random selection
+
+        # Prepare for evaluation
+        self.model.eval()
+
+        visualisations: Dict[str, Any] = {"images": []}
+        handles = []
+
+        # Gather attention maps with forward hooks
+        hooks = {}
+        for name, module in self.model.named_modules():
+            if isinstance(module, GATConv):
+                hooks[name] = GATConvAttentionHook()
+                handle = module.register_forward_hook(hooks[name])
+                handles.append(handle)
+        visualisations.update({key: [] for key in hooks})
+
+        dataloader = DataLoader(
+            torch.utils.data.Subset(
+                self.datasets.val, range(start, end)
+            ),  # TODO Make num. attention map samples a config param
+            batch_size=1,
+            num_workers=0,
+            collate_fn=VariableSizeTensorCollator(),
+        )
+        with torch.no_grad():
+            for batch, sample in enumerate(dataloader):
+                # Load data
+                dependencies = sample["question"]["dependencies"].to(self.device)
+                graph = sample["scene_graph"]["graph"].to(self.device)
+                image_id = sample["scene_graph"]["imageId"]
+                # Propagate data forward
+                self.model(question_graph=dependencies, scene_graph=graph)
+
+                # Add image with labeled ground truth bounding boxes
+                visualisations["images"] += wandb_image(
+                    self.datasets.images[
+                        self.datasets.images.key_to_index(
+                            sample["scene_graph"]["imageId"]
+                        )
+                    ],
+                    caption=image_id,
+                    boxes={
+                        "ground_truth": [
+                            BoundingBox(box[0], box[1], box[2], box[3], label=lbl)
+                            for box, lbl in zip(
+                                sample["scene_graph"]["boxes"].tolist(),
+                                sample["scene_graph"]["labels"],
+                            )
+                        ]
+                    },
+                    object_to_index=self.preprocessors.scene_graphs.object_to_index,
+                )
+
+                for name, hook in hooks.items():
+                    if hook.result is not None:
+                        visualisations[name] += wandb.Image(
+                            hook.result, caption=image_id
+                        )
+
+        # Remove forward hooks
+        for handle in handles:
+            handle.remove()
+
+        # Reset model to train
+        self.model.train()
+
+        return visualisations

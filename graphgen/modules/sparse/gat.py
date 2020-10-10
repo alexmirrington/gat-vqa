@@ -37,11 +37,10 @@ class GAT(AbstractGCN):
     def forward(self, graphs: Batch) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """Perform a forward GAT pass."""
         feats, edge_index = graphs.x, graphs.edge_index
-
         for layer in self.layers[:-1]:
-            feats = layer(feats, edge_index)
+            feats, attn = layer(feats, edge_index, return_attention_weights=True)
             # TODO experiment with dropout and activations
-        feats = self.layers[-1](feats, edge_index)
+        feats, attn = self.layers[-1](feats, edge_index, return_attention_weights=True)
 
         if self.pool is not None:
             pooled_feats = self.pool(feats, graphs.batch)

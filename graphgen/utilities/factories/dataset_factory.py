@@ -197,6 +197,10 @@ class DatasetFactory:
             )
 
         return (
-            DatasetCollection(train=datasets[0], val=datasets[1]),
+            DatasetCollection(
+                train=datasets[0],
+                val=datasets[1],
+                images=GQAImages(config.dataset.filemap),
+            ),
             preprocessors,
         )
