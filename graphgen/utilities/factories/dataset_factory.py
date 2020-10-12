@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 import jsons
+
 import wandb
 
 from ...config import Config
@@ -65,7 +66,7 @@ class DatasetFactory:
     def _create_gqa(
         config: Config,
     ) -> Tuple[DatasetCollection, PreprocessorCollection]:
-        # pylint: disable=too-many-branches,too-many-locals
+        # pylint: disable=too-many-branches,too-many-locals,too-many-statements
 
         if not isinstance(config.dataset, GQADatasetConfig):
             raise ValueError(
@@ -135,6 +136,8 @@ class DatasetFactory:
                                 f'"{feature.name}" from path/artifact',
                                 f"{feature.artifact}.",
                             ) from ex
+                    else:
+                        raise ValueError(f"Invalid artifact '{feature.artifact}'")
 
                 if feature.name == GQAFeatures.QUESTIONS.value:
                     questions = GQAQuestions(
