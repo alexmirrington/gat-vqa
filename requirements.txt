@@ -2,6 +2,7 @@ h5py
 jsons
 mypy
 numpy
+pandas
 pillow
 pre-commit
 pylint

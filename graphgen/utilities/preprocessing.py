@@ -548,6 +548,8 @@ class SceneGraphTransformer:
                 data["boxes"], dtype=torch.float
             ),
             "labels": data["labels"],
+            "attributes": data["attributes"],
+            "relations": data["relations"],
             "graph": Data(edge_index=coos, x=feats),
         }
 

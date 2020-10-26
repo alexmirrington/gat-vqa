@@ -29,6 +29,7 @@ class JobType(Enum):
     PREPROCESS = "preprocess"
     TRAIN = "train"
     TEST = "test"
+    VISUALISE = "visualise"
 
 
 def main(args: argparse.Namespace, config: Config) -> None:
@@ -60,12 +61,12 @@ def main(args: argparse.Namespace, config: Config) -> None:
 
     if args.job == JobType.PREPROCESS:
         preprocess(config)
-    elif args.job == JobType.TRAIN:
+    elif args.job in (JobType.TRAIN, JobType.VISUALISE):
         resume = None
         if args.resume != "":
             run_id, checkpoint = args.resume.split(":")
             resume = ResumeInfo(run_id, checkpoint)
-        run(config, device, resume)
+        run(config, args.job, device, resume)
     elif args.job == JobType.TEST:
         raise NotImplementedError()
     else:
@@ -79,7 +80,9 @@ def preprocess(config: Config) -> None:
     factory.process(config)
 
 
-def run(config: Config, device: torch.device, resume: Optional[ResumeInfo]) -> None:
+def run(
+    config: Config, job: JobType, device: torch.device, resume: Optional[ResumeInfo]
+) -> None:
     """Train a model according to the `config.model` config."""
     # Load datasets
     print(colored("loading datasets:", attrs=["bold"]))
@@ -98,7 +101,12 @@ def run(config: Config, device: torch.device, resume: Optional[ResumeInfo]) -> N
 
     # Run model
     print(colored("running:", attrs=["bold"]))
-    runner.train()
+    if job == JobType.TRAIN:
+        runner.train()
+    elif job == JobType.VISUALISE:
+        wandb.log(runner.visualise())
+    else:
+        raise NotImplementedError()
 
 
 def parse_args() -> Tuple[argparse.Namespace, List[str]]:

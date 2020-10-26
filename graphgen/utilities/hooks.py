@@ -3,7 +3,6 @@ from typing import Any
 
 import torch
 from torch_geometric.nn.conv import GATConv
-from torch_geometric.utils import to_dense_adj
 
 
 class GATConvAttentionHook:
@@ -18,12 +17,7 @@ class GATConvAttentionHook:
         if not isinstance(module, GATConv):
             return
         if isinstance(output, tuple) and len(output) > 1:
-            edge_index, edge_attr = output[1]
-            adj = (
-                to_dense_adj(edge_index=edge_index, edge_attr=edge_attr)
-                .squeeze()
-                .detach()
-                .numpy()
-            )
-            self.result = adj
+            coos, attn = output[1]
+            self.result = coos, attn
+            return
         self.result = None

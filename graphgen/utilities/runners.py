@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn.functional as F
 import wandb
@@ -21,7 +22,7 @@ from ..schemas.common import BoundingBox
 from ..utilities.preprocessing import DatasetCollection, PreprocessorCollection
 from .hooks import GATConvAttentionHook
 from .logging import log_metrics_stdout
-from .visualisation import wandb_image
+from .visualisation import SparseGraphVisualiser, plot_image
 
 
 @dataclass
@@ -72,7 +73,7 @@ class Runner(ABC):
         """Evaluate a model according to a criterion on a given dataset."""
 
     @abstractmethod
-    def visualise(self) -> Dict[str, Any]:
+    def visualise(self, count: int = 1) -> Dict[str, Any]:
         """Visualise samples from the validation set."""
 
     def save(self, epoch: int, name: str) -> None:
@@ -175,6 +176,8 @@ class VQAModelRunner(Runner):
         self.model.train()
         self.model.to(self.device)
 
+        #  TEMPORARY
+        vis_count = 32
         best_val_loss = math.inf
         if self._start_epoch == 0:
             # Start with val to offset hyperband indices
@@ -183,8 +186,16 @@ class VQAModelRunner(Runner):
             results = {f"val/{key}": val for key, val in self.evaluate().items()}
             best_val_loss = results["val/loss"]
             log_metrics_stdout(results)
+            results.update(
+                {f"vis/{key}": val for key, val in self.visualise(vis_count).items()}
+            )
             wandb.log(results)
-            metrics.reset()
+        else:
+            # TEMPORARY
+            results = {
+                f"vis/{key}": val for key, val in self.visualise(vis_count).items()
+            }
+            wandb.log(results)
 
         for epoch in range(self._start_epoch, self.config.training.epochs):
             for batch, sample in enumerate(dataloader):
@@ -244,7 +255,9 @@ class VQAModelRunner(Runner):
                 best_val_loss = results["val/loss"]
                 self.save(epoch + 1, "best.pt")
             log_metrics_stdout(results)
-            results.update({f"val/{key}": val for key, val in self.visualise().items()})
+            results.update(
+                {f"vis/{key}": val[0] for key, val in self.visualise().items()}
+            )
             wandb.log(results)
             metrics.reset()
 
@@ -309,12 +322,14 @@ class VQAModelRunner(Runner):
 
         return results
 
-    def visualise(self) -> Dict[str, Any]:
+    def visualise(
+        self, sample_limit: int = 1, row_limit: int = 10000
+    ) -> Dict[str, Any]:
         """Visualise a fixed number of samples to view the model's reasoning."""
         # Determine dataset bounds
         start = int(self.config.training.data.val.subset[0] * len(self.datasets.val))
         end = int(self.config.training.data.val.subset[1] * len(self.datasets.val))
-        end = min(10, end)  # TODO: move 10 to visualisation config, random selection
+        end = min(sample_limit, end)
 
         # Prepare for evaluation
         self.model.eval()
@@ -323,56 +338,109 @@ class VQAModelRunner(Runner):
         handles = []
 
         # Gather attention maps with forward hooks
-        hooks = {}
+        gat_hooks = {}
         for name, module in self.model.named_modules():
             if isinstance(module, GATConv):
-                hooks[name] = GATConvAttentionHook()
-                handle = module.register_forward_hook(hooks[name])
+                gat_hooks[name] = GATConvAttentionHook()
+                handle = module.register_forward_hook(gat_hooks[name])
                 handles.append(handle)
-        visualisations.update({key: [] for key in hooks})
 
         dataloader = DataLoader(
-            torch.utils.data.Subset(
-                self.datasets.val, range(start, end)
-            ),  # TODO Make num. attention map samples a config param
+            torch.utils.data.Subset(self.datasets.val, range(start, end)),
             batch_size=1,
             num_workers=0,
             collate_fn=VariableSizeTensorCollator(),
         )
+        gat_graph_visualiser = SparseGraphVisualiser()
         with torch.no_grad():
-            for batch, sample in enumerate(dataloader):
+            for idx, sample in enumerate(dataloader):
                 # Load data
                 dependencies = sample["question"]["dependencies"].to(self.device)
                 graph = sample["scene_graph"]["graph"].to(self.device)
-                image_id = sample["scene_graph"]["imageId"]
+                image_id = sample["scene_graph"]["imageId"][0]
+                image = self.datasets.images[
+                    self.datasets.images.key_to_index(image_id)
+                ]
+                boxes = {
+                    "ground_truth": [
+                        BoundingBox(box[0], box[1], box[2], box[3], label=lbl)
+                        for box, lbl in zip(
+                            sample["scene_graph"]["boxes"][0].tolist(),
+                            [
+                                self.preprocessors.scene_graphs.object_to_index[
+                                    obj_lbl[0]
+                                ]
+                                for obj_lbl in sample["scene_graph"]["labels"]
+                            ],
+                        )
+                    ]
+                }
+                labels = [obj_lbl[0] for obj_lbl in sample["scene_graph"]["labels"]]
+                relations = [
+                    rel_lbl[0] for rel_lbl in sample["scene_graph"]["relations"]
+                ]
+                attributes = [
+                    attr_lbl[0]
+                    for obj_attrs in sample["scene_graph"]["attributes"]
+                    for attr_lbl in obj_attrs
+                ]
+                # Remove all duplicate attributes since attribute nodes are shared
+                unique_attributes = []
+                for attr in attributes:
+                    if attr not in unique_attributes:
+                        unique_attributes.append(attr)
+
                 # Propagate data forward
                 self.model(question_graph=dependencies, scene_graph=graph)
 
-                # Add image with labeled ground truth bounding boxes
-                visualisations["images"] += wandb_image(
-                    self.datasets.images[
-                        self.datasets.images.key_to_index(
-                            sample["scene_graph"]["imageId"]
-                        )
-                    ],
-                    caption=image_id,
-                    boxes={
-                        "ground_truth": [
-                            BoundingBox(box[0], box[1], box[2], box[3], label=lbl)
-                            for box, lbl in zip(
-                                sample["scene_graph"]["boxes"].tolist(),
-                                sample["scene_graph"]["labels"],
-                            )
-                        ]
-                    },
-                    object_to_index=self.preprocessors.scene_graphs.object_to_index,
+                # Add images with labeled ground truth bounding boxes
+
+                visualisations["images"].append(
+                    plot_image(
+                        image,
+                        caption=image_id,
+                        boxes=boxes,
+                    )
                 )
 
-                for name, hook in hooks.items():
+                # wandb bounding boxes are bugged:
+                # https://github.com/wandb/client/issues/1348
+                # visualisations["images"].append(wandb_image(
+                #     image,
+                #     caption=image_id,
+                #     boxes=boxes,
+                #     object_to_index=self.preprocessors.scene_graphs.object_to_index,
+                # ))
+
+                # Add scene graoh nodes and edges to a table
+                node_labels = labels + relations + unique_attributes
+                node_types = (
+                    ["object"] * len(labels)
+                    + ["relation"] * len(relations)
+                    + ["attribute"] * len(unique_attributes)
+                )
+                edge_index = None
+                values = {}
+                for name, hook in gat_hooks.items():
                     if hook.result is not None:
-                        visualisations[name] += wandb.Image(
-                            hook.result, caption=image_id
-                        )
+                        indices, attn_weights = hook.result
+                        if edge_index is not None:
+                            assert torch.allclose(indices, edge_index)
+                        edge_index = indices
+                        values[name] = attn_weights
+                try:
+                    gat_graph_visualiser.add_graph(
+                        node_labels, node_types, edge_index, values
+                    )
+                except ValueError:
+                    break
+
+        visualisations["scene_graph_nodes"] = wandb.Table(
+            dataframe=pd.DataFrame(gat_graph_visualiser.node_data)
+        )
+        visualisations["scene_graph_edges"] = wandb.Table(
+            dataframe=pd.DataFrame(gat_graph_visualiser.edge_data)
+        )
 
         # Remove forward hooks
         for handle in handles:
