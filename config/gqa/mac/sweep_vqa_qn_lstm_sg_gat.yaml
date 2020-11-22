@@ -20,9 +20,9 @@ command:
   - ${args}
 parameters:
   training/optimiser/learning_rate:
-    distribution: uniform
-    min: 0.00001
-    max: 0.001
+    distribution: log_uniform
+    min: -10
+    max: -7
   model/reasoning/length:
     distribution: categorical
     values:
