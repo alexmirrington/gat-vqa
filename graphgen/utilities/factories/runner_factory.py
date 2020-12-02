@@ -222,7 +222,7 @@ class RunnerFactory:
         if isinstance(config.model.question.module, LSTMModelConfig):
             question_dim = config.model.question.module.hidden_dim
         elif isinstance(config.model.question.module, GCNModelConfig):
-            question_dim = config.model.question.embedding.dim
+            question_dim = config.model.question.module.dim
         else:
             raise NotImplementedError()
         if isinstance(config.model.scene_graph.module, LSTMModelConfig):
