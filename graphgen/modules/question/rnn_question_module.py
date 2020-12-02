@@ -37,7 +37,7 @@ class RNNQuestionModule(torch.nn.Module):  # type: ignore  # pylint: disable=abs
         batch_size = dense_text_feats.size(0)
         packed_text_feats = torch.nn.utils.rnn.pack_padded_sequence(
             dense_text_feats,
-            question_lengths,
+            question_lengths.cpu(),
             batch_first=True,
             enforce_sorted=False,
         )

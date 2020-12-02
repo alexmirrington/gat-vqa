@@ -10,10 +10,7 @@ pytest-cov
 schema
 stanza
 termcolor
-torch
-torch-geometric
-torchtext
-torchvision
 tqdm
 wandb
+wheel
 sklearn
