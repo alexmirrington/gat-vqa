@@ -39,7 +39,7 @@ class RNNSceneGraphModule(AbstractSceneGraphModule):
         num_nodes = torch.clamp(num_nodes, min=1)
         packed_object_feats = torch.nn.utils.rnn.pack_padded_sequence(
             dense_node_feats,
-            num_nodes,
+            num_nodes.cpu(),
             batch_first=True,
             enforce_sorted=False,
         )
