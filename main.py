@@ -104,6 +104,7 @@ def train(config: Config, device: torch.device, resume: Optional[ResumeInfo]) ->
 
 def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) -> None:
     """Train a model according to the `config.model` config."""
+    # pylint: disable=too-many-locals
     # Load datasets
     print(colored("loading training datasets:", attrs=["bold"]))
     dataset_factory = DatasetFactory()
@@ -113,13 +114,20 @@ def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) 
     print(f"test: {len(datasets.test)}")
 
     print(colored("saving question ids:", attrs=["bold"]))
-    splits = {"train": datasets.train, "val": datasets.val, "test": datasets.test}
-    for split, dataset in splits.items():
+    split_map = {
+        "train": (config.training.data.train, datasets.train),
+        "val": (config.training.data.val, datasets.val),
+        "test": (config.training.data.test, datasets.test),
+    }
+    for split, (dataconfig, dataset) in split_map.items():
         root = Path(wandb.run.dir) / "predictions"
         if not root.exists():
             root.mkdir(parents=True)
         path = root / f"{split}_ids.json"
-        ids = [dataset[i]["question"]["questionId"] for i in range(len(dataset))]
+        start = int(dataconfig.subset[0] * len(dataset))
+        end = int(dataconfig.subset[1] * len(dataset))
+        subset = torch.utils.data.Subset(dataset, range(start, end))
+        ids = [dataset[i]["question"]["questionId"] for i in range(len(subset))]
         with open(path, "w") as file:
             json.dump(ids, file)
 

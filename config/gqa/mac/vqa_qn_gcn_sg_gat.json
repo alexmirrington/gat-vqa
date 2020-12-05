@@ -146,15 +146,15 @@
       ],
       "train": {
         "split": "train",
-        "version": "all"
+        "version": "balanced"
       },
       "val": {
         "split": "val",
-        "version": "all"
+        "version": "balanced"
       },
       "test": {
         "split": "val",
-        "version": "all"
+        "version": "balanced"
       }
     }
   }
