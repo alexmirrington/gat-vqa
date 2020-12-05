@@ -83,7 +83,7 @@ class GQA(torch.utils.data.Dataset):  # type: ignore
 
     @property
     def questions(self) -> Optional[GQAQuestions]:
-        """Get the scene graphs portion of the dataset."""
+        """Get the questions portion of the dataset."""
         return self._questions
 
     @property
