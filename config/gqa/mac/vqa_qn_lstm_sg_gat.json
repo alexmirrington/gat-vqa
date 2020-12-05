@@ -27,6 +27,16 @@
       "feature": "questions",
       "split": "val",
       "version": "balanced"
+    },
+    {
+      "feature": "questions",
+      "split": "train",
+      "version": "all"
+    },
+    {
+      "feature": "questions",
+      "split": "val",
+      "version": "all"
     }]
   },
   "model": {
