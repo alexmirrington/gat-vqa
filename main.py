@@ -127,7 +127,7 @@ def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) 
         start = int(dataconfig.subset[0] * len(dataset))
         end = int(dataconfig.subset[1] * len(dataset))
         subset = torch.utils.data.Subset(dataset, range(start, end))
-        ids = [dataset[i]["question"]["questionId"] for i in range(len(subset))]
+        ids = [subset[i]["question"]["questionId"] for i in range(len(subset))]
         with open(path, "w") as file:
             json.dump(ids, file)
 
