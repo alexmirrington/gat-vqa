@@ -148,9 +148,10 @@ parser.add_argument(
 )
 parser.add_argument(
     "--predictions",
-    default=os.path.join(os.path.dirname(__file__), "{tier}_predictions.json"),
+    default=None,
+    required=True,
     type=str,
-    help="Answers file name format.",
+    help="Answers file name.",
 )
 parser.add_argument(
     "--attentions",
@@ -213,16 +214,21 @@ if not args.grounding:
 # Files Loading
 def load_file(name):
     """Load a file."""
+    print(name)
     # load standard json file
     if os.path.isfile(name):
         with open(name) as file:
             data = json.load(file)
     # load file chunks if too big
-    elif os.path.isdir(name.split(".")[0]):
+    elif os.path.isdir(os.path.dirname(name)):
+        dir_, ext = os.path.splitext(os.path.basename(name))
         data = {}
         chunks = glob.glob(
-            "{dir}/{dir}_*.{ext}".format(dir=name.split(".")[0], ext=name.split(".")[1])
+            os.path.join(
+                os.path.dirname(name), "{dir}/{dir}_*{ext}".format(dir=dir_, ext=ext)
+            )
         )
+        print(chunks)
         for chunk in chunks:
             with open(chunk) as file:
                 data.update(json.load(file))
@@ -245,7 +251,7 @@ choices = load_file(args.choices.format(tier=args.tier))
 
 # Load predictions and turn them into a dictionary
 print("Loading predictions...")
-predictions = load_file(args.predictions.format(tier=args.tier))
+predictions = load_file(args.predictions)
 predictions = {p["questionId"]: p["prediction"] for p in predictions}
 
 # Load masked ids
@@ -261,13 +267,15 @@ if args.exclude_ids is not None:
 
 # Make sure all question have predictions
 # TODO check for include and exclude IDs?
-for qid in questions:
-    if (qid not in predictions) and (args.consistency or questions[qid]["isBalanced"]):
-        print(
-            "no prediction for question {}.".format(qid),
-            "Please add prediction for all questions.",
-        )
-        raise Exception("missing predictions")
+# for qid in questions:
+#     if (qid not in predictions) and \
+#         (args.consistency or questions[qid]["isBalanced"]):
+#         if include_ids is None or qid in include_ids:
+#             print(
+#                 "no prediction for question {}.".format(qid),
+#                 "Please add prediction for all questions.",
+#             )
+#             raise Exception("missing predictions")
 
 # Load attentions and turn them into a dictionary
 ATTENTIONS = None
@@ -518,22 +526,21 @@ def chiSquare(goldDist, predictedDist):
 
 
 # Main score computation
-
+print(len(questions))
 # Loop over the questions and compute mterics
 for qid, question in tqdm(questions.items()):
-    gold = question["answer"]
-    predicted = predictions[qid]
-
-    correct = predicted == gold
-    score = to_score(correct)
-
-    wordsNum = getWordsNum(question)
-    stepsNum = getStepsNum(question)
-
     # Compute scores over the balanced dataset
     # (more robust against cheating by making educated guesses)
     # Mask ids where appropriate to evaluate custom subsets of tiers
     if question["isBalanced"] and (include_ids is None or qid in include_ids):
+        gold = question["answer"]
+        predicted = predictions[qid]
+
+        correct = predicted == gold
+        score = to_score(correct)
+
+        wordsNum = getWordsNum(question)
+        stepsNum = getStepsNum(question)
         # Update accuracy
         scores["accuracy"].append(score)
         scores["accuracyPerLength"][wordsNum].append(score)
@@ -567,13 +574,14 @@ for qid, question in tqdm(questions.items()):
             dist["gold"][globalGroup][gold] += 1
             dist["predicted"][globalGroup][predicted] += 1
 
-        # Compute consistency (for entailed questions)
-        updateConsistency(
-            qid,
-            question,
-            questions,
-            exclude=exclude_ids if exclude_ids is not None else [],
-        )
+        if args.consistency:
+            # Compute consistency (for entailed questions)
+            updateConsistency(
+                qid,
+                question,
+                questions,
+                exclude=exclude_ids if exclude_ids is not None else [],
+            )
 
 # Compute distribution score
 scores["distribution"] = chiSquare(dist["gold"], dist["predicted"]) / 100

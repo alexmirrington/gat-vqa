@@ -28,7 +28,7 @@ class JobType(Enum):
 
     PREPROCESS = "preprocess"
     TRAIN = "train"
-    TEST = "test"
+    PREDICT = "predict"
 
 
 def main(args: argparse.Namespace, config: Config) -> None:
@@ -60,14 +60,15 @@ def main(args: argparse.Namespace, config: Config) -> None:
 
     if args.job == JobType.PREPROCESS:
         preprocess(config)
-    elif args.job == JobType.TRAIN:
+    elif args.job in (JobType.TRAIN, JobType.PREDICT):
         resume = None
         if args.resume != "":
             run_id, checkpoint = args.resume.split(":")
             resume = ResumeInfo(run_id, checkpoint)
-        run(config, device, resume)
-    elif args.job == JobType.TEST:
-        raise NotImplementedError()
+        if args.job == JobType.TRAIN:
+            train(config, device, resume)
+        else:
+            predict(config, device, resume)
     else:
         raise NotImplementedError()
 
@@ -79,14 +80,15 @@ def preprocess(config: Config) -> None:
     factory.process(config)
 
 
-def run(config: Config, device: torch.device, resume: Optional[ResumeInfo]) -> None:
+def train(config: Config, device: torch.device, resume: Optional[ResumeInfo]) -> None:
     """Train a model according to the `config.model` config."""
     # Load datasets
-    print(colored("loading datasets:", attrs=["bold"]))
+    print(colored("loading training datasets:", attrs=["bold"]))
     dataset_factory = DatasetFactory()
     datasets, preprocessors = dataset_factory.create(config)
     print(f"train: {len(datasets.train)}")
     print(f"val: {len(datasets.val)}")
+    print(f"test: {len(datasets.test)}")
 
     # Create model runner
     print(colored("model:", attrs=["bold"]))
@@ -96,9 +98,46 @@ def run(config: Config, device: torch.device, resume: Optional[ResumeInfo]) -> N
     print(f"{runner.criterion=}")
     print(f"{runner.optimiser=}")
 
-    # Run model
-    print(colored("running:", attrs=["bold"]))
+    print(colored("training:", attrs=["bold"]))
     runner.train()
+
+
+def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) -> None:
+    """Train a model according to the `config.model` config."""
+    # Load datasets
+    print(colored("loading training datasets:", attrs=["bold"]))
+    dataset_factory = DatasetFactory()
+    datasets, preprocessors = dataset_factory.create(config)
+    print(f"train: {len(datasets.train)}")
+    print(f"val: {len(datasets.val)}")
+    print(f"test: {len(datasets.test)}")
+
+    print(colored("saving question ids:", attrs=["bold"]))
+    splits = {"train": datasets.train, "val": datasets.val, "test": datasets.test}
+    for split, dataset in splits.items():
+        root = Path(wandb.run.dir) / "predictions"
+        if not root.exists():
+            root.mkdir(parents=True)
+        path = root / f"{split}_ids.json"
+        ids = [dataset[i]["question"]["questionId"] for i in range(len(dataset))]
+        with open(path, "w") as file:
+            json.dump(ids, file)
+
+    print(colored("loading prediction datasets:", attrs=["bold"]))
+    dataset_factory = DatasetFactory(training=False)
+    datasets, preprocessors = dataset_factory.create(config)
+    print(f"train: {len(datasets.train)}")
+    print(f"val: {len(datasets.val)}")
+    print(f"test: {len(datasets.test)}")
+
+    # Create model runner
+    print(colored("model:", attrs=["bold"]))
+    runner_factory = RunnerFactory()
+    runner = runner_factory.create(config, device, preprocessors, datasets, resume)
+    print(f"{runner.model=}")
+
+    print(colored("predicting:", attrs=["bold"]))
+    runner.predict()
 
 
 def parse_args() -> Tuple[argparse.Namespace, List[str]]:
