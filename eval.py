@@ -100,31 +100,61 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--tier", default="val", type=str, help="Tier, e.g. train, val")
 parser.add_argument(
     "--scenes",
-    default="{tier}_sceneGraphs.json",
+    default=os.path.join(
+        os.path.dirname(__file__), "data/gqa/sceneGraphs/{tier}_sceneGraphs.json"
+    ),
     type=str,
     help="Scene graphs file name format.",
 )
 parser.add_argument(
     "--questions",
-    default="{tier}_all_questions.json",
+    default=os.path.join(
+        os.path.dirname(__file__), "data/gqa/questions/{tier}_all_questions.json"
+    ),
     type=str,
     help="Questions file name format.",
 )
 parser.add_argument(
     "--choices",
-    default="{tier}_choices.json",
+    default=os.path.join(
+        os.path.dirname(__file__), "data/gqa/eval/{tier}_choices.json"
+    ),
     type=str,
     help="Choices file name format.",
 )
+# The include-ids and exclude-ids flags are used to compute metrics on a subset
+# of a tier; For this project, we train on the full balanced training set, we
+# evaluate on the *first half* of the balanced val tier, and we test
+# on the second half of the balanced val tier.
+# For computing test consistency, we need to include predictions to all questions
+# for a given tier (not just balanced ones), as specified by the --questions
+# argument; we then use --include-ids to specify the ids we should include for
+# evaluating the test metrics (i.e. the second half of the val set), and use
+# --exclude-ids to specify the ids that we used for evaluation so we don't use
+# those when calculating consistency over entailed questions.
+parser.add_argument(
+    "--include-ids",
+    default=None,
+    type=str,
+    help="A path to a list of question IDs on which to compute metrics. "
+    + "If None, compute metrics for all provided IDs",
+)
+parser.add_argument(
+    "--exclude-ids",
+    default=None,
+    type=str,
+    help="A path to a list of question IDs on which to exclude when computing "
+    + "metrics. If None, no IDs are excluded",
+)
 parser.add_argument(
     "--predictions",
-    default="{tier}_predictions.json",
+    default=os.path.join(os.path.dirname(__file__), "{tier}_predictions.json"),
     type=str,
     help="Answers file name format.",
 )
 parser.add_argument(
     "--attentions",
-    default="{tier}_attentions.json",
+    default=os.path.join(os.path.dirname(__file__), "{tier}_attentions.json"),
     type=str,
     help="Attentions file name format.",
 )
@@ -218,7 +248,19 @@ print("Loading predictions...")
 predictions = load_file(args.predictions.format(tier=args.tier))
 predictions = {p["questionId"]: p["prediction"] for p in predictions}
 
+# Load masked ids
+include_ids = None
+if args.include_ids is not None:
+    print("Loading include ids...")
+    include_ids = load_file(args.include_ids)
+
+exclude_ids = None
+if args.exclude_ids is not None:
+    print("Loading exclude ids...")
+    exclude_ids = load_file(args.exclude_ids)
+
 # Make sure all question have predictions
+# TODO check for include and exclude IDs?
 for qid in questions:
     if (qid not in predictions) and (args.consistency or questions[qid]["isBalanced"]):
         print(
@@ -288,15 +330,13 @@ dist = {
     "predicted": defaultdict(lambda: defaultdict(int)),
 }
 
+
 # Question lengths - words numbers and reasoning steps number
-
-
 def getWordsNum(question):
     """Compute question length (words number)."""
     return len(question["question"].split())
 
 
-#
 def getStepsNum(question):
     """Compute number of reasoning steps.
 
@@ -329,9 +369,11 @@ def belongs(element, group, question):
 
 
 # Functions for consistency scores (for entailed questions ("inferred"))
-def updateConsistency(questionId, question, questions):
+def updateConsistency(questionId, question, questions, exclude=[]):
     """Update the consistency score."""
-    inferredQuestions = [eid for eid in question["entailed"] if eid != questionId]
+    inferredQuestions = [
+        eid for eid in question["entailed"] if eid != questionId and eid not in exclude
+    ]
 
     if correct and len(inferredQuestions) > 0:
 
@@ -490,7 +532,8 @@ for qid, question in tqdm(questions.items()):
 
     # Compute scores over the balanced dataset
     # (more robust against cheating by making educated guesses)
-    if question["isBalanced"]:
+    # Mask ids where appropriate to evaluate custom subsets of tiers
+    if question["isBalanced"] and (include_ids is None or qid in include_ids):
         # Update accuracy
         scores["accuracy"].append(score)
         scores["accuracyPerLength"][wordsNum].append(score)
@@ -525,7 +568,12 @@ for qid, question in tqdm(questions.items()):
             dist["predicted"][globalGroup][predicted] += 1
 
         # Compute consistency (for entailed questions)
-        updateConsistency(qid, question, questions)
+        updateConsistency(
+            qid,
+            question,
+            questions,
+            exclude=exclude_ids if exclude_ids is not None else [],
+        )
 
 # Compute distribution score
 scores["distribution"] = chiSquare(dist["gold"], dist["predicted"]) / 100
