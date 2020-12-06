@@ -1,7 +1,7 @@
 """Tools for creating trainable datasets given configuration objects."""
 import json
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import jsons
 import wandb
@@ -16,6 +16,8 @@ from ...config.gqa import (
     GQASplit,
     GQAVersion,
 )
+from ...config.prediction import PredictionConfig
+from ...config.training import TrainingConfig
 from ...datasets.gqa import (
     GQA,
     GQAImages,
@@ -90,6 +92,10 @@ class DatasetFactory:
             }
         )
 
+        cfg: Union[TrainingConfig, PredictionConfig] = (
+            config.training if self.training else config.prediction
+        )
+
         for split_key, subset in split_map.items():
 
             if subset.split not in [split.value for split in iter(GQASplit)]:
@@ -104,7 +110,7 @@ class DatasetFactory:
             spatial = None
             scene_graphs = None
 
-            for feature in config.training.data.features:
+            for feature in cfg.data.features:
                 if feature.name not in [feature.value for feature in iter(GQAFeatures)]:
                     raise ValueError("Invalid feature string.")
 
