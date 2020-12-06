@@ -126,7 +126,7 @@
   },
   "prediction": {
     "dataloader": {
-      "batch_size": 64,
+      "batch_size": 16,
       "workers": 1
     },
     "data": {
