@@ -133,24 +133,24 @@
       "features": [
         {
           "name": "questions",
-          "artifact": "gqa-preprocessed:v11"
+          "artifact": "gqa-preprocessed:v13"
         },
         {
           "name": "scene_graphs",
-          "artifact": "gqa-preprocessed:v11"
+          "artifact": "gqa-preprocessed:v13"
         }
       ],
       "train": {
         "split": "train",
-        "version": "balanced"
+        "version": "all"
       },
       "val": {
         "split": "val",
-        "version": "balanced"
+        "version": "all"
       },
       "test": {
         "split": "val",
-        "version": "balanced"
+        "version": "all"
       }
     }
   }
