@@ -157,7 +157,7 @@ def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) 
                         - runner.model.question_embeddings.num_embeddings,
                         runner.model.question_embeddings.embedding_dim,
                     )
-                ),
+                ).to(device),
             ),
             dim=0,
         )
