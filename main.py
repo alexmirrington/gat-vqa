@@ -150,12 +150,12 @@ def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) 
     runner.model.question_embeddings = torch.nn.Embedding.from_pretrained(
         torch.cat(
             (
-                runner.model.question_embeddings.data,
+                runner.model.question_embeddings.weight.data,
                 torch.zeros(
                     (
                         len(runner.preprocessors.questions.index_to_word)
-                        - runner.model.question_embeddings.data.size(0),
-                        runner.model.question_embeddings.data.size(1),
+                        - runner.model.question_embeddings.num_embeddings,
+                        runner.model.question_embeddings.embedding_dim,
                     )
                 ),
             ),
