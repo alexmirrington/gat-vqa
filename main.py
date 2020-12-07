@@ -131,18 +131,28 @@ def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) 
         with open(path, "w") as file:
             json.dump(ids, file)
 
-    # Create model runner
-    print(colored("model:", attrs=["bold"]))
-    runner_factory = RunnerFactory()
-    runner = runner_factory.create(config, device, preprocessors, datasets, resume)
-    print(f"{runner.model=}")
-
     print(colored("loading prediction datasets:", attrs=["bold"]))
-    dataset_factory = DatasetFactory(training=False)
-    datasets, preprocessors = dataset_factory.create(config)
+    pred_dataset_factory = DatasetFactory(training=False)
+    pred_datasets, pred_preprocessors = pred_dataset_factory.create(config)
     print(f"train: {len(datasets.train)}")
     print(f"val: {len(datasets.val)}")
     print(f"test: {len(datasets.test)}")
+
+    # Keep index to answer the same, but replace index to word to allow
+    # embedding of new vocab in unseen datasets. Hacky, but will work for now.
+    preprocessors.questions._index_to_word = (  # pylint: disable=protected-access
+        pred_preprocessors.questions.index_to_word
+    )
+    preprocessors.questions._word_to_index = {  # pylint: disable=protected-access
+        w: i for i, w in enumerate(pred_preprocessors.questions.index_to_word)
+    }
+
+    # Create model runner
+    print(colored("model:", attrs=["bold"]))
+    runner_factory = RunnerFactory()
+    runner = runner_factory.create(config, device, preprocessors, pred_datasets, resume)
+    print(f"{runner.model=}")
+
     runner.datasets = datasets
     runner.preprocessors = preprocessors
 
