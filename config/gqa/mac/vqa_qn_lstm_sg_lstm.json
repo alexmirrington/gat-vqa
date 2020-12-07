@@ -138,7 +138,7 @@
       ],
       "train": {
         "split": "train",
-        "version": "all"
+        "version": "balanced"
       },
       "val": {
         "split": "val",
