@@ -163,8 +163,8 @@ def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) 
         )
     )
     # Update datasets and preprocessors for prediction
-    runner.datasets = datasets
-    runner.preprocessors = preprocessors
+    runner.datasets = pred_datasets
+    runner.preprocessors = pred_preprocessors
 
     print(colored("predicting:", attrs=["bold"]))
     runner.predict()
