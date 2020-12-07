@@ -138,8 +138,8 @@ def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) 
     print(f"{runner.model=}")
 
     print(colored("loading prediction datasets:", attrs=["bold"]))
-    pred_dataset_factory = DatasetFactory(training=False)
-    pred_datasets, pred_preprocessors = pred_dataset_factory.create(config)
+    dataset_factory = DatasetFactory(training=False)
+    datasets, pred_preprocessors = dataset_factory.create(config)
     print(f"train: {len(datasets.train)}")
     print(f"val: {len(datasets.val)}")
     print(f"test: {len(datasets.test)}")
@@ -153,7 +153,7 @@ def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) 
                 runner.model.question_embeddings.weight.data,
                 torch.zeros(
                     (
-                        len(runner.preprocessors.questions.index_to_word)
+                        len(pred_preprocessors.questions.index_to_word)
                         - runner.model.question_embeddings.num_embeddings,
                         runner.model.question_embeddings.embedding_dim,
                     )
@@ -163,7 +163,7 @@ def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) 
         )
     )
     # Update datasets and preprocessors for prediction
-    runner.datasets = pred_datasets
+    runner.datasets = datasets
     runner.preprocessors = pred_preprocessors
 
     print(colored("predicting:", attrs=["bold"]))
