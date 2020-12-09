@@ -43,19 +43,19 @@
     "name": "vqa",
     "reasoning": {
       "name": "mac",
-      "length": 6,
+      "length": 4,
       "hidden_dim": 512
     },
     "question": {
       "embedding": {
         "init": "glove",
         "dim": 300,
-        "trainable": true,
+        "trainable": false,
         "average_mwt": true
       },
       "module": {
         "name": "lstm",
-        "hidden_dim": 512,
+        "hidden_dim": 256,
         "bidirectional": true
       }
     },
@@ -79,15 +79,15 @@
     }
   },
   "training": {
-    "epochs": 25,
-    "log_step": 512,
+    "epochs": 32,
+    "log_step": 1024,
     "dataloader": {
-      "batch_size": 32,
+      "batch_size": 16,
       "workers": 1
     },
     "optimiser": {
       "name": "adam",
-      "learning_rate": 3e-4,
+      "learning_rate": 4.761103570438788e-05,
       "momentum": null,
       "weight_decay": 0,
       "grad_clip": 8,
