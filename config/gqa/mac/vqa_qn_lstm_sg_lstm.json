@@ -67,8 +67,8 @@
         "average_mwt": true
       },
       "graph": {
-        "directed": true,
-        "object_skip_edges": true,
+        "directed": false,
+        "object_skip_edges": false,
         "aggregation": "per_obj_concat_mean_rel_attr"
       },
       "module": {
