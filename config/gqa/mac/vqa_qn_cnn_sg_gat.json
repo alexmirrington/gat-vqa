@@ -144,11 +144,11 @@
       },
       "val": {
         "split": "val",
-        "version": "all"
+        "version": "balanced"
       },
       "test": {
         "split": "val",
-        "version": "all"
+        "version": "balanced"
       }
     }
   }
