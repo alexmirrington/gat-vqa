@@ -6,7 +6,8 @@ test:
 	@pytest ./tests/ --cov-report=term-missing --cov=graphgen
 
 install-torch:
-	@pip install torch==1.7.0+cu110 torchvision==0.8.1+cu110 torchtext==0.8.0 -f https://download.pytorch.org/whl/torch_stable.html
+	# @pip install torch==1.7.0+cu110 torchvision==0.8.1+cu110 torchtext==0.8.0 -f https://download.pytorch.org/whl/torch_stable.html
+	@pip install torch==1.7.0 torchvision==0.8.1 torchtext==0.8.0 -f https://download.pytorch.org/whl/torch_stable.html
 
 install-torch-geometric:
 	$(eval CUDA_VERSION = $(shell python -c "import torch; print(torch.version.cuda)"))
