@@ -4,7 +4,7 @@ mypy
 numpy
 pillow
 pre-commit
-pylint
+pylint<=2.5.3
 pytest
 pytest-cov
 schema
