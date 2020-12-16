@@ -1,4 +1,5 @@
 """Various train/val/test loops for running different types of models."""
+import json
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -66,6 +67,10 @@ class Runner(ABC):
     @abstractmethod
     def evaluate(self) -> Dict[str, Any]:
         """Evaluate a model according to a criterion on a given dataset."""
+
+    @abstractmethod
+    def predict(self) -> None:
+        """Get model predictions for train, val and test datasets."""
 
     def save(self, epoch: int, name: str) -> None:
         """Save a model's state dict to file."""
@@ -292,3 +297,64 @@ class VQAModelRunner(Runner):
         results = {"loss": loss / len(dataloader.dataset)}
         results.update(metrics.evaluate())
         return results
+
+    def predict(self) -> None:
+        """Get model predictions for train, val and test datasets."""
+        # pylint: disable=too-many-locals
+        split_map = {
+            "train": (self.config.prediction.data.train, self.datasets.train),
+            "val": (self.config.prediction.data.val, self.datasets.val),
+            # "test": (self.config.prediction.data.test, self.datasets.test),
+        }
+
+        # Prepare for prediction
+        self.model.to(self.device)
+        self.model.eval()
+        root = Path(wandb.run.dir) / "predictions"
+        if not root.exists():
+            root.mkdir(parents=True)
+
+        for split, (config, dataset) in split_map.items():
+            start = int(config.subset[0] * len(dataset))
+            end = int(config.subset[1] * len(dataset))
+            print(f"split: {split}, start: {start}, end: {end}")
+            dataloader = DataLoader(
+                torch.utils.data.Subset(dataset, range(start, end)),
+                batch_size=self.config.prediction.dataloader.batch_size,
+                num_workers=self.config.prediction.dataloader.workers,
+                collate_fn=VariableSizeTensorCollator(),
+            )
+
+            # Predict
+            all_preds = []
+            with torch.no_grad():
+                for batch, sample in enumerate(dataloader):
+                    # Move data to GPU
+                    dependencies = sample["question"]["dependencies"].to(self.device)
+                    graph = sample["scene_graph"]["graph"].to(self.device)
+                    qids = sample["question"]["questionId"]
+
+                    # Get predictions
+                    preds = F.log_softmax(
+                        self.model(question_graph=dependencies, scene_graph=graph),
+                        dim=1,
+                    )
+                    preds = np.argmax(preds.detach().cpu().numpy(), axis=1)
+
+                    # Convert predictions to strings
+                    i2a = self.preprocessors.questions.index_to_answer
+                    preds = np.array([i2a[p] for p in preds])
+                    all_preds += [
+                        {"questionId": qid, "prediction": pred}
+                        for qid, pred in zip(qids, preds)
+                    ]
+                    print(f"pred: {batch + 1}/{len(dataloader)}", end="\r")
+
+            path = root / f"{split}_predictions.json"
+            with open(path, "w") as file:
+                json.dump(all_preds, file)
+
+            wandb.save(str(root / "*"), wandb.run.dir)
+
+        # Reset model to train and reset criterion reduction ready for training
+        self.model.train()

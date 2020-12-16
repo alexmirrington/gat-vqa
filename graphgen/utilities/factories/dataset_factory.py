@@ -1,7 +1,7 @@
 """Tools for creating trainable datasets given configuration objects."""
 import json
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import jsons
 import wandb
@@ -16,6 +16,8 @@ from ...config.gqa import (
     GQASplit,
     GQAVersion,
 )
+from ...config.prediction import PredictionConfig
+from ...config.training import TrainingConfig
 from ...datasets.gqa import (
     GQA,
     GQAImages,
@@ -37,12 +39,13 @@ from .runner_factory import RunnerFactory
 class DatasetFactory:
     """Factory class for creating datasets given a configuration object."""
 
-    def __init__(self) -> None:
+    def __init__(self, training: bool = True) -> None:
         """Initialise the dataset factory."""
         self._factory_methods = {
-            DatasetName.GQA: DatasetFactory._create_gqa,
-            DatasetName.CLEVR: DatasetFactory._create_clevr,
+            DatasetName.GQA: self._create_gqa,
+            DatasetName.CLEVR: self._create_clevr,
         }
+        self.training = training
 
     def create(
         self, config: Config
@@ -50,10 +53,11 @@ class DatasetFactory:
         """Create a dataset from a given config."""
         return self._factory_methods[config.dataset.name](config)
 
-    @staticmethod
     def _create_clevr(
+        self,
         config: Config,
     ) -> Tuple[DatasetCollection, PreprocessorCollection]:
+        # pylint: disable=no-self-use
         if not isinstance(config.dataset, CLEVRDatasetConfig):
             raise ValueError(
                 f"Param {config.dataset} must be of type",
@@ -61,8 +65,8 @@ class DatasetFactory:
             )
         raise NotImplementedError()
 
-    @staticmethod
     def _create_gqa(
+        self,
         config: Config,
     ) -> Tuple[DatasetCollection, PreprocessorCollection]:
         # pylint: disable=too-many-branches,too-many-locals,too-many-statements
@@ -74,10 +78,25 @@ class DatasetFactory:
 
         datasets: List[GQA] = []
 
-        for split_key, subset in {
-            "train": config.training.data.train,
-            "val": config.training.data.val,
-        }.items():
+        split_map = (
+            {
+                "train": config.training.data.train,
+                "val": config.training.data.val,
+                "test": config.training.data.test,
+            }
+            if self.training
+            else {
+                "train": config.prediction.data.train,
+                "val": config.prediction.data.val,
+                "test": config.prediction.data.test,
+            }
+        )
+
+        cfg: Union[TrainingConfig, PredictionConfig] = (
+            config.training if self.training else config.prediction
+        )
+
+        for split_key, subset in split_map.items():
 
             if subset.split not in [split.value for split in iter(GQASplit)]:
                 raise ValueError("Invalid split string.")
@@ -91,7 +110,7 @@ class DatasetFactory:
             spatial = None
             scene_graphs = None
 
-            for feature in config.training.data.features:
+            for feature in cfg.data.features:
                 if feature.name not in [feature.value for feature in iter(GQAFeatures)]:
                     raise ValueError("Invalid feature string.")
 
@@ -199,6 +218,6 @@ class DatasetFactory:
             )
 
         return (
-            DatasetCollection(train=datasets[0], val=datasets[1]),
+            DatasetCollection(train=datasets[0], val=datasets[1], test=datasets[2]),
             preprocessors,
         )

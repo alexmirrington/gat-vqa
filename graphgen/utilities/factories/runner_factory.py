@@ -171,7 +171,7 @@ class RunnerFactory:
         resume: Optional[ResumeInfo],
     ) -> Runner:
         """Create a runner from a config."""
-        # pylint: disable=too-many-branches,too-many-locals
+        # pylint: disable=too-many-branches,too-many-locals,too-many-statements
         if not isinstance(config.model, VQAModelConfig):
             raise TypeError(
                 f"Expected model config of type \
@@ -223,6 +223,8 @@ class RunnerFactory:
             question_dim = config.model.question.module.hidden_dim
         elif isinstance(config.model.question.module, GCNModelConfig):
             question_dim = config.model.question.module.dim
+        elif isinstance(config.model.question.module, TextCNNModelConfig):
+            question_dim = config.model.reasoning.hidden_dim
         else:
             raise NotImplementedError()
         if isinstance(config.model.scene_graph.module, LSTMModelConfig):

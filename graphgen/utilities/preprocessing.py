@@ -579,3 +579,4 @@ class DatasetCollection:
 
     train: torch.utils.data.Dataset
     val: torch.utils.data.Dataset
+    test: torch.utils.data.Dataset
