@@ -2,9 +2,10 @@ h5py
 jsons
 mypy
 numpy
+pandas<=1.1.4
 pillow
 pre-commit
-pylint<=2.5.3
+pylint
 pytest
 pytest-cov
 schema
