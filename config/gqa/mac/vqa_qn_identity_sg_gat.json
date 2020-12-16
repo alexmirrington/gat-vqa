@@ -1,0 +1,155 @@
+{
+  "dataset": {
+    "name": "gqa",
+    "filemap": {
+      "root": "./data/gqa"
+    }
+  },
+  "preprocessing": {
+    "cache": {
+      "root": "./cache",
+      "artifact": "gqa-preprocessed"
+    },
+    "pipeline": [{
+      "feature": "scene_graphs",
+      "split": "train"
+    },
+    {
+      "feature": "scene_graphs",
+      "split": "val"
+    },
+    {
+      "feature": "questions",
+      "split": "train",
+      "version": "balanced"
+    },
+    {
+      "feature": "questions",
+      "split": "val",
+      "version": "balanced"
+    },
+    {
+      "feature": "questions",
+      "split": "train",
+      "version": "all"
+    },
+    {
+      "feature": "questions",
+      "split": "val",
+      "version": "all"
+    }]
+  },
+  "model": {
+    "name": "vqa",
+    "reasoning": {
+      "name": "mac",
+      "length": 4,
+      "hidden_dim": 512
+    },
+    "question": {
+      "embedding": {
+        "init": "glove",
+        "dim": 300,
+        "trainable": false,
+        "average_mwt": true
+      },
+      "module": {
+        "name": "identity"
+      }
+    },
+    "scene_graph": {
+      "embedding": {
+        "init": "glove",
+        "dim": 300,
+        "trainable": true,
+        "average_mwt": true
+      },
+      "graph": {
+        "directed": true,
+        "object_skip_edges": true,
+        "aggregation": null
+      },
+      "module": {
+        "name": "gcn",
+        "conv": "gat",
+        "layers": 3,
+        "dim": 256,
+        "pooling": null,
+        "heads": 4,
+        "concat": true
+      }
+    }
+  },
+  "training": {
+    "epochs": 32,
+    "log_step": 1024,
+    "dataloader": {
+      "batch_size": 16,
+      "workers": 1
+    },
+    "optimiser": {
+      "name": "adam",
+      "learning_rate": 4.761103570438788e-05,
+      "momentum": null,
+      "weight_decay": 0,
+      "grad_clip": 8,
+      "schedule": false
+    },
+    "data": {
+      "features": [
+        {
+          "name": "questions",
+          "artifact": "gqa-preprocessed:v11"
+        },
+        {
+          "name": "scene_graphs",
+          "artifact": "gqa-preprocessed:v11"
+        }
+      ],
+      "train": {
+        "split": "train",
+        "version": "balanced"
+      },
+      "val": {
+        "split": "val",
+        "version": "balanced",
+        "subset": [0.0, 0.5]
+      },
+      "test": {
+        "split": "val",
+        "version": "balanced",
+        "subset": [0.5, 1.0]
+      }
+    }
+  },
+  "prediction": {
+    "dataloader": {
+      "batch_size": 16,
+      "workers": 1
+    },
+    "data": {
+      "features": [
+        {
+          "name": "questions",
+          "artifact": "gqa-preprocessed:v11"
+        },
+        {
+          "name": "scene_graphs",
+          "artifact": "gqa-preprocessed:v11"
+        }
+      ],
+      "train": {
+        "split": "train",
+        "version": "balanced"
+      },
+      "val": {
+        "split": "val",
+        "version": "balanced"
+      },
+      "test": {
+        "split": "val",
+        "version": "balanced"
+      }
+    }
+  }
+}
