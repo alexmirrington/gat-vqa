@@ -28,8 +28,8 @@ class JobType(Enum):
 
     PREPROCESS = "preprocess"
     TRAIN = "train"
-    TEST = "test"
     VISUALISE = "visualise"
+    PREDICT = "predict"
 
 
 def main(args: argparse.Namespace, config: Config) -> None:
@@ -61,14 +61,17 @@ def main(args: argparse.Namespace, config: Config) -> None:
 
     if args.job == JobType.PREPROCESS:
         preprocess(config)
-    elif args.job in (JobType.TRAIN, JobType.VISUALISE):
+    elif args.job in (JobType.TRAIN, JobType.PREDICT, JobType.VISUALISE):
         resume = None
         if args.resume != "":
             run_id, checkpoint = args.resume.split(":")
             resume = ResumeInfo(run_id, checkpoint)
-        run(config, args.job, device, resume)
-    elif args.job == JobType.TEST:
-        raise NotImplementedError()
+        if args.job == JobType.TRAIN:
+            train(config, device, resume)
+        elif args.job == JobType.PREDICT:
+            predict(config, device, resume)
+        else:
+            visualise(config, device, resume)
     else:
         raise NotImplementedError()
 
@@ -80,16 +83,15 @@ def preprocess(config: Config) -> None:
     factory.process(config)
 
 
-def run(
-    config: Config, job: JobType, device: torch.device, resume: Optional[ResumeInfo]
-) -> None:
+def train(config: Config, device: torch.device, resume: Optional[ResumeInfo]) -> None:
     """Train a model according to the `config.model` config."""
     # Load datasets
-    print(colored("loading datasets:", attrs=["bold"]))
+    print(colored("loading training datasets:", attrs=["bold"]))
     dataset_factory = DatasetFactory()
     datasets, preprocessors = dataset_factory.create(config)
     print(f"train: {len(datasets.train)}")
     print(f"val: {len(datasets.val)}")
+    print(f"test: {len(datasets.test)}")
 
     # Create model runner
     print(colored("model:", attrs=["bold"]))
@@ -99,14 +101,100 @@ def run(
     print(f"{runner.criterion=}")
     print(f"{runner.optimiser=}")
 
-    # Run model
-    print(colored("running:", attrs=["bold"]))
-    if job == JobType.TRAIN:
-        runner.train()
-    elif job == JobType.VISUALISE:
-        wandb.log(runner.visualise())
-    else:
-        raise NotImplementedError()
+    print(colored("training:", attrs=["bold"]))
+    runner.train()
+
+
+def visualise(
+    config: Config, device: torch.device, resume: Optional[ResumeInfo]
+) -> None:
+    """Visualise a model according to the `config.model` config."""
+    # Load datasets
+    print(colored("loading test dataset:", attrs=["bold"]))
+    dataset_factory = DatasetFactory()
+    datasets, preprocessors = dataset_factory.create(config)
+    print(f"train: {len(datasets.train)}")
+    print(f"val: {len(datasets.val)}")
+    print(f"test: {len(datasets.test)}")
+
+    # Create model runner
+    print(colored("model:", attrs=["bold"]))
+    runner_factory = RunnerFactory()
+    runner = runner_factory.create(config, device, preprocessors, datasets, resume)
+    print(f"{runner.model=}")
+    print(f"{runner.criterion=}")
+    print(f"{runner.optimiser=}")
+
+    print(colored("creating visualisations:", attrs=["bold"]))
+    wandb.log(runner.visualise())
+
+
+def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) -> None:
+    """Train a model according to the `config.model` config."""
+    # pylint: disable=too-many-locals
+    # Load datasets
+    print(colored("loading training datasets:", attrs=["bold"]))
+    dataset_factory = DatasetFactory()
+    datasets, preprocessors = dataset_factory.create(config)
+    print(f"train: {len(datasets.train)}")
+    print(f"val: {len(datasets.val)}")
+    print(f"test: {len(datasets.test)}")
+
+    print(colored("saving question ids:", attrs=["bold"]))
+    split_map = {
+        "train": (config.training.data.train, datasets.train),
+        "val": (config.training.data.val, datasets.val),
+        "test": (config.training.data.test, datasets.test),
+    }
+    for split, (dataconfig, dataset) in split_map.items():
+        root = Path(wandb.run.dir) / "predictions"
+        if not root.exists():
+            root.mkdir(parents=True)
+        path = root / f"{split}_ids.json"
+        start = int(dataconfig.subset[0] * len(dataset))
+        end = int(dataconfig.subset[1] * len(dataset))
+        subset = torch.utils.data.Subset(dataset, range(start, end))
+        ids = [subset[i]["question"]["questionId"] for i in range(len(subset))]
+        with open(path, "w") as file:
+            json.dump(ids, file)
+
+    # Create model runner
+    print(colored("model:", attrs=["bold"]))
+    runner_factory = RunnerFactory()
+    runner = runner_factory.create(config, device, preprocessors, datasets, resume)
+    print(f"{runner.model=}")
+
+    print(colored("loading prediction datasets:", attrs=["bold"]))
+    dataset_factory = DatasetFactory(training=False)
+    datasets, pred_preprocessors = dataset_factory.create(config)
+    print(f"train: {len(datasets.train)}")
+    print(f"val: {len(datasets.val)}")
+    print(f"test: {len(datasets.test)}")
+
+    # Extend question embedding dictionary with pad vector for OOV.
+    # The runner will check if a question token index is out of bounds and
+    # set it to the padding index if so.
+    runner.model.question_embeddings = torch.nn.Embedding.from_pretrained(
+        torch.cat(
+            (
+                runner.model.question_embeddings.weight.data,
+                torch.zeros(
+                    (
+                        len(pred_preprocessors.questions.index_to_word)
+                        - runner.model.question_embeddings.num_embeddings,
+                        runner.model.question_embeddings.embedding_dim,
+                    )
+                ).to(device),
+            ),
+            dim=0,
+        )
+    )
+    # Update datasets and preprocessors for prediction
+    runner.datasets = datasets
+    runner.preprocessors = pred_preprocessors
+
+    print(colored("predicting:", attrs=["bold"]))
+    runner.predict()
 
 
 def parse_args() -> Tuple[argparse.Namespace, List[str]]:

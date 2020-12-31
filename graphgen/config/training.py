@@ -81,7 +81,7 @@ class FeatureConfig:
 
 
 @dataclass
-class TrainingDataConfig:
+class DataConfig:
     """Class storing dataset information for model training."""
 
     features: List[FeatureConfig]
@@ -98,7 +98,7 @@ class TrainingConfig:
     log_step: int
     dataloader: DataloaderConfig
     optimiser: OptimiserConfig
-    data: TrainingDataConfig
+    data: DataConfig
 
     def __post_init__(self) -> None:
         """Validate fields after dataclass construction."""

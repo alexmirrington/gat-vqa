@@ -72,13 +72,7 @@
         "aggregation": null
       },
       "module": {
-        "name": "gcn",
-        "conv": "gat",
-        "layers": 3,
-        "dim": 256,
-        "pooling": null,
-        "heads": 4,
-        "concat": true
+        "name": "identity"
       }
     }
   },

@@ -79,4 +79,4 @@ class ReadUnit(nn.Module):  # type: ignore  # pylint: disable=abstract-method  #
 
         read = (attn * know).sum(1)
 
-        return read
+        return read, attn.squeeze(-1)

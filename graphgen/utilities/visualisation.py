@@ -108,12 +108,14 @@ class SparseGraphVisualiser:
     def __init__(self):
         self.node_data: Dict[str, List] = {
             "sample": [],
+            "step": [],
             "node_index": [],
             "node_label": [],
             "node_group": [],
         }
         self.edge_data: Dict[str, List] = {
             "sample": [],
+            "head": [],
             "source_node_index": [],
             "target_node_index": [],
         }
@@ -124,7 +126,8 @@ class SparseGraphVisualiser:
         node_labels: Sequence[str],
         node_groups: Sequence[str],
         edge_indices: Tensor,
-        edge_values: Dict[str, Tensor],
+        edge_values: Dict[str, Tensor] = {},
+        node_values: Dict[str, Tensor] = {},
     ):
         # Convert tensors to numpy arrays
         edge_indices = edge_indices.detach().squeeze().cpu().numpy()
@@ -132,18 +135,35 @@ class SparseGraphVisualiser:
             key: val.detach().squeeze().cpu().numpy()
             for key, val in edge_values.items()
         }
-
+        node_values = {
+            key: val.detach().squeeze().cpu().numpy()
+            for key, val in node_values.items()
+        }
         # Perform length and size checks
         assert len(edge_indices.shape) == 2
         assert edge_indices.shape[0] == 2
+        head_count = 1
         for t in edge_values.values():
-            assert len(t.shape) == 1
+            # Single head, expand dimensions so we can iterate over heads later
+            if len(t.shape) == 1:
+                np.expand_dims(t, axis=-1)
+            assert len(t.shape) == 2
+            head_count = t.shape[1]
             assert edge_indices.shape[1] == t.shape[0]
+
         assert len(node_labels) == len(node_groups)
+        step_count = 1
+        for t in node_values.values():
+            if len(t.shape) == 1:
+                np.expand_dims(t, axis=-1)
+            assert len(t.shape) == 2
+            step_count = t.shape[1]
+            assert len(node_labels) == t.shape[0]
 
         # Assert adding the graph will not go over the row limit
         if (
-            len(self.edge_data["sample"]) + edge_indices.shape[1] > self.MAX_ROWS
+            len(self.edge_data["sample"]) + head_count * edge_indices.shape[1]
+            > self.MAX_ROWS
             or len(self.node_data["sample"]) + len(node_labels) > self.MAX_ROWS
         ):
             raise ValueError(
@@ -152,12 +172,16 @@ class SparseGraphVisualiser:
 
         # Populate edge values
         for key, values in edge_values.items():
+            # Offset missing samples if needed
             if key not in self.edge_data.keys():
                 self.edge_data[key] = [None] * len(self.edge_data["sample"])
-            self.edge_data[key] += list(values)
-        self.edge_data["source_node_index"] += list(edge_indices[0, :])
-        self.edge_data["target_node_index"] += list(edge_indices[1, :])
-        self.edge_data["sample"] += [self.__index] * edge_indices.shape[1]
+            for i in range(head_count):
+                self.edge_data[key] += list(values[:, i])
+        for head_idx in range(head_count):
+            self.edge_data["head"] += [head_idx] * edge_indices.shape[1]
+            self.edge_data["source_node_index"] += list(edge_indices[0, :])
+            self.edge_data["target_node_index"] += list(edge_indices[1, :])
+            self.edge_data["sample"] += [self.__index] * edge_indices.shape[1]
 
         # Check for any keys that weren't updated
         for key in self.edge_data.keys():
@@ -172,9 +196,30 @@ class SparseGraphVisualiser:
                 )
 
         # Populate node values
-        self.node_data["node_index"] += list(range(len(node_labels)))
-        self.node_data["node_label"] += node_labels
-        self.node_data["node_group"] += node_groups
-        self.node_data["sample"] += [self.__index] * len(node_labels)
+        for key, values in node_values.items():
+            # Offset missing samples if needed
+            if key not in self.node_data.keys():
+                self.node_data[key] = [None] * len(self.node_data["sample"])
+            for i in range(step_count):
+                self.node_data[key] += list(values[:, i])
+        for step_idx in range(step_count):
+            self.node_data["step"] += [step_idx] * len(node_labels)
+            self.node_data["node_index"] += list(range(len(node_labels)))
+            self.node_data["node_label"] += node_labels
+            self.node_data["node_group"] += node_groups
+            self.node_data["sample"] += [self.__index] * len(node_labels)
+
+        # Check for any keys that weren't updated
+        for key in self.node_data.keys():
+            if key not in (
+                "sample",
+                "node_index",
+                "node_label",
+                "node_group",
+                *node_values.keys(),
+            ):
+                self.node_data[key] += [None] * (
+                    len(self.node_data["sample"]) - len(self.node_data[key])
+                )
 
         self.__index += 1

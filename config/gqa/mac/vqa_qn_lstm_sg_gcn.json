@@ -73,11 +73,11 @@
       },
       "module": {
         "name": "gcn",
-        "conv": "gat",
+        "conv": "gcn",
         "layers": 3,
         "dim": 256,
         "pooling": null,
-        "heads": 4,
+        "heads": 0,
         "concat": true
       }
     }

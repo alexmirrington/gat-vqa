@@ -11,6 +11,7 @@ class ModelName(Enum):
     GCN = "gcn"
     LSTM = "lstm"
     TEXT_CNN = "text_cnn"
+    IDENTITY = "identity"
 
 
 class SceneGraphAggregationName(Enum):
@@ -95,6 +96,18 @@ class LSTMModelConfig(ModelConfig):
 
 
 @dataclass
+class IdentityModelConfig(ModelConfig):
+    """Class for storing identity module configuration information."""
+
+    def __post_init__(self) -> None:
+        """Perform post-init checks on fields."""
+        if self.name != ModelName.IDENTITY:
+            raise ValueError(
+                f"Field {self.name=} must be equal to {ModelName.IDENTITY}"
+            )
+
+
+@dataclass
 class TextCNNModelConfig(ModelConfig):
     """Class for storing text cnn model configuration information."""
 
@@ -157,7 +170,9 @@ class EmbeddingModuleConfig:
     """Class for storing embedding module configuration information."""
 
     embedding: EmbeddingConfig
-    module: Union[LSTMModelConfig, GCNModelConfig, TextCNNModelConfig]
+    module: Union[
+        LSTMModelConfig, GCNModelConfig, TextCNNModelConfig, IdentityModelConfig
+    ]
 
 
 @dataclass

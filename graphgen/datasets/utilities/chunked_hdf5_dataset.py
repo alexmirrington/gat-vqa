@@ -30,7 +30,12 @@ class ChunkedHDF5Dataset(ChunkedDataset, KeyedDataset):
 
         self._key_to_idx: Optional[Dict[str, int]] = {}
         self._chunk_sizes: Tuple[int, ...] = ()
-        self._chunks, self._chunk_sizes, dataset_shapes = self._load_dataset_metadata()
+        (
+            self._chunks,
+            self._chunk_sizes,
+            dataset_shapes,
+            dataset_dtypes,
+        ) = self._load_dataset_metadata()
 
         if len(self._chunks) == 0:
             raise ValueError(
@@ -45,7 +50,7 @@ class ChunkedHDF5Dataset(ChunkedDataset, KeyedDataset):
             for dataset, shape in dataset_shapes.items()
         }
         layouts = {
-            dataset: h5py.VirtualLayout(shape=shape)
+            dataset: h5py.VirtualLayout(shape=shape, dtype=dataset_dtypes[dataset])
             for dataset, shape in cat_shapes.items()
         }
         for dataset, shape in dataset_shapes.items():
@@ -81,24 +86,33 @@ class ChunkedHDF5Dataset(ChunkedDataset, KeyedDataset):
 
     def _load_dataset_metadata(
         self,
-    ) -> Tuple[Tuple[Path, ...], Tuple[int, ...], Dict[str, Tuple[Any, ...]]]:
+    ) -> Tuple[
+        Tuple[Path, ...], Tuple[int, ...], Dict[str, Tuple[Any, ...]], Dict[str, str]
+    ]:
+        # pylint: disable=too-many-branches
         chunks = list(self._chunks)
         dataset_shapes: Dict[str, Tuple[Any, ...]] = {}
+        dataset_dtypes: Dict[str, str] = {}
         chunk_sizes: List[int] = []
         to_remove = []
         for chunk_idx, chunk_name in enumerate(chunks):
             try:
                 with h5py.File(chunk_name, "r") as chunk:
-                    # Get shapes of datasets
+                    # Get shapes and dtypes of datasets in current chunk
                     shape = {
                         dataset: tuple(chunk[dataset].shape) for dataset in chunk.keys()
                     }
+                    dtypes = {dataset: chunk[dataset].dtype for dataset in chunk.keys()}
 
                     # Set dataset shapes
                     if len(dataset_shapes) == 0:
                         dataset_shapes = {
                             dataset: val[1:] for dataset, val in shape.items()
                         }
+
+                    # Set dtypes of datasets
+                    if len(dataset_dtypes) == 0:
+                        dataset_dtypes = dtypes
 
                     # Enforce datasets are the same length in first dimension.
                     chunk_size = None
@@ -112,7 +126,8 @@ class ChunkedHDF5Dataset(ChunkedDataset, KeyedDataset):
                                 "equal length.",
                             )
 
-                    # Enforce dataset existence and check shapes across chunks
+                    # Enforce dataset existence and check shapes and dtypes
+                    # across chunks
                     for dataset, val in shape.items():
                         if dataset not in dataset_shapes.keys():
                             raise ValueError(
@@ -126,13 +141,27 @@ class ChunkedHDF5Dataset(ChunkedDataset, KeyedDataset):
                                 "dataset in other chunks. Expected shape ",
                                 f"{dataset_shapes[dataset][0]} but got {val[1:]}",
                             )
+                    for dataset, dtype in dtypes.items():
+                        if dataset not in dataset_dtypes.keys():
+                            raise ValueError(
+                                f"Chunk {chunk_name} must only contain ",
+                                "datasets present in other chunks.",
+                            )
+                        if dtype != dataset_dtypes[dataset]:
+                            raise ValueError(
+                                f"Dataset {dataset} in chunk {chunk_name} must ",
+                                "have the same dtype as its corresponding ",
+                                "dataset in other chunks. Expected dtype ",
+                                f"{dataset_dtypes[dataset]} but got {dtype}",
+                            )
+
             except OSError:
                 to_remove.append(chunk_name)
 
         for chunk in to_remove:
             chunks.remove(chunk)
 
-        return tuple(chunks), tuple(chunk_sizes), dataset_shapes
+        return tuple(chunks), tuple(chunk_sizes), dataset_shapes, dataset_dtypes
 
     @property
     def chunk_sizes(self) -> Tuple[int, ...]:

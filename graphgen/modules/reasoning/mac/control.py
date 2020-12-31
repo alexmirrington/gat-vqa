@@ -87,4 +87,4 @@ class ControlUnit(nn.Module):  # type: ignore  # pylint: disable=abstract-method
         # only valid if self.inwords == self.outwords
         next_control = (attn * context).sum(1)
 
-        return next_control
+        return next_control, attn.squeeze(-1)

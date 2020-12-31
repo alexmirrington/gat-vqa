@@ -14,6 +14,7 @@ from ...config.model import (
     GCNConvName,
     GCNModelConfig,
     GCNPoolingName,
+    IdentityModelConfig,
     LSTMModelConfig,
     MACModelConfig,
     ModelName,
@@ -23,14 +24,23 @@ from ...config.model import (
 )
 from ...config.training import OptimiserName
 from ...modules import VQA
-from ...modules.question import CNNQuestionModule, GCNQuestionModule, RNNQuestionModule
+from ...modules.question import (
+    CNNQuestionModule,
+    GCNQuestionModule,
+    IdentityQuestionModule,
+    RNNQuestionModule,
+)
 from ...modules.reasoning.bottomup import BottomUp
 from ...modules.reasoning.mac import MACCell, MACNetwork
 from ...modules.reasoning.mac.control import ControlUnit
 from ...modules.reasoning.mac.output import OutputUnit
 from ...modules.reasoning.mac.read import ReadUnit
 from ...modules.reasoning.mac.write import WriteUnit
-from ...modules.scene import GCNSceneGraphModule, RNNSceneGraphModule
+from ...modules.scene import (
+    GCNSceneGraphModule,
+    IdentitySceneGraphModule,
+    RNNSceneGraphModule,
+)
 from ...modules.sparse import GAT, GCN, AbstractGCN
 from ..preprocessing import DatasetCollection, PreprocessorCollection
 from ..runners import ResumeInfo, Runner, VQAModelRunner
@@ -171,7 +181,7 @@ class RunnerFactory:
         resume: Optional[ResumeInfo],
     ) -> Runner:
         """Create a runner from a config."""
-        # pylint: disable=too-many-branches,too-many-locals
+        # pylint: disable=too-many-branches,too-many-locals,too-many-statements
         if not isinstance(config.model, VQAModelConfig):
             raise TypeError(
                 f"Expected model config of type \
@@ -197,10 +207,12 @@ class RunnerFactory:
                 input_dim=config.model.question.embedding.dim,
                 out_channels=config.model.reasoning.hidden_dim,
             )
+        elif isinstance(config.model.question.module, IdentityModelConfig):
+            question_module = IdentityQuestionModule()
         else:
             raise NotImplementedError()
 
-        # Create scene gcn
+        # Create scene graph module
         if isinstance(config.model.scene_graph.module, LSTMModelConfig):
             input_dim = config.model.scene_graph.embedding.dim
             if (
@@ -215,6 +227,8 @@ class RunnerFactory:
                 config.model.scene_graph.module, config.model.scene_graph.embedding.dim
             )
             scene_graph_module = GCNSceneGraphModule(gcn)
+        elif isinstance(config.model.scene_graph.module, IdentityModelConfig):
+            scene_graph_module = IdentitySceneGraphModule()
         else:
             raise NotImplementedError()
 
@@ -222,6 +236,10 @@ class RunnerFactory:
         if isinstance(config.model.question.module, LSTMModelConfig):
             question_dim = config.model.question.module.hidden_dim
         elif isinstance(config.model.question.module, GCNModelConfig):
+            question_dim = config.model.question.module.dim
+        elif isinstance(config.model.question.module, TextCNNModelConfig):
+            question_dim = config.model.reasoning.hidden_dim
+        elif isinstance(config.model.question.module, IdentityModelConfig):
             question_dim = config.model.question.embedding.dim
         else:
             raise NotImplementedError()
@@ -229,6 +247,8 @@ class RunnerFactory:
             scene_graph_dim = config.model.scene_graph.module.hidden_dim
         elif isinstance(config.model.scene_graph.module, GCNModelConfig):
             scene_graph_dim = config.model.scene_graph.module.dim
+        elif isinstance(config.model.scene_graph.module, IdentityModelConfig):
+            scene_graph_dim = config.model.scene_graph.embedding.dim
         else:
             raise NotImplementedError()
         if isinstance(config.model.reasoning, MACModelConfig):

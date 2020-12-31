@@ -54,9 +54,7 @@
         "average_mwt": true
       },
       "module": {
-        "name": "lstm",
-        "hidden_dim": 256,
-        "bidirectional": true
+        "name": "identity"
       }
     },
     "scene_graph": {

@@ -54,9 +54,13 @@
         "average_mwt": true
       },
       "module": {
-        "name": "lstm",
-        "hidden_dim": 256,
-        "bidirectional": true
+        "name": "gcn",
+        "conv": "gat",
+        "layers": 3,
+        "dim": 256,
+        "pooling": "global_mean",
+        "heads": 4,
+        "concat": true
       }
     },
     "scene_graph": {

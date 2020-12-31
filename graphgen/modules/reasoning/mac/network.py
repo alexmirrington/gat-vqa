@@ -119,10 +119,10 @@ class MACCell(nn.Module):  # type: ignore  # pylint: disable=abstract-method  # 
         words, question, img = inputs
         controls, memories = state
 
-        control = self.control(words, question, controls)
+        control, _ = self.control(words, question, controls)
         controls.append(control)
 
-        read = self.read(memories, img, controls, masks)
+        read, _ = self.read(memories, img, controls, masks)
         # if config.writeDropout < 1.0:     dropouts["write"]
         memory = self.write(memories, read, controls)
         memories.append(memory)

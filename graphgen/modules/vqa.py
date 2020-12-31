@@ -9,7 +9,7 @@ from .reasoning import AbstractReasoningModule
 from .scene import AbstractSceneGraphModule
 
 
-class VQA(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method  # noqa: B905
+class VQA(torch.nn.Module):  # type: ignore  # pylint: disable=abstract-method  # noqa: B950
     """Network that uses multiple GCN/BiLSTM inputs for its question and \
     knowledge-base representations, and a reasoning module for predictions."""
 

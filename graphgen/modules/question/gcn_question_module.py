@@ -39,7 +39,7 @@ class GCNQuestionModule(torch.nn.Module):  # type: ignore  # pylint: disable=abs
         # TODO verify if this is necessary: pack and pad again for MAC compatibility
         packed_word_feats = torch.nn.utils.rnn.pack_padded_sequence(
             dense_word_feats,
-            question_lengths,
+            question_lengths.cpu(),
             batch_first=True,
             enforce_sorted=False,
         )

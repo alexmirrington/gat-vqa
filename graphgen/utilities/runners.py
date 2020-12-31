@@ -1,4 +1,5 @@
 """Various train/val/test loops for running different types of models."""
+import json
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -18,11 +19,13 @@ from ..config import Config
 from ..datasets.collators import VariableSizeTensorCollator
 from ..datasets.utilities.chunked_random_sampler import ChunkedRandomSampler
 from ..metrics import Metric, MetricCollection
+from ..modules.reasoning.mac.control import ControlUnit
+from ..modules.reasoning.mac.read import ReadUnit
 from ..schemas.common import BoundingBox
 from ..utilities.preprocessing import DatasetCollection, PreprocessorCollection
-from .hooks import GATConvAttentionHook
+from .hooks import ControlUnitAttentionHook, GATConvAttentionHook, ReadUnitAttentionHook
 from .logging import log_metrics_stdout
-from .visualisation import SparseGraphVisualiser, plot_image
+from .visualisation import SparseGraphVisualiser, plot_image, wandb_image
 
 
 @dataclass
@@ -74,7 +77,10 @@ class Runner(ABC):
 
     @abstractmethod
     def visualise(self, count: int = 1) -> Dict[str, Any]:
-        """Visualise samples from the validation set."""
+        """Visualise samples from the test set."""
+
+    def predict(self) -> None:
+        """Get model predictions for train, val and test datasets."""
 
     def save(self, epoch: int, name: str) -> None:
         """Save a model's state dict to file."""
@@ -323,35 +329,46 @@ class VQAModelRunner(Runner):
         return results
 
     def visualise(
-        self, sample_limit: int = 1, row_limit: int = 10000
+        self, sample_limit: int = 8, row_limit: int = 10000
     ) -> Dict[str, Any]:
         """Visualise a fixed number of samples to view the model's reasoning."""
         # Determine dataset bounds
-        start = int(self.config.training.data.val.subset[0] * len(self.datasets.val))
-        end = int(self.config.training.data.val.subset[1] * len(self.datasets.val))
-        end = min(sample_limit, end)
+        start = int(self.config.training.data.test.subset[0] * len(self.datasets.test))
+        end = int(self.config.training.data.test.subset[1] * len(self.datasets.test))
+        end = min(start + sample_limit, end)
 
         # Prepare for evaluation
         self.model.eval()
 
-        visualisations: Dict[str, Any] = {"images": []}
+        visualisations: Dict[str, Any] = {"vis/images": []}
         handles = []
 
         # Gather attention maps with forward hooks
         gat_hooks = {}
+        read_hooks = {}
+        control_hooks = {}
         for name, module in self.model.named_modules():
             if isinstance(module, GATConv):
                 gat_hooks[name] = GATConvAttentionHook()
                 handle = module.register_forward_hook(gat_hooks[name])
                 handles.append(handle)
+            elif isinstance(module, ReadUnit):
+                read_hooks[name] = ReadUnitAttentionHook()
+                handle = module.register_forward_hook(read_hooks[name])
+                handles.append(handle)
+            elif isinstance(module, ControlUnit):
+                control_hooks[name] = ControlUnitAttentionHook()
+                handle = module.register_forward_hook(control_hooks[name])
+                handles.append(handle)
 
         dataloader = DataLoader(
-            torch.utils.data.Subset(self.datasets.val, range(start, end)),
+            torch.utils.data.Subset(self.datasets.test, range(start, end)),
             batch_size=1,
             num_workers=0,
             collate_fn=VariableSizeTensorCollator(),
         )
         gat_graph_visualiser = SparseGraphVisualiser()
+        read_unit_graph_visualiser = SparseGraphVisualiser()
         with torch.no_grad():
             for idx, sample in enumerate(dataloader):
                 # Load data
@@ -395,24 +412,26 @@ class VQAModelRunner(Runner):
 
                 # Add images with labeled ground truth bounding boxes
 
-                visualisations["images"].append(
-                    plot_image(
-                        image,
-                        caption=image_id,
-                        boxes=boxes,
-                    )
-                )
+                # visualisations["vis/images"].append(
+                #     plot_image(
+                #         image,
+                #         caption=image_id,
+                #         boxes=boxes,
+                #     )
+                # )
 
                 # wandb bounding boxes are bugged:
                 # https://github.com/wandb/client/issues/1348
-                # visualisations["images"].append(wandb_image(
-                #     image,
-                #     caption=image_id,
-                #     boxes=boxes,
-                #     object_to_index=self.preprocessors.scene_graphs.object_to_index,
-                # ))
+                visualisations["vis/images"].append(
+                    wandb_image(
+                        image,
+                        caption=image_id,
+                        boxes=boxes,
+                        object_to_index=self.preprocessors.scene_graphs.object_to_index,
+                    )
+                )
 
-                # Add scene graoh nodes and edges to a table
+                # Scene graph GAT attention
                 node_labels = labels + relations + unique_attributes
                 node_types = (
                     ["object"] * len(labels)
@@ -428,18 +447,43 @@ class VQAModelRunner(Runner):
                             assert torch.allclose(indices, edge_index)
                         edge_index = indices
                         values[name] = attn_weights
+                        hook.reset()
                 try:
                     gat_graph_visualiser.add_graph(
-                        node_labels, node_types, edge_index, values
+                        node_labels, node_types, edge_index, edge_values=values
                     )
                 except ValueError:
                     break
 
-        visualisations["scene_graph_nodes"] = wandb.Table(
+                # Scene graph read unit attention
+                values = {}
+                for name, hook in read_hooks.items():
+                    if hook.result is not None:
+                        attn_weights = hook.result
+                        # Stack cell attentions
+                        attn_weights = torch.stack(attn_weights, dim=-1)
+                        # Remove first batch_size dimension
+                        values[name] = attn_weights.squeeze()
+                        hook.reset()
+                try:
+                    read_unit_graph_visualiser.add_graph(
+                        node_labels, node_types, edge_index, node_values=values
+                    )
+                except ValueError:
+                    break
+
+        visualisations["vis/gat_nodes"] = wandb.Table(
             dataframe=pd.DataFrame(gat_graph_visualiser.node_data)
         )
-        visualisations["scene_graph_edges"] = wandb.Table(
+        visualisations["vis/gat_edges"] = wandb.Table(
             dataframe=pd.DataFrame(gat_graph_visualiser.edge_data)
+        )
+
+        visualisations["vis/read_unit_nodes"] = wandb.Table(
+            dataframe=pd.DataFrame(read_unit_graph_visualiser.node_data)
+        )
+        visualisations["vis/read_unit_edges"] = wandb.Table(
+            dataframe=pd.DataFrame(read_unit_graph_visualiser.edge_data)
         )
 
         # Remove forward hooks
@@ -450,3 +494,64 @@ class VQAModelRunner(Runner):
         self.model.train()
 
         return visualisations
+
+    def predict(self) -> None:
+        """Get model predictions for train, val and test datasets."""
+        # pylint: disable=too-many-locals
+        split_map = {
+            "train": (self.config.prediction.data.train, self.datasets.train),
+            "val": (self.config.prediction.data.val, self.datasets.val),
+            # "test": (self.config.prediction.data.test, self.datasets.test),
+        }
+
+        # Prepare for prediction
+        self.model.to(self.device)
+        self.model.eval()
+        root = Path(wandb.run.dir) / "predictions"
+        if not root.exists():
+            root.mkdir(parents=True)
+
+        for split, (config, dataset) in split_map.items():
+            start = int(config.subset[0] * len(dataset))
+            end = int(config.subset[1] * len(dataset))
+            print(f"split: {split}, start: {start}, end: {end}")
+            dataloader = DataLoader(
+                torch.utils.data.Subset(dataset, range(start, end)),
+                batch_size=self.config.prediction.dataloader.batch_size,
+                num_workers=self.config.prediction.dataloader.workers,
+                collate_fn=VariableSizeTensorCollator(),
+            )
+
+            # Predict
+            all_preds = []
+            with torch.no_grad():
+                for batch, sample in enumerate(dataloader):
+                    # Move data to GPU
+                    dependencies = sample["question"]["dependencies"].to(self.device)
+                    graph = sample["scene_graph"]["graph"].to(self.device)
+                    qids = sample["question"]["questionId"]
+
+                    # Get predictions
+                    preds = F.log_softmax(
+                        self.model(question_graph=dependencies, scene_graph=graph),
+                        dim=1,
+                    )
+                    preds = np.argmax(preds.detach().cpu().numpy(), axis=1)
+
+                    # Convert predictions to strings
+                    i2a = self.preprocessors.questions.index_to_answer
+                    preds = np.array([i2a[p] for p in preds])
+                    all_preds += [
+                        {"questionId": qid, "prediction": pred}
+                        for qid, pred in zip(qids, preds)
+                    ]
+                    print(f"pred: {batch + 1}/{len(dataloader)}", end="\r")
+
+            path = root / f"{split}_predictions.json"
+            with open(path, "w") as file:
+                json.dump(all_preds, file)
+
+            wandb.save(str(root / "*"), wandb.run.dir)
+
+        # Reset model to train and reset criterion reduction ready for training
+        self.model.train()
