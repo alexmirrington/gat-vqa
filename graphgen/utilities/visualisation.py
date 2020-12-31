@@ -36,31 +36,6 @@ def plot_image(
     return wandb.Image(img, caption=caption)
 
 
-def wandb_heatmap(matrix: Tensor):
-    """Plot a heatmap to wandb."""
-    matrix = matrix.detach().cpu().numpy()
-    y, x = np.meshgrid(np.arange(matrix.shape[0]), np.arange(matrix.shape[1]))
-    x = list(x.T.flatten())
-    y = list(y.T.flatten())
-    values = list(matrix.flatten())
-    # Assert matrix reshapes match up
-    for row in range(matrix.shape[0]):
-        for col in range(matrix.shape[1]):
-            assert (
-                abs(
-                    float(values[row * matrix.shape[1] + col]) - float(matrix[row][col])
-                )
-                < 1e-4
-            )
-            assert col == int(x[row * matrix.shape[1] + col])
-            assert row == int(y[row * matrix.shape[1] + col])
-    table = wandb.Table(
-        data=[list(row) for row in zip(x, y, values)],
-        columns=["x", "y", "value"],
-    )
-    return table
-
-
 def wandb_image(
     image: Tensor,
     caption: Optional[str] = None,
@@ -221,5 +196,55 @@ class SparseGraphVisualiser:
                 self.node_data[key] += [None] * (
                     len(self.node_data["sample"]) - len(self.node_data[key])
                 )
+
+        self.__index += 1
+
+
+class AttentionMapVisualiser:
+
+    def __init__(self):
+        self.heatmap_data: Dict[str, List] = {
+            "sample": [],
+            "values": [],
+            "x": [],
+            "y": [],
+            "x_label": [],
+            "y_label": [],
+        }
+        self.__index = 0
+
+    def add_attention_map(
+        self,
+        matrix: Tensor,
+        x_labels: List[str],
+        y_labels: List[str]
+    ):
+        matrix = matrix.detach().cpu().numpy()
+        y, x = np.meshgrid(np.arange(matrix.shape[0]), np.arange(matrix.shape[1]))
+        x = list(x.T.flatten())
+        y = list(y.T.flatten())
+        values = list(matrix.flatten())
+        # Assert matrix reshapes match up
+        for row in range(matrix.shape[0]):
+            for col in range(matrix.shape[1]):
+                assert (
+                    abs(
+                        float(values[row * matrix.shape[1] + col]) - float(matrix[row][col])
+                    )
+                    < 1e-4
+                )
+                assert col == int(x[row * matrix.shape[1] + col])
+                assert row == int(y[row * matrix.shape[1] + col])
+        table = wandb.Table(
+            data=[[x_, y_, x_labels[x_], y_labels[y_], v] for x_, y_, v in zip(x, y, values)],
+            columns=["x", "y", "x_label", "y_label", "value"],
+        )
+
+        self.heatmap_data["sample"] += [self.__index] * len(values)
+        self.heatmap_data["x"] += x
+        self.heatmap_data["y"] += y
+        self.heatmap_data["values"] += values
+        self.heatmap_data["x_label"] += [x_labels[x_] for x_ in x]
+        self.heatmap_data["y_label"] += [y_labels[y_] for y_ in y]
 
         self.__index += 1

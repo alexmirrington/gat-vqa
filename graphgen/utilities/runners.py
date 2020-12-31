@@ -25,7 +25,7 @@ from ..schemas.common import BoundingBox
 from ..utilities.preprocessing import DatasetCollection, PreprocessorCollection
 from .hooks import ControlUnitAttentionHook, GATConvAttentionHook, ReadUnitAttentionHook
 from .logging import log_metrics_stdout
-from .visualisation import SparseGraphVisualiser, plot_image, wandb_image
+from .visualisation import SparseGraphVisualiser, AttentionMapVisualiser, plot_image, wandb_image
 
 
 @dataclass
@@ -340,7 +340,11 @@ class VQAModelRunner(Runner):
         # Prepare for evaluation
         self.model.eval()
 
-        visualisations: Dict[str, Any] = {"vis/images": []}
+        visualisations: Dict[str, Any] = {
+            "vis/images": [],
+            "vis/boxes": [],
+            "vis/questions": wandb.Table(columns=["Question ID", "Image ID", "Question", "Predicted Answer", "True Answer"])
+        }
         handles = []
 
         # Gather attention maps with forward hooks
@@ -369,6 +373,7 @@ class VQAModelRunner(Runner):
         )
         gat_graph_visualiser = SparseGraphVisualiser()
         read_unit_graph_visualiser = SparseGraphVisualiser()
+        control_unit_attn_visualiser = AttentionMapVisualiser()
         with torch.no_grad():
             for idx, sample in enumerate(dataloader):
                 # Load data
@@ -378,6 +383,9 @@ class VQAModelRunner(Runner):
                 image = self.datasets.images[
                     self.datasets.images.key_to_index(image_id)
                 ]
+                question_id = sample["question"]["questionId"][0]
+                question_tokens = sample["question"]["tokens"][0]
+                answer = sample["question"]["answer"][0]
                 boxes = {
                     "ground_truth": [
                         BoundingBox(box[0], box[1], box[2], box[3], label=lbl)
@@ -407,18 +415,28 @@ class VQAModelRunner(Runner):
                     if attr not in unique_attributes:
                         unique_attributes.append(attr)
 
-                # Propagate data forward
-                self.model(question_graph=dependencies, scene_graph=graph)
+                # Get predictions
+                preds = F.log_softmax(
+                    self.model(question_graph=dependencies, scene_graph=graph),
+                    dim=1,
+                )
+                preds = np.argmax(preds.detach().cpu().numpy(), axis=1)
+                visualisations["vis/questions"].add_data(
+                    question_id,
+                    image_id,
+                    " ".join([self.preprocessors.questions.index_to_word[t] for t in list(question_tokens)]),
+                    self.preprocessors.questions.index_to_answer[preds[0]],
+                    self.preprocessors.questions.index_to_answer[answer]
+                )
 
                 # Add images with labeled ground truth bounding boxes
-
-                # visualisations["vis/images"].append(
-                #     plot_image(
-                #         image,
-                #         caption=image_id,
-                #         boxes=boxes,
-                #     )
-                # )
+                visualisations["vis/boxes"].append(
+                    plot_image(
+                        image,
+                        caption=image_id,
+                        boxes=boxes,
+                    )
+                )
 
                 # wandb bounding boxes are bugged:
                 # https://github.com/wandb/client/issues/1348
@@ -471,6 +489,26 @@ class VQAModelRunner(Runner):
                     )
                 except ValueError:
                     break
+
+                # Scene graph control unit attention
+                values = {}
+                for name, hook in control_hooks.items():
+                    # THIS ASSUMES ONLY ONE CONTROL MODULE
+                    if hook.result is not None:
+                        attn_weights = hook.result
+                        # Stack cell attentions
+                        attn_weights = torch.stack(attn_weights, dim=-1)
+                        attn_weights = attn_weights.squeeze()
+                        control_unit_attn_visualiser.add_attention_map(
+                            attn_weights,
+                            list(range(attn_weights.size(0))),
+                            [self.preprocessors.questions.index_to_word[t] for t in list(question_tokens)]
+                        )
+                        hook.reset()
+
+        visualisations["vis/control_unit_attention"] = wandb.Table(
+            dataframe=pd.DataFrame(control_unit_attn_visualiser.heatmap_data)
+        )
 
         visualisations["vis/gat_nodes"] = wandb.Table(
             dataframe=pd.DataFrame(gat_graph_visualiser.node_data)
