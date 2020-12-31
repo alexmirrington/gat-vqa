@@ -329,13 +329,12 @@ class VQAModelRunner(Runner):
         return results
 
     def visualise(
-        self, sample_limit: int = 8, row_limit: int = 10000
+        self, sample_limit: int = 8, row_limit: int = 10000, skip_correct: bool = False
     ) -> Dict[str, Any]:
         """Visualise a fixed number of samples to view the model's reasoning."""
         # Determine dataset bounds
         start = int(self.config.training.data.test.subset[0] * len(self.datasets.test))
         end = int(self.config.training.data.test.subset[1] * len(self.datasets.test))
-        end = min(start + sample_limit, end)
 
         # Prepare for evaluation
         self.model.eval()
@@ -374,6 +373,7 @@ class VQAModelRunner(Runner):
         gat_graph_visualiser = SparseGraphVisualiser()
         read_unit_graph_visualiser = SparseGraphVisualiser()
         control_unit_attn_visualiser = AttentionMapVisualiser()
+        collected = 0
         with torch.no_grad():
             for idx, sample in enumerate(dataloader):
                 # Load data
@@ -421,6 +421,8 @@ class VQAModelRunner(Runner):
                     dim=1,
                 )
                 preds = np.argmax(preds.detach().cpu().numpy(), axis=1)
+                if preds[0] == answer and skip_correct:
+                    continue
                 visualisations["vis/questions"].add_data(
                     question_id,
                     image_id,
@@ -505,6 +507,9 @@ class VQAModelRunner(Runner):
                             [self.preprocessors.questions.index_to_word[t] for t in list(question_tokens)]
                         )
                         hook.reset()
+                collected += 1
+                if collected == sample_limit:
+                    break
 
         visualisations["vis/control_unit_attention"] = wandb.Table(
             dataframe=pd.DataFrame(control_unit_attn_visualiser.heatmap_data)
