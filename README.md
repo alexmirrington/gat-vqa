@@ -1,4 +1,4 @@
-# Graphgen
+# Graph Attention Networks for Compositional Visual Question Answering
 
 <p align="center">
   <a href="https://github.com/alexmirrington/graphgen/actions?query=branch%3Adevelop+workflow%3Atests">
@@ -10,9 +10,6 @@
 </p>
 
 ----------------------
-
-Generate graph representations of images and text for downstream multimodal
-tasks like VQA.
 
 ## Getting started
 
