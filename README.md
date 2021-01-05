@@ -1,8 +1,8 @@
 # Graph Attention Networks for Compositional Visual Question Answering
 
 <p align="center">
-  <a href="https://github.com/alexmirrington/graphgen/actions?query=branch%3Adevelop+workflow%3Atests">
-    <img src="https://github.com/alexmirrington/graphgen/workflows/tests/badge.svg" alt="Tests status" />
+  <a href="https://github.com/alexmirrington/gat-vqa/actions?query=branch%3Adevelop+workflow%3Atests">
+    <img src="https://github.com/alexmirrington/gat-vqa/workflows/tests/badge.svg" alt="Tests status" />
   </a>
   <a href="https://github.com/psf/black">
     <img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Code style: black" />
