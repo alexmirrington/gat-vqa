@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from graphgen.datasets.utilities import ChunkedJSONDataset
+from gat_vqa.datasets.utilities import ChunkedJSONDataset
 
 from .conftest import ChunkedDataConfig
 

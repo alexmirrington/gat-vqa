@@ -5,7 +5,7 @@ import pytest
 import torch
 from torch import Tensor
 
-from graphgen.datasets.utilities import ImageFolderDataset
+from gat_vqa.datasets.utilities import ImageFolderDataset
 
 
 def test_imagefolder_nonexistent_root(tmp_path: Path) -> None:

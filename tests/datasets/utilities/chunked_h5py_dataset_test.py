@@ -5,7 +5,7 @@ import h5py
 import numpy as np
 import pytest
 
-from graphgen.datasets.utilities import ChunkedHDF5Dataset
+from gat_vqa.datasets.utilities import ChunkedHDF5Dataset
 
 from .conftest import ChunkedDataConfig
 

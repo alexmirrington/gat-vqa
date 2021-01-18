@@ -4,7 +4,7 @@ from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 
 import pytest
 
-from graphgen.utilities.serialisation import path_deserializer, path_serializer
+from gat_vqa.utilities.serialisation import path_deserializer, path_serializer
 
 
 @pytest.fixture(scope="module", name="jsons")

@@ -4,9 +4,9 @@ from typing import Any, Dict
 
 import pytest
 
-from graphgen.config.gqa import GQAFilemap, GQASplit
-from graphgen.datasets.gqa.scene_graphs import GQASceneGraphs
-from graphgen.schemas.gqa import GQASceneGraph
+from gat_vqa.config.gqa import GQAFilemap, GQASplit
+from gat_vqa.datasets.gqa.scene_graphs import GQASceneGraphs
+from gat_vqa.schemas.gqa import GQASceneGraph
 
 
 def test_scene_graphs_nonexistent_root(tmp_path: Path) -> None:

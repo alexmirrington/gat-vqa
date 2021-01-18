@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from graphgen.config.gqa import GQAFilemap
-from graphgen.datasets.gqa.images import GQAImages
+from gat_vqa.config.gqa import GQAFilemap
+from gat_vqa.datasets.gqa.images import GQAImages
 
 
 def test_images_nonexistent_root(tmp_path: Path) -> None:
