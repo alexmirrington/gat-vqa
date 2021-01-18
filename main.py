@@ -13,14 +13,14 @@ import torch
 import wandb
 from termcolor import colored
 
-from graphgen.config import Config
-from graphgen.utilities.factories import (
+from gat_vqa.config import Config
+from gat_vqa.utilities.factories import (
     DatasetFactory,
     PreprocessingFactory,
     RunnerFactory,
 )
-from graphgen.utilities.runners import ResumeInfo
-from graphgen.utilities.serialisation import path_deserializer, path_serializer
+from gat_vqa.utilities.runners import ResumeInfo
+from gat_vqa.utilities.serialisation import path_deserializer, path_serializer
 
 
 class JobType(Enum):
@@ -272,7 +272,7 @@ if __name__ == "__main__":
     if not Path(".wandb").exists():
         Path(".wandb").mkdir()
     wandb.init(
-        project="graphgen",
+        project="gat-vqa",
         dir=".wandb",
         job_type=parsed_args.job.value,
         config=jsons.dump(config_obj),

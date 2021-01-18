@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from graphgen.config.gqa import GQAFilemap, GQASplit, GQAVersion
+from gat_vqa.config.gqa import GQAFilemap, GQASplit, GQAVersion
 
 _QUESTIONS_FULL: Dict[str, Any] = {
     "0": {

@@ -4,9 +4,9 @@ from typing import Any, Dict
 
 import pytest
 
-from graphgen.config.gqa import GQAFilemap, GQASplit, GQAVersion
-from graphgen.datasets.gqa.questions import GQAQuestions
-from graphgen.schemas.gqa import GQAQuestion
+from gat_vqa.config.gqa import GQAFilemap, GQASplit, GQAVersion
+from gat_vqa.datasets.gqa.questions import GQAQuestions
+from gat_vqa.schemas.gqa import GQAQuestion
 
 _SPLIT_VERSION_GRID = [(split, version) for split in GQASplit for version in GQAVersion]
 

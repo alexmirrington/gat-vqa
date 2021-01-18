@@ -4,13 +4,13 @@ from pathlib import Path
 import pytest
 from torch import Tensor
 
-from graphgen.config.gqa import GQAFilemap, GQASplit, GQAVersion
-from graphgen.datasets.gqa import GQA
-from graphgen.datasets.gqa.images import GQAImages
-from graphgen.datasets.gqa.objects import GQAObjects
-from graphgen.datasets.gqa.questions import GQAQuestions
-from graphgen.datasets.gqa.scene_graphs import GQASceneGraphs
-from graphgen.datasets.gqa.spatial import GQASpatial
+from gat_vqa.config.gqa import GQAFilemap, GQASplit, GQAVersion
+from gat_vqa.datasets.gqa import GQA
+from gat_vqa.datasets.gqa.images import GQAImages
+from gat_vqa.datasets.gqa.objects import GQAObjects
+from gat_vqa.datasets.gqa.questions import GQAQuestions
+from gat_vqa.datasets.gqa.scene_graphs import GQASceneGraphs
+from gat_vqa.datasets.gqa.spatial import GQASpatial
 
 _SPLIT_VERSION_GRID = [(split, version) for split in GQASplit for version in GQAVersion]
 

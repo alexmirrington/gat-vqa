@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 from torch import Tensor
 
-from graphgen.config.gqa import GQAFilemap
-from graphgen.datasets.gqa.objects import GQAObjects
+from gat_vqa.config.gqa import GQAFilemap
+from gat_vqa.datasets.gqa.objects import GQAObjects
 
 
 def test_objects_nonexistent_root(tmp_path: Path) -> None:
