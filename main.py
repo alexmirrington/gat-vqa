@@ -272,7 +272,7 @@ if __name__ == "__main__":
     if not Path(".wandb").exists():
         Path(".wandb").mkdir()
     wandb.init(
-        project="graphgen",
+        project="gat-vqa",
         dir=".wandb",
         job_type=parsed_args.job.value,
         config=jsons.dump(config_obj),
