@@ -415,6 +415,9 @@ class VQAModelRunner(Runner):
                     if attr not in unique_attributes:
                         unique_attributes.append(attr)
 
+                # qwords = [self.preprocessors.questions.index_to_word[t] for t in list(question_tokens)]
+                # if not ("same" in qwords or "different" in qwords):
+                #     continue
                 # Get predictions
                 preds = F.log_softmax(
                     self.model(question_graph=dependencies, scene_graph=graph),
@@ -422,6 +425,12 @@ class VQAModelRunner(Runner):
                 )
                 preds = np.argmax(preds.detach().cpu().numpy(), axis=1)
                 if preds[0] == answer and skip_correct:
+                    for hook in gat_hooks.values():
+                        hook.reset()
+                    for hook in read_hooks.values():
+                        hook.reset()
+                    for hook in control_hooks.values():
+                        hook.reset()
                     continue
                 visualisations["vis/questions"].add_data(
                     question_id,
@@ -461,10 +470,10 @@ class VQAModelRunner(Runner):
                 edge_index = None
                 values = {}
                 for name, hook in gat_hooks.items():
+                    if "question" in name.lower():
+                        continue
                     if hook.result is not None:
                         indices, attn_weights = hook.result
-                        if edge_index is not None:
-                            assert torch.allclose(indices, edge_index)
                         edge_index = indices
                         values[name] = attn_weights
                         hook.reset()
