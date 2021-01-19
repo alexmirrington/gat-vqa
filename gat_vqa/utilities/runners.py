@@ -304,7 +304,7 @@ class VQAModelRunner(Runner):
         split_map = {
             "train": (self.config.prediction.data.train, self.datasets.train),
             "val": (self.config.prediction.data.val, self.datasets.val),
-            # "test": (self.config.prediction.data.test, self.datasets.test),
+            "test": (self.config.prediction.data.test, self.datasets.test),
         }
 
         # Prepare for prediction

@@ -113,23 +113,23 @@ def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) 
     print(f"val: {len(datasets.val)}")
     print(f"test: {len(datasets.test)}")
 
-    print(colored("saving question ids:", attrs=["bold"]))
-    split_map = {
-        "train": (config.training.data.train, datasets.train),
-        "val": (config.training.data.val, datasets.val),
-        "test": (config.training.data.test, datasets.test),
-    }
-    for split, (dataconfig, dataset) in split_map.items():
-        root = Path(wandb.run.dir) / "predictions"
-        if not root.exists():
-            root.mkdir(parents=True)
-        path = root / f"{split}_ids.json"
-        start = int(dataconfig.subset[0] * len(dataset))
-        end = int(dataconfig.subset[1] * len(dataset))
-        subset = torch.utils.data.Subset(dataset, range(start, end))
-        ids = [subset[i]["question"]["questionId"] for i in range(len(subset))]
-        with open(path, "w") as file:
-            json.dump(ids, file)
+    # print(colored("saving question ids:", attrs=["bold"]))
+    # split_map = {
+    #     "train": (config.training.data.train, datasets.train),
+    #     "val": (config.training.data.val, datasets.val),
+    #     "test": (config.training.data.test, datasets.test),
+    # }
+    # for split, (dataconfig, dataset) in split_map.items():
+    #     root = Path(wandb.run.dir) / "predictions"
+    #     if not root.exists():
+    #         root.mkdir(parents=True)
+    #     path = root / f"{split}_ids.json"
+    #     start = int(dataconfig.subset[0] * len(dataset))
+    #     end = int(dataconfig.subset[1] * len(dataset))
+    #     subset = torch.utils.data.Subset(dataset, range(start, end))
+    #     ids = [subset[i]["question"]["questionId"] for i in range(len(subset))]
+    #     with open(path, "w") as file:
+    #         json.dump(ids, file)
 
     # Create model runner
     print(colored("model:", attrs=["bold"]))
@@ -156,6 +156,26 @@ def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) 
                         len(pred_preprocessors.questions.index_to_word)
                         - runner.model.question_embeddings.num_embeddings,
                         runner.model.question_embeddings.embedding_dim,
+                    )
+                ).to(device),
+            ),
+            dim=0,
+        )
+    )
+    runner.model.scene_graph_embeddings = torch.nn.Embedding.from_pretrained(
+        torch.cat(
+            (
+                runner.model.scene_graph_embeddings.weight.data,
+                torch.zeros(  # TODO GloVe?
+                    (
+                        len(pred_preprocessors.scene_graphs.object_to_index)
+                        + len(pred_preprocessors.scene_graphs.attr_to_index)
+                        + len(pred_preprocessors.scene_graphs.rel_to_index)
+                        + len(pred_preprocessors.scene_graphs.oov_object_to_index)
+                        + len(pred_preprocessors.scene_graphs.oov_attr_to_index)
+                        + len(pred_preprocessors.scene_graphs.oov_rel_to_index)
+                        - runner.model.scene_graphs.num_embeddings,
+                        runner.model.scene_graphs.embedding_dim,
                     )
                 ).to(device),
             ),

@@ -73,11 +73,23 @@ class SceneGraphPreprocessor:
         object_to_index: Optional[Dict[str, int]] = None,
         attr_to_index: Optional[Dict[str, int]] = None,
         rel_to_index: Optional[Dict[str, int]] = None,
+        oov_object_to_index: Optional[Dict[str, int]] = None,
+        oov_attr_to_index: Optional[Dict[str, int]] = None,
+        oov_rel_to_index: Optional[Dict[str, int]] = None,
     ) -> None:
         """Create a `SceneGraphPreprocessor` instance."""
         self._object_to_index = object_to_index if object_to_index is not None else {}
         self._attr_to_index = attr_to_index if attr_to_index is not None else {}
         self._rel_to_index = rel_to_index if rel_to_index is not None else {}
+        self._oov_object_to_index = (
+            oov_object_to_index if oov_object_to_index is not None else {}
+        )
+        self._oov_attr_to_index = (
+            oov_attr_to_index if oov_attr_to_index is not None else {}
+        )
+        self._oov_rel_to_index = (
+            oov_rel_to_index if oov_rel_to_index is not None else {}
+        )
 
     @property
     def object_to_index(self) -> Dict[str, int]:
@@ -111,6 +123,39 @@ class SceneGraphPreprocessor:
     def rel_to_index(self, value: Dict[str, int]) -> None:
         """Set the int to str mapping of indices to relations."""
         self._rel_to_index = value
+
+    @property
+    def oov_object_to_index(self) -> Dict[str, int]:
+        """Get the `int` to `str` mapping of indices to object classes, based \
+        on the data that has been processed so far."""
+        return self._oov_object_to_index.copy()
+
+    @oov_object_to_index.setter
+    def oov_object_to_index(self, value: Dict[str, int]) -> None:
+        """Set the int to str mapping of indices to objects."""
+        self._oov_object_to_index = value
+
+    @property
+    def oov_attr_to_index(self) -> Dict[str, int]:
+        """Get the `int` to `str` mapping of indices to attribute classes, based \
+        on the data that has been processed so far."""
+        return self._oov_attr_to_index.copy()
+
+    @oov_attr_to_index.setter
+    def oov_attr_to_index(self, value: Dict[str, int]) -> None:
+        """Set the int to str mapping of indices to attributes."""
+        self._oov_attr_to_index = value
+
+    @property
+    def oov_rel_to_index(self) -> Dict[str, int]:
+        """Get the `int` to `str` mapping of indices to relation classes, based \
+        on the data that has been processed so far."""
+        return self._oov_rel_to_index.copy()
+
+    @oov_rel_to_index.setter
+    def oov_rel_to_index(self, value: Dict[str, int]) -> None:
+        """Set the int to str mapping of indices to relations."""
+        self._oov_rel_to_index = value
 
     def __call__(self, data: Sequence[Any]) -> List[SceneGraph]:
         """Preprocess a scene graph sample."""
@@ -394,6 +439,10 @@ class SceneGraphTransformer:
             feats.append(
                 torch.tensor(relations)  # pylint: disable=not-callable
                 + self.num_objects
+                * (
+                    torch.tensor(relations)  # pylint: disable=not-callable
+                    < self.num_objects + self.num_relations + self.num_attributes
+                )  # Add offset if inside vocabulary
             )
         else:
             feats.append(
@@ -424,8 +473,13 @@ class SceneGraphTransformer:
         if self.embeddings is None:
             feats.append(
                 torch.tensor(list(attr_to_idx.keys()))  # pylint: disable=not-callable
-                + self.num_objects
-                + self.num_relations
+                + (self.num_objects + self.num_relations)
+                * (
+                    torch.tensor(  # pylint: disable=not-callable
+                        list(attr_to_idx.keys())
+                    )
+                    < self.num_objects + self.num_relations + self.num_attributes
+                )  # Add offset if inside vocabulary
             )
         else:
             feats.append(
