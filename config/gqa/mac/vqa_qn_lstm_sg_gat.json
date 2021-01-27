@@ -8,34 +8,21 @@
   "preprocessing": {
     "cache": {
       "root": "./cache",
-      "artifact": "gqa-preprocessed"
+      "artifact": "gqa-preprocessed-questions"
     },
     "pipeline": [{
-      "feature": "scene_graphs",
-      "split": "train"
-    },
-    {
-      "feature": "scene_graphs",
-      "split": "val"
-    },
-    {
       "feature": "questions",
-      "split": "train",
-      "version": "balanced"
-    },
-    {
-      "feature": "questions",
-      "split": "val",
-      "version": "balanced"
-    },
-    {
-      "feature": "questions",
-      "split": "train",
+      "split": "testdev",
       "version": "all"
     },
     {
       "feature": "questions",
-      "split": "val",
+      "split": "test",
+      "version": "all"
+    },
+    {
+      "feature": "questions",
+      "split": "challenge",
       "version": "all"
     }]
   },
@@ -126,18 +113,18 @@
   },
   "prediction": {
     "dataloader": {
-      "batch_size": 16,
+      "batch_size": 1,
       "workers": 1
     },
     "data": {
       "features": [
         {
           "name": "questions",
-          "artifact": "gqa-preprocessed:v11"
+          "artifact": "gqa-sgg-preprocessed:v1"
         },
         {
           "name": "scene_graphs",
-          "artifact": "gqa-preprocessed:v11"
+          "artifact": "gqa-sgg-preprocessed:v1"
         }
       ],
       "train": {
@@ -149,8 +136,8 @@
         "version": "balanced"
       },
       "test": {
-        "split": "val",
-        "version": "balanced"
+        "split": "testdev",
+        "version": "all"
       }
     }
   }

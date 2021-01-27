@@ -12,6 +12,7 @@ import stanza
 import torch
 import wandb
 from termcolor import colored
+from torchtext.vocab import GloVe
 
 from gat_vqa.config import Config
 from gat_vqa.utilities.factories import (
@@ -144,47 +145,93 @@ def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) 
     print(f"val: {len(datasets.val)}")
     print(f"test: {len(datasets.test)}")
 
-    # Extend question embedding dictionary with pad vector for OOV.
-    # The runner will check if a question token index is out of bounds and
-    # set it to the padding index if so.
+    # Extend question embedding dictionary with glove vectors for OOV tokens.
+    glove = GloVe(name="6B", dim=runner.model.question_embeddings.embedding_dim)
+    oov_words = [
+        w
+        for w in pred_preprocessors.questions.index_to_word
+        if w not in preprocessors.questions.index_to_word
+    ]
+    oov_vectors = torch.stack(
+        [
+            torch.mean(
+                glove.get_vecs_by_tokens(word.split(), lower_case_backup=True),
+                dim=0,
+            )
+            for word in oov_words
+        ],
+        dim=0,
+    )
     runner.model.question_embeddings = torch.nn.Embedding.from_pretrained(
         torch.cat(
             (
                 runner.model.question_embeddings.weight.data,
-                torch.zeros(
-                    (
-                        len(pred_preprocessors.questions.index_to_word)
-                        - runner.model.question_embeddings.num_embeddings,
-                        runner.model.question_embeddings.embedding_dim,
-                    )
-                ).to(device),
+                oov_vectors.to(runner.model.scene_graph_embeddings.weight.data.device)
+                # torch.zeros(
+                #     (
+                #         len(pred_preprocessors.questions.index_to_word)
+                #         - runner.model.question_embeddings.num_embeddings,
+                #         runner.model.question_embeddings.embedding_dim,
+                #     )
+                # ).to(runner.model.scene_graph_embeddings.weight.data.device),
             ),
             dim=0,
         )
+    )
+    assert runner.model.question_embeddings.weight.data.size(0) == len(
+        pred_preprocessors.questions.index_to_word
+    )
+    # Extend scene graph embedding dictionary with glove vectors for OOV tokens.
+    glove = GloVe(name="6B", dim=runner.model.scene_graph_embeddings.embedding_dim)
+    oov_objs = [k for k in pred_preprocessors.scene_graphs.oov_object_to_index]
+    oov_attrs = [k for k in pred_preprocessors.scene_graphs.oov_attr_to_index]
+    oov_rels = [k for k in pred_preprocessors.scene_graphs.oov_rel_to_index]
+    oov_vectors = torch.stack(
+        [
+            torch.mean(
+                glove.get_vecs_by_tokens(word.split(), lower_case_backup=True),
+                dim=0,
+            )
+            for word in oov_objs + oov_rels + oov_attrs
+        ],
+        dim=0,
     )
     runner.model.scene_graph_embeddings = torch.nn.Embedding.from_pretrained(
         torch.cat(
             (
                 runner.model.scene_graph_embeddings.weight.data,
-                torch.zeros(  # TODO GloVe?
-                    (
-                        len(pred_preprocessors.scene_graphs.object_to_index)
-                        + len(pred_preprocessors.scene_graphs.attr_to_index)
-                        + len(pred_preprocessors.scene_graphs.rel_to_index)
-                        + len(pred_preprocessors.scene_graphs.oov_object_to_index)
-                        + len(pred_preprocessors.scene_graphs.oov_attr_to_index)
-                        + len(pred_preprocessors.scene_graphs.oov_rel_to_index)
-                        - runner.model.scene_graphs.num_embeddings,
-                        runner.model.scene_graphs.embedding_dim,
-                    )
-                ).to(device),
+                oov_vectors.to(runner.model.scene_graph_embeddings.weight.data.device)
+                # torch.zeros(  # TODO GloVe?
+                #     (
+                #         len(pred_preprocessors.scene_graphs.object_to_index)
+                #         + len(pred_preprocessors.scene_graphs.attr_to_index)
+                #         + len(pred_preprocessors.scene_graphs.rel_to_index)
+                #         + len(pred_preprocessors.scene_graphs.oov_object_to_index)
+                #         + len(pred_preprocessors.scene_graphs.oov_attr_to_index)
+                #         + len(pred_preprocessors.scene_graphs.oov_rel_to_index)
+                #         - runner.model.scene_graph_embeddings.num_embeddings,
+                #         runner.model.scene_graph_embeddings.embedding_dim,
+                #     )
+                # ).to(runner.model.scene_graph_embeddings.weight.data.device),
             ),
             dim=0,
         )
     )
+    assert runner.model.scene_graph_embeddings.weight.data.size(0) == len(
+        pred_preprocessors.scene_graphs.object_to_index
+    ) + len(pred_preprocessors.scene_graphs.attr_to_index) + len(
+        pred_preprocessors.scene_graphs.rel_to_index
+    ) + len(
+        pred_preprocessors.scene_graphs.oov_object_to_index
+    ) + len(
+        pred_preprocessors.scene_graphs.oov_attr_to_index
+    ) + len(
+        pred_preprocessors.scene_graphs.oov_rel_to_index
+    )
     # Update datasets and preprocessors for prediction
     runner.datasets = datasets
     runner.preprocessors = pred_preprocessors
+    print(f"{runner.model=}")
 
     print(colored("predicting:", attrs=["bold"]))
     runner.predict()

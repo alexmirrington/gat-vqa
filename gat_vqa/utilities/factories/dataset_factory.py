@@ -167,37 +167,28 @@ class DatasetFactory:
                 elif feature.name == GQAFeatures.IMAGES.value:
                     images = GQAImages(filemap, transform=None)
                 elif feature.name == GQAFeatures.SCENE_GRAPHS.value:
-                    if GQASplit(subset.split) in (GQASplit.TRAIN, GQASplit.VAL):
-                        scene_graphs = GQASceneGraphs(
-                            filemap,
-                            GQASplit(subset.split),
-                            transform=SceneGraphTransformer(
-                                num_objects=len(
-                                    preprocessors.scene_graphs.object_to_index
-                                ),
-                                num_relations=len(
-                                    preprocessors.scene_graphs.rel_to_index
-                                ),
-                                num_attributes=len(
-                                    preprocessors.scene_graphs.attr_to_index
-                                ),
-                                graph=config.model.scene_graph.graph,
-                                embeddings=RunnerFactory.build_embeddings(
-                                    config.model.scene_graph.embedding,
-                                    list(
-                                        preprocessors.scene_graphs.object_to_index.keys()  # noqa: B950
-                                    )
-                                    + list(
-                                        preprocessors.scene_graphs.rel_to_index.keys()
-                                    )
-                                    + list(
-                                        preprocessors.scene_graphs.attr_to_index.keys()
-                                    ),
-                                )
-                                if not config.model.scene_graph.embedding.trainable
-                                else None,
+                    scene_graphs = GQASceneGraphs(
+                        filemap,
+                        GQASplit(subset.split),
+                        transform=SceneGraphTransformer(
+                            num_objects=len(preprocessors.scene_graphs.object_to_index),
+                            num_relations=len(preprocessors.scene_graphs.rel_to_index),
+                            num_attributes=len(
+                                preprocessors.scene_graphs.attr_to_index
                             ),
-                        )
+                            graph=config.model.scene_graph.graph,
+                            embeddings=RunnerFactory.build_embeddings(
+                                config.model.scene_graph.embedding,
+                                list(
+                                    preprocessors.scene_graphs.object_to_index.keys()  # noqa: B950
+                                )
+                                + list(preprocessors.scene_graphs.rel_to_index.keys())
+                                + list(preprocessors.scene_graphs.attr_to_index.keys()),
+                            )
+                            if not config.model.scene_graph.embedding.trainable
+                            else None,
+                        ),
+                    )
                 elif feature.name == GQAFeatures.SPATIAL.value:
                     spatial = GQASpatial(filemap)
                 elif feature.name == GQAFeatures.OBJECTS.value:

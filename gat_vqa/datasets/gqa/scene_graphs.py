@@ -35,11 +35,6 @@ class GQASceneGraphs(ChunkedJSONDataset):
         if not isinstance(split, GQASplit):
             raise TypeError(f"Parameter {split=} must be of type {GQASplit.__name__}.")
 
-        if split not in (GQASplit.TRAIN, GQASplit.VAL):
-            raise ValueError(
-                f"Parameter {split=} must be one of {(GQASplit.TRAIN, GQASplit.VAL)}."
-            )
-
         # Validate the scene_graphs root file/directory
         root = filemap.scene_graph_path(split)
         if not root.exists():

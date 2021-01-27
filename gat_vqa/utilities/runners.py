@@ -302,8 +302,8 @@ class VQAModelRunner(Runner):
         """Get model predictions for train, val and test datasets."""
         # pylint: disable=too-many-locals
         split_map = {
-            "train": (self.config.prediction.data.train, self.datasets.train),
-            "val": (self.config.prediction.data.val, self.datasets.val),
+            # "train": (self.config.prediction.data.train, self.datasets.train),
+            # "val": (self.config.prediction.data.val, self.datasets.val),
             "test": (self.config.prediction.data.test, self.datasets.test),
         }
 

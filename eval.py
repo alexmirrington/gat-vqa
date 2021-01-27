@@ -552,13 +552,14 @@ for qid, question in tqdm(questions.items()):
         answerType = "open" if question["types"]["structural"] == "query" else "binary"
         scores[answerType].append(score)
 
-        # Update validity score
-        valid = belongs(predicted, choices[qid]["valid"], question)
-        scores["validity"].append(to_score(valid))
+        if len(choices) > 0:
+            # Update validity score
+            valid = belongs(predicted, choices[qid]["valid"], question)
+            scores["validity"].append(to_score(valid))
 
-        # Update plausibility score
-        plausible = belongs(predicted, choices[qid]["plausible"], question)
-        scores["plausibility"].append(to_score(plausible))
+            # Update plausibility score
+            plausible = belongs(predicted, choices[qid]["plausible"], question)
+            scores["plausibility"].append(to_score(plausible))
 
         # Optionally compute grounding (attention) score
         if ATTENTIONS is not None:
