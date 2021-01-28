@@ -12,6 +12,16 @@
     },
     "pipeline": [{
       "feature": "questions",
+      "split": "train",
+      "version": "balanced"
+    },
+    {
+      "feature": "questions",
+      "split": "val",
+      "version": "balanced"
+    },
+    {
+      "feature": "questions",
       "split": "testdev",
       "version": "all"
     },
