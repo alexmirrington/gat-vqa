@@ -130,11 +130,11 @@
       "features": [
         {
           "name": "questions",
-          "artifact": "gqa-sgg-preprocessed:v1"
+          "artifact": "gqa-sgg-preprocessed:v2"
         },
         {
           "name": "scene_graphs",
-          "artifact": "gqa-sgg-preprocessed:v1"
+          "artifact": "gqa-sgg-preprocessed:v2"
         }
       ],
       "train": {
