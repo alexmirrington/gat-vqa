@@ -166,14 +166,14 @@ def predict(config: Config, device: torch.device, resume: Optional[ResumeInfo]) 
         torch.cat(
             (
                 runner.model.question_embeddings.weight.data,
-                oov_vectors.to(runner.model.scene_graph_embeddings.weight.data.device)
+                oov_vectors.to(runner.model.question_embeddings.weight.data.device)
                 # torch.zeros(
                 #     (
                 #         len(pred_preprocessors.questions.index_to_word)
                 #         - runner.model.question_embeddings.num_embeddings,
                 #         runner.model.question_embeddings.embedding_dim,
                 #     )
-                # ).to(runner.model.scene_graph_embeddings.weight.data.device),
+                # ).to(runner.model.question_embeddings.weight.data.device),
             ),
             dim=0,
         )
